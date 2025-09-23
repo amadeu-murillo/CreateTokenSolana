@@ -23,7 +23,7 @@ import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_LAMPORTS } from '@/lib/co
 export async function POST(request: Request) {
   try {
     // 1. Extrair e validar os dados do corpo da requisição
-    const { decimals, supply, wallet } = await request.json();
+    const { decimals, supply, wallet, mintAuthority, freezeAuthority } = await request.json();
 
     if (decimals === undefined || !supply || !wallet) {
       return NextResponse.json({ error: 'Dados incompletos fornecidos (decimais, supply, wallet).' }, { status: 400 });
@@ -69,10 +69,10 @@ export async function POST(request: Request) {
         mintKeypair.publicKey,
         decimals,
         userPublicKey, // Mint Authority (usuário que pode criar novos tokens)
-        userPublicKey, // Freeze Authority (usuário que pode congelar contas de token)
+        freezeAuthority ? userPublicKey : null, // Freeze Authority (usuário que pode congelar contas de token)
         TOKEN_PROGRAM_ID
       ),
-      // Instrução 4: Criar a conta de token associada (ATA) para a carteira do usuário
+      // Instrução 4: Criar la conta de token associada (ATA) para a carteira do usuário
       createAssociatedTokenAccountInstruction(
         userPublicKey,
         associatedTokenAccount,
@@ -85,16 +85,20 @@ export async function POST(request: Request) {
         associatedTokenAccount,
         userPublicKey, // Mint Authority
         BigInt(supply * Math.pow(10, decimals)) // O fornecimento precisa ser em BigInt
-      ),
-      // Instrução 6 (Recomendado): Desabilitar futuras mintagens para um fornecimento fixo.
-      // A autoridade de mint é revogada passando `null` como a nova autoridade.
-      createSetAuthorityInstruction(
-        mintKeypair.publicKey,
-        userPublicKey,
-        AuthorityType.MintTokens,
-        null
       )
     );
+
+    // Instrução 6 (Opcional): Revogar a autoridade de mint se o usuário desejar
+    if (!mintAuthority) {
+        transaction.add(
+            createSetAuthorityInstruction(
+                mintKeypair.publicKey,
+                userPublicKey,
+                AuthorityType.MintTokens,
+                null
+            )
+        );
+    }
 
     // 6. Serializar a transação com assinatura parcial do mint
     // A carteira do usuário no front-end será a primeira a assinar (como pagador).

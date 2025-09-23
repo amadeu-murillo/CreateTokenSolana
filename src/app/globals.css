@@ -5,17 +5,24 @@
   /* Paleta Light (Exemplo, focando no Dark) */
   --background-light: 0 0% 100%;
   --foreground-light: 240 10% 3.9%;
-  /* ...outras variáveis para o modo light */
+  --card-light: 0 0% 98%;
+  --card-foreground-light: 240 10% 3.9%;
+  --border-light: 240 5.9% 90%;
+  --input-light: 240 5.9% 90%;
+  --muted-light: 240 4.8% 95.9%;
+  --muted-foreground-light: 240 3.8% 46.1%;
 
   /* Paleta Dark (Refinada) */
-  --background: 240 10% 3.9%; /* Preto azulado escuro */
-  --foreground: 0 0% 98%; /* Branco suave */
+  --background-dark: 240 10% 3.9%; /* Preto azulado escuro */
+  --foreground-dark: 0 0% 98%; /* Branco suave */
   
-  --card: 240 4% 10%; /* Cinza escuro para cards */
-  --card-foreground: 0 0% 98%;
+  --card-dark: 240 4% 10%; /* Cinza escuro para cards */
+  --card-foreground-dark: 0 0% 98%;
 
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
+  --border-dark: 240 3.7% 15.9%;
+  --input-dark: 240 3.7% 15.9%;
+  --muted-dark: 240 3.7% 15.9%;
+  --muted-foreground-dark: 240 5% 64.9%;
 
   --primary: 260 85% 65%; /* Roxo vibrante */
   --primary-foreground: 0 0% 98%;
@@ -23,22 +30,39 @@
   --secondary: 240 3.7% 15.9%;
   --secondary-foreground: 0 0% 98%;
   
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
   --ring: 260 85% 70%; /* Roxo mais claro para foco */
 
   /* Gradiente Primário Moderno */
   --primary-gradient: linear-gradient(90deg, hsl(260, 85%, 65%), hsl(220, 85%, 60%));
 }
+
+/* Modo Light */
+body {
+  --background: var(--background-light);
+  --foreground: var(--foreground-light);
+  --card: var(--card-light);
+  --card-foreground: var(--card-foreground-light);
+  --border: var(--border-light);
+  --input: var(--input-light);
+  --muted: var(--muted-light);
+  --muted-foreground: var(--muted-foreground-light);
+}
+
+/* Modo Dark */
+body.dark {
+  --background: var(--background-dark);
+  --foreground: var(--foreground-dark);
+  --card: var(--card-dark);
+  --card-foreground: var(--card-foreground-dark);
+  --border: var(--border-dark);
+  --input: var(--input-dark);
+  --muted: var(--muted-dark);
+  --muted-foreground: var(--muted-foreground-dark);
+}
+
 
 * {
   box-sizing: border-box;
@@ -69,6 +93,7 @@ body {
     radial-gradient(circle at 25px 25px, hsla(var(--primary), 0.1) 2%, transparent 0%),
     radial-gradient(circle at 75px 75px, hsla(var(--primary), 0.05) 2%, transparent 0%);
   background-size: 100px 100px;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 a {

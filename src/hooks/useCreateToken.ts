@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Transaction } from "@solana/web3.js";
+import { Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 
 interface TokenData {
@@ -9,7 +9,29 @@ interface TokenData {
   decimals: number;
   supply: number;
   imageUrl: string; 
+  mintAuthority: boolean;
+  freezeAuthority: boolean;
 }
+
+function getFriendlyErrorMessage(error: any): string {
+    const message = error.message || String(error);
+
+    if (message.includes("User rejected the request")) {
+        return "Transação rejeitada pelo usuário na carteira.";
+    }
+    if (message.includes("not enough SOL")) {
+        return "Falha na transação. Verifique se você possui SOL suficiente em sua carteira para cobrir os custos.";
+    }
+    if (message.includes("Transaction simulation failed")) {
+        return "A simulação da transação falhou. Isso pode ser um problema temporário na rede ou um problema com a transação.";
+    }
+     if (message.includes("blockhash")) {
+        return "O blockhash da transação expirou. Por favor, tente novamente.";
+    }
+
+    return message;
+}
+
 
 export const useCreateToken = () => {
   const router = useRouter();
@@ -69,10 +91,10 @@ export const useCreateToken = () => {
 
     } catch (err: any) {
       console.error("Erro no processo de criação do token:", err);
-      const errorMessage = err.message || "Ocorreu um erro desconhecido durante a criação do token.";
-      setError(errorMessage);
+      const friendlyMessage = getFriendlyErrorMessage(err);
+      setError(friendlyMessage);
       // 6. Redirecionar para a página de confirmação com erro
-      router.push(`/confirmation?status=error&error=${encodeURIComponent(errorMessage)}`);
+      router.push(`/confirmation?status=error&error=${encodeURIComponent(friendlyMessage)}`);
       return null;
     } finally {
       setIsLoading(false);

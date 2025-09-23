@@ -1,0 +1,55 @@
+.previewCard {
+    border-style: dashed;
+}
+
+.tokenDisplay {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: hsl(var(--muted) / 0.5);
+    border-radius: var(--radius);
+}
+
+.tokenImage {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid hsl(var(--primary));
+    flex-shrink: 0;
+}
+
+.tokenInfo {
+    flex-grow: 1;
+}
+
+.tokenName {
+    font-weight: 600;
+    font-size: 1.25rem;
+    color: hsl(var(--foreground));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tokenSymbol {
+    font-size: 0.9rem;
+    color: hsl(var(--muted-foreground));
+    text-transform: uppercase;
+}
+
+.tokenSupply {
+    text-align: right;
+}
+
+.supplyValue {
+    font-weight: 600;
+    font-size: 1.25rem;
+    font-family: monospace;
+}
+
+.supplyLabel {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+}
