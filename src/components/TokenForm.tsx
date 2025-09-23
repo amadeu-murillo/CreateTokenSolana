@@ -1,91 +1,113 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useConnection } from "@solana/wallet-adapter-react";
-import { createToken } from "@/lib/token";
+import { useCreateToken } from "@/hooks/useCreateToken";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 export default function TokenForm() {
+  const router = useRouter();
+  const { publicKey } = useWallet();
+  const { createToken, isLoading, error } = useCreateToken();
+
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [decimals, setDecimals] = useState(9);
   const [supply, setSupply] = useState("");
-  const [status, setStatus] = useState("");
-
-  const { connection } = useConnection();
-  const { publicKey, sendTransaction, signTransaction, connected } = useWallet();
+  const [imageUrl, setImageUrl] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!connected) {
-      alert("Conecte sua carteira antes!");
+    if (!publicKey) {
+      alert("Por favor, conecte sua carteira primeiro.");
       return;
     }
 
-    try {
-      setStatus("⏳ Criando token...");
-      const mintAddress = await createToken(
-        connection,
-        { publicKey, signTransaction },
-        decimals,
-        parseInt(supply)
-      );
-      setStatus(`✅ Token criado: ${mintAddress}`);
-    } catch (err: any) {
-      console.error(err);
-      setStatus("❌ Erro: " + err.message);
+    const tokenData = {
+      name,
+      symbol,
+      decimals,
+      supply: Number(supply),
+      imageUrl,
+    };
+    
+    const result = await createToken(tokenData);
+
+    if (result) {
+      router.push(`/confirmation?status=success&tokenAddress=${result.tokenAddress}`);
+    } else {
+      router.push(`/confirmation?status=error&error=${error}`);
     }
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="max-w-md space-y-4 bg-white p-6 rounded-lg shadow"
-    >
-      <input
-        type="text"
-        placeholder="Nome do Token"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="w-full p-2 border rounded"
-        required
-      />
-      <input
-        type="text"
-        placeholder="Símbolo"
-        value={symbol}
-        onChange={(e) => setSymbol(e.target.value)}
-        maxLength={8}
-        className="w-full p-2 border rounded"
-        required
-      />
-      <input
-        type="number"
-        placeholder="Decimais"
-        value={decimals}
-        onChange={(e) => setDecimals(Number(e.target.value))}
-        min={0}
-        max={9}
-        className="w-full p-2 border rounded"
-      />
-      <input
-        type="number"
-        placeholder="Fornecimento Total"
-        value={supply}
-        onChange={(e) => setSupply(e.target.value)}
-        className="w-full p-2 border rounded"
-        required
-      />
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="name">Nome do Token</Label>
+        <Input
+          id="name"
+          type="text"
+          placeholder="Ex: Meu Token"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="symbol">Símbolo</Label>
+        <Input
+          id="symbol"
+          type="text"
+          placeholder="Ex: MEU (máx 8)"
+          value={symbol}
+          onChange={(e) => setSymbol(e.target.value)}
+          maxLength={8}
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="decimals">Decimais</Label>
+        <Input
+          id="decimals"
+          type="number"
+          placeholder="Ex: 9"
+          value={decimals}
+          onChange={(e) => setDecimals(Number(e.target.value))}
+          min={0}
+          max={9}
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="supply">Fornecimento Total</Label>
+        <Input
+          id="supply"
+          type="number"
+          placeholder="Ex: 1000000"
+          value={supply}
+          onChange={(e) => setSupply(e.target.value)}
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="imageUrl">URL da Imagem</Label>
+        <Input
+          id="imageUrl"
+          type="url"
+          placeholder="https://exemplo.com/imagem.png"
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+        />
+      </div>
 
-      <button
-        type="submit"
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-      >
-        Criar Token
-      </button>
+      <Button type="submit" className="w-full" disabled={isLoading || !publicKey}>
+        {isLoading ? "Criando..." : "Criar Token"}
+      </Button>
 
-      {status && <p className="mt-2">{status}</p>}
+      {!publicKey && <p className="text-center text-sm text-yellow-600">Conecte sua carteira para criar um token.</p>}
     </form>
   );
 }
