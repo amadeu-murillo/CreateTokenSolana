@@ -1,18 +1,41 @@
 "use client";
 
 import { useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
+import { createToken } from "@/lib/token";
 
 export default function TokenForm() {
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [decimals, setDecimals] = useState(9);
   const [supply, setSupply] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [status, setStatus] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { connection } = useConnection();
+  const { publicKey, sendTransaction, signTransaction, connected } = useWallet();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log({ name, symbol, decimals, supply, imageUrl });
-    alert("Validação OK - integração Solana vem aqui 🚀");
+
+    if (!connected) {
+      alert("Conecte sua carteira antes!");
+      return;
+    }
+
+    try {
+      setStatus("⏳ Criando token...");
+      const mintAddress = await createToken(
+        connection,
+        { publicKey, signTransaction },
+        decimals,
+        parseInt(supply)
+      );
+      setStatus(`✅ Token criado: ${mintAddress}`);
+    } catch (err: any) {
+      console.error(err);
+      setStatus("❌ Erro: " + err.message);
+    }
   };
 
   return (
@@ -30,7 +53,7 @@ export default function TokenForm() {
       />
       <input
         type="text"
-        placeholder="Símbolo (máx 8)"
+        placeholder="Símbolo"
         value={symbol}
         onChange={(e) => setSymbol(e.target.value)}
         maxLength={8}
@@ -45,7 +68,6 @@ export default function TokenForm() {
         min={0}
         max={9}
         className="w-full p-2 border rounded"
-        required
       />
       <input
         type="number"
@@ -55,20 +77,15 @@ export default function TokenForm() {
         className="w-full p-2 border rounded"
         required
       />
-      <input
-        type="url"
-        placeholder="URL da Imagem"
-        value={imageUrl}
-        onChange={(e) => setImageUrl(e.target.value)}
-        className="w-full p-2 border rounded"
-      />
 
       <button
         type="submit"
         className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
       >
-        Criar
+        Criar Token
       </button>
+
+      {status && <p className="mt-2">{status}</p>}
     </form>
   );
 }

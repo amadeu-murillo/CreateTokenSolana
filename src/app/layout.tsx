@@ -1,5 +1,7 @@
 import "./globals.css";
 import type { ReactNode } from "react";
+import WalletContext from "@/context/WalletContext";
+import "@solana/wallet-adapter-react-ui/styles.css";
 
 export const metadata = {
   title: "Create Token Solana",
@@ -10,13 +12,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR">
       <body className="bg-gray-50 text-gray-900">
-        <header className="p-4 border-b shadow-sm bg-white">
-          <h1 className="text-xl font-bold">Create Token Solana</h1>
-        </header>
-        <main className="p-6">{children}</main>
-        <footer className="p-4 text-center text-sm text-gray-500">
-          © {new Date().getFullYear()} CreateTokenSolana
-        </footer>
+        <WalletContext>
+          <header className="p-4 border-b shadow-sm bg-white flex justify-between">
+            <h1 className="text-xl font-bold">Create Token Solana</h1>
+          </header>
+          <main className="p-6">{children}</main>
+          <footer className="p-4 text-center text-sm text-gray-500">
+            © {new Date().getFullYear()} CreateTokenSolana
+          </footer>
+        </WalletContext>
       </body>
     </html>
   );
