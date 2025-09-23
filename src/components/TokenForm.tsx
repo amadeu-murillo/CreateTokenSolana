@@ -18,7 +18,20 @@ export default function TokenForm() {
   const [symbol, setSymbol] = useState("");
   const [decimals, setDecimals] = useState(9);
   const [supply, setSupply] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageUrl, setImageUrl] = useState(""); // link final
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+        setImageUrl(reader.result as string); // base64 temporário
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +47,7 @@ export default function TokenForm() {
       supply: Number(supply),
       imageUrl,
     };
-    
+
     const result = await createToken(tokenData);
 
     if (result) {
@@ -93,15 +106,21 @@ export default function TokenForm() {
           required
         />
       </div>
+
       <div className={styles.field}>
-        <Label htmlFor="imageUrl">URL da Imagem</Label>
-        <Input
-          id="imageUrl"
-          type="url"
-          placeholder="https://exemplo.com/imagem.png"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
+        <Label htmlFor="imageFile">Imagem do Token</Label>
+        <input
+          id="imageFile"
+          type="file"
+          accept="image/*"
+          className={styles.squareInput}
+          onChange={handleImageUpload}
         />
+        {preview && (
+          <div className={styles.preview}>
+            <img src={preview} alt="Preview" />
+          </div>
+        )}
       </div>
 
       <Button type="submit" disabled={isLoading || !publicKey}>

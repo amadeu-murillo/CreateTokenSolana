@@ -10,9 +10,37 @@
   gap: 0.5rem;
 }
 
+.squareInput {
+  border: 2px dashed #888;
+  border-radius: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  background: #fafafa;
+  transition: border-color 0.2s ease;
+}
+
+.squareInput:hover {
+  border-color: #6366f1; /* Indigo */
+}
+
+.preview {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.preview img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid #ddd;
+}
+
 .warning {
   text-align: center;
   font-size: 0.875rem;
-  color: #f59e0b; /* Amber 500 */
+  color: #f59e0b;
   margin-top: 0.5rem;
 }
