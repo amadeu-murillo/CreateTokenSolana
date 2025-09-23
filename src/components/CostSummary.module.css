@@ -1,23 +1,43 @@
 .card {
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
-  background-color: var(--card);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  padding: 1rem;
-  max-width: 28rem; /* 448px */
+  background-color: hsl(var(--card));
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.card p {
-  margin-bottom: 0.5rem;
+.item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.item span:first-child {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.item span:last-child {
+    font-weight: 500;
+}
+
+.item svg {
+    width: 1rem;
+    height: 1rem;
+    color: hsl(var(--primary));
 }
 
 .divider {
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid hsl(var(--border));
 }
 
-.total {
-  font-weight: 700;
-  margin-bottom: 0 !important;
+.total p {
+    font-weight: 700;
+    font-size: 1rem;
+    color: hsl(var(--foreground));
 }

@@ -1,7 +1,7 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .field {
@@ -13,5 +13,6 @@
 .warning {
   text-align: center;
   font-size: 0.875rem;
-  color: #ca8a04;
+  color: #f59e0b; /* Amber 500 */
+  margin-top: 0.5rem;
 }

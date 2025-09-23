@@ -2,13 +2,42 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
+  flex-direction: column;
+  text-align: center;
+  min-height: 70vh;
+  padding: 1rem;
 }
 
-.cardContent {
-  text-align: center;
+.content {
+  max-width: 48rem;
+}
+
+.title {
+  font-size: 3rem;
+  line-height: 1.1;
+  letter-spacing: -0.05em;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 1.5rem;
+}
+
+@media(min-width: 768px) {
+  .title {
+    font-size: 4rem;
+  }
 }
 
 .description {
-  margin-bottom: 1.5rem; /* 24px */
+  font-size: 1.125rem;
+  color: hsl(var(--muted-foreground));
+  max-width: 38rem;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 2.5rem;
+}
+
+.buttonContainer {
+  max-width: 15rem;
+  margin: 0 auto;
 }

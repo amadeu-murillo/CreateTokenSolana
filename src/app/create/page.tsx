@@ -6,18 +6,16 @@ import styles from './Create.module.css';
 export default function CreatePage() {
   return (
     <div className={styles.grid}>
-      <div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Crie seu Token SPL</CardTitle>
-            <CardDescription>Preencha os detalhes abaixo para criar seu novo token na rede Solana.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TokenForm />
-          </CardContent>
-        </Card>
-      </div>
-      <div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Crie seu Token SPL</CardTitle>
+          <CardDescription>Preencha os detalhes abaixo para criar seu novo token na rede Solana.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TokenForm />
+        </CardContent>
+      </Card>
+      <div className={styles.summaryContainer}>
         <h2 className={styles.summaryTitle}>Resumo de Custos</h2>
         <CostSummary />
       </div>

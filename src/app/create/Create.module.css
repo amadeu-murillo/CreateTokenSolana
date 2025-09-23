@@ -1,20 +1,25 @@
 .grid {
   display: grid;
-  gap: 2rem;
-  max-width: 56rem; /* 896px */
+  gap: 2.5rem;
+  align-items: flex-start;
+  max-width: 64rem;
   margin-left: auto;
   margin-right: auto;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 2fr 1fr;
   }
 }
 
+.summaryContainer {
+  position: sticky;
+  top: 6rem; /* altura do header + padding */
+}
+
 .summaryTitle {
-  font-size: 1.5rem; /* 24px */
-  line-height: 2rem; /* 32px */
+  font-size: 1.25rem;
   font-weight: 700;
   margin-bottom: 1rem;
 }

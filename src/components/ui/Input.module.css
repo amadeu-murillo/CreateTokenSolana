@@ -1,21 +1,23 @@
 .input {
   display: flex;
-  height: 2.5rem; /* 40px */
+  height: 3rem;
   width: 100%;
   border-radius: var(--radius);
-  border: 1px solid var(--input);
-  background-color: var(--background);
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem; /* 14px */
+  border: 1px solid hsl(var(--input));
+  background-color: hsl(var(--background));
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 
 .input:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+  outline: none;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
 }
 
 .input::placeholder {
-  color: var(--muted-foreground);
+  color: hsl(var(--muted-foreground));
 }
 
 .input:disabled {
