@@ -103,12 +103,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </header>
             <main className={`${styles.container} ${styles.main}`}>{children}</main>
             <footer className={styles.footer}>
-              <div className={`${styles.container} ${styles.footerContainer}`}>
-                <p className={styles.footerText}>
-                  © {new Date().getFullYear()} CreateTokenSolana. Feito com ❤️.
-                </p>
-              </div>
-            </footer>
+  <div className={`${styles.container} ${styles.footerContainer}`}>
+    <div className={styles.footerLinks}>
+      <Link href="/privacy">Privacidade</Link>
+      <Link href="/terms">Termos</Link>
+      <a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </div>
+    <p className={styles.footerText}>
+      © {new Date().getFullYear()} CreateTokenSolana · Feito com ❤️ na Solana
+    </p>
+  </div>
+</footer>
+
           </div>
         </WalletProvider>
       </body>
