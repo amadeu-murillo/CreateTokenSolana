@@ -1,33 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCreateToken } from "@/hooks/useCreateToken";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import styles from "./TokenForm.module.css";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import styles from "@/components/TokenForm.module.css";
 
 export default function TokenForm() {
   const router = useRouter();
   const { publicKey } = useWallet();
   const { createToken, isLoading, error } = useCreateToken();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [decimals, setDecimals] = useState(9);
   const [supply, setSupply] = useState("");
-  const [imageUrl, setImageUrl] = useState(""); // link final
-  const [preview, setPreview] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPreview(reader.result as string);
-        setImageUrl(reader.result as string); // base64 temporário
+        setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -40,6 +40,12 @@ export default function TokenForm() {
       return;
     }
 
+    // Validação da URL da imagem
+    if (!imageUrl || !imageUrl.startsWith('http')) {
+      alert("A URL da imagem deve ser um link público (http://... ou https://...). Por favor, hospede a imagem e cole o link direto.");
+      return;
+    }
+
     const tokenData = {
       name,
       symbol,
@@ -48,13 +54,7 @@ export default function TokenForm() {
       imageUrl,
     };
 
-    const result = await createToken(tokenData);
-
-    if (result) {
-      router.push(`/confirmation?status=success&tokenAddress=${result.tokenAddress}`);
-    } else {
-      router.push(`/confirmation?status=error&error=${error}`);
-    }
+    await createToken(tokenData);
   };
 
   return (
@@ -75,10 +75,10 @@ export default function TokenForm() {
         <Input
           id="symbol"
           type="text"
-          placeholder="Ex: MEU (máx 8)"
+          placeholder="Ex: MEU (máx 10)"
           value={symbol}
           onChange={(e) => setSymbol(e.target.value)}
-          maxLength={8}
+          maxLength={10}
           required
         />
       </div>
@@ -108,17 +108,40 @@ export default function TokenForm() {
       </div>
 
       <div className={styles.field}>
-        <Label htmlFor="imageFile">Imagem do Token</Label>
-        <input
-          id="imageFile"
-          type="file"
-          accept="image/*"
-          className={styles.squareInput}
-          onChange={handleImageUpload}
+        <Label htmlFor="imageUrl">URL da Imagem do Token</Label>
+        <p className={styles.helperText}>
+            Hospede sua imagem em um serviço como o{' '}
+            <a href="https://imgur.com/upload" target="_blank" rel="noopener noreferrer">
+              Imgur
+            </a>{' '}
+            e cole a URL pública abaixo.
+        </p>
+        <Input
+          id="imageUrl"
+          type="url"
+          placeholder="https://i.imgur.com/seu-logo.png"
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          required
         />
-        {preview && (
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImageFileChange}
+          accept="image/png, image/jpeg, image/gif"
+          style={{ display: 'none' }}
+        />
+        <Button 
+            type="button" 
+            className={styles.uploadButton}
+            onClick={() => fileInputRef.current?.click()}
+        >
+            Fazer upload para pré-visualizar
+        </Button>
+        
+         {(imagePreview || imageUrl) && (
           <div className={styles.preview}>
-            <img src={preview} alt="Preview" />
+            <img src={imagePreview || imageUrl} alt="Preview do token" />
           </div>
         )}
       </div>
@@ -128,6 +151,8 @@ export default function TokenForm() {
       </Button>
 
       {!publicKey && <p className={styles.warning}>Conecte sua carteira para criar um token.</p>}
+      {error && <p className={styles.error}>{error}</p>}
     </form>
   );
 }
+
