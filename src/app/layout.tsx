@@ -93,10 +93,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                        <IconCreditCard className={styles.navIcon} />
                        <span>Custos</span>
                     </Link>
-                    <Link href="/settings" className={styles.navLink}>
-                      <IconSettings className={styles.navIcon} />
-                      <span>Configurações</span>
-                    </Link>
+                    
                   </nav>
                 </div>
                 <div className={styles.walletContainer}>

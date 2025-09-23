@@ -9,12 +9,13 @@
 }
 
 .content {
-  max-width: 48rem;
+  max-width: 52rem; /* Aumenta um pouco a largura máxima */
 }
 
 .title {
-  font-size: 3rem;
+  font-size: 3.5rem; /* Aumenta a fonte do título */
   line-height: 1.1;
+  font-weight: 800; /* Mais peso para o título */
   letter-spacing: -0.05em;
   background: var(--primary-gradient);
   -webkit-background-clip: text;
@@ -24,20 +25,21 @@
 
 @media(min-width: 768px) {
   .title {
-    font-size: 4rem;
+    font-size: 5rem; /* Título ainda maior para desktop */
   }
 }
 
 .description {
-  font-size: 1.125rem;
+  font-size: 1.25rem; /* Aumenta a fonte da descrição */
   color: hsl(var(--muted-foreground));
-  max-width: 38rem;
+  max-width: 42rem; /* Aumenta a largura do texto */
   margin-left: auto;
   margin-right: auto;
-  margin-bottom: 2.5rem;
+  margin-bottom: 3rem; /* Mais espaço antes do botão */
+  line-height: 1.6;
 }
 
 .buttonContainer {
-  max-width: 15rem;
+  max-width: 18rem; /* Botão um pouco maior */
   margin: 0 auto;
 }

@@ -7,6 +7,7 @@
   background-color: hsl(var(--background));
   padding: 0.5rem 1rem;
   font-size: 0.9rem;
+  color: hsl(var(--foreground)); /* Adicionado para garantir a visibilidade do texto */
   transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 

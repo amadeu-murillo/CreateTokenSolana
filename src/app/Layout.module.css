@@ -22,40 +22,40 @@
   margin-right: auto;
   padding-left: 1.5rem;
   padding-right: 1.5rem;
-}
-
-@media (min-width: 1024px) {
-  .container {
-    max-width: 1280px;
-  }
+  max-width: 1280px;
 }
 
 .headerContainer {
   display: flex;
-  height: 4rem;
+  height: 4.5rem; /* Aumenta a altura para melhor espaçamento */
   align-items: center;
+  justify-content: space-between;
 }
 
 .navContainer {
   display: flex;
   align-items: center;
-  flex: 1;
+  gap: 1.5rem; /* Espaçamento entre logo e nav */
 }
 
 .logoLink {
-  margin-right: 2rem;
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.logoLink:hover {
+  opacity: 0.8;
 }
 
 .logoText {
   font-weight: 700;
-  font-size: 1.125rem;
+  font-size: 1.25rem; /* Aumenta o tamanho do logo */
 }
 
 .nav {
-  display: none;
+  display: none; /* Escondido por padrão, aparece em telas maiores */
 }
 
 @media (min-width: 768px) {
@@ -72,9 +72,10 @@
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   border-radius: var(--radius);
-  transition: background-color 0.2s ease-in-out;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
   color: hsl(var(--muted-foreground));
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .navLink:hover {
@@ -96,8 +97,9 @@
 
 .main {
   flex: 1 1 0%;
-  padding-top: 2.5rem;
-  padding-bottom: 2.5rem;
+  padding-top: 3.5rem;
+  padding-bottom: 3.5rem;
+  animation: fadeInUp 0.5s ease-out forwards;
 }
 
 .footer {

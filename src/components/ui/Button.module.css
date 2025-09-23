@@ -3,23 +3,25 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius);
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: 1rem; /* Fonte maior */
+  font-weight: 600; /* Mais peso */
   transition: all 0.2s ease-in-out;
-  padding: 0.75rem 1.5rem;
+  padding: 0.875rem 2rem; /* Mais padding */
   cursor: pointer;
   background-image: var(--primary-gradient);
   background-size: 200% auto;
-  color: #fff;
+  color: white;
   border: none;
   width: 100%;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  text-transform: none; /* Remove o uppercase */
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.1);
 }
 
-.button:hover {
+.button:hover:not(:disabled) {
   background-position: right center;
-  transform: scale(1.02);
+  transform: translateY(-2px); /* Efeito de elevação */
+  box-shadow: 0 6px 20px 0 rgba(0, 0, 0, 0.15);
 }
 
 .button:disabled {

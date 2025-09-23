@@ -1,10 +1,13 @@
+/* Efeito de Glassmorphism com borda sutil */
 .card {
   border-radius: var(--radius);
   border: 1px solid hsla(var(--border), 0.5);
-  background-color: hsla(var(--card), 0.5);
+  background-color: hsla(var(--card), 0.5); /* Fundo semi-transparente */
   color: hsl(var(--card-foreground));
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px); /* Efeito de desfoque no fundo */
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08); /* Sombra suave */
+  transition: all 0.2s ease-in-out;
 }
 
 .cardHeader {
@@ -12,6 +15,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 1.5rem;
+  border-bottom: 1px solid hsl(var(--border)); /* Adiciona separador */
 }
 
 .cardTitle {
@@ -28,7 +32,6 @@
 
 .cardContent {
   padding: 1.5rem;
-  padding-top: 0;
 }
 
 .cardFooter {

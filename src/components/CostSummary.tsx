@@ -18,7 +18,7 @@ export default function CostSummary() {
         <hr className={styles.divider} />
         <div className={`${styles.item} ${styles.total}`}>
             <p>Total:</p>
-            <p>~0.302 SOL</p>
+            <p>~0.094 SOL</p>
         </div>
     </div>
   );
