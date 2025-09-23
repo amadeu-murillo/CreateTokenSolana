@@ -9,13 +9,13 @@
 }
 
 .content {
-  max-width: 52rem; /* Aumenta um pouco a largura máxima */
+  max-width: 52rem;
 }
 
 .title {
-  font-size: 3.5rem; /* Aumenta a fonte do título */
+  font-size: 3.5rem;
   line-height: 1.1;
-  font-weight: 800; /* Mais peso para o título */
+  font-weight: 800;
   letter-spacing: -0.05em;
   background: var(--primary-gradient);
   -webkit-background-clip: text;
@@ -25,21 +25,118 @@
 
 @media(min-width: 768px) {
   .title {
-    font-size: 5rem; /* Título ainda maior para desktop */
+    font-size: 5rem;
   }
 }
 
 .description {
-  font-size: 1.25rem; /* Aumenta a fonte da descrição */
+  font-size: 1.25rem;
   color: hsl(var(--muted-foreground));
-  max-width: 42rem; /* Aumenta a largura do texto */
+  max-width: 42rem;
   margin-left: auto;
   margin-right: auto;
-  margin-bottom: 3rem; /* Mais espaço antes do botão */
+  margin-bottom: 2.5rem; /* Ajuste de espaço */
   line-height: 1.6;
 }
 
 .buttonContainer {
-  max-width: 18rem; /* Botão um pouco maior */
+  max-width: 20rem; /* Botão um pouco maior */
   margin: 0 auto;
+}
+
+/* SUGESTÃO: Estilos para o destaque da taxa */
+.feeHighlight {
+  margin-bottom: 2.5rem;
+  background: hsla(var(--card), 0.7);
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 1rem 1.5rem;
+  display: inline-block;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.feeHighlight p {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 1.1rem;
+}
+
+.feeHighlight span:first-child {
+  color: hsl(var(--muted-foreground));
+}
+
+.feeHighlight strong {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: hsl(var(--primary));
+}
+
+.feeHighlight span:last-child {
+  background-color: hsla(var(--primary), 0.1);
+  color: hsl(var(--primary));
+  padding: 0.25rem 0.5rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* SUGESTÃO: Estilos para a seção "Como Funciona" */
+.howItWorksSection, .faqSection {
+  width: 100%;
+  max-width: 1100px;
+  margin: 6rem auto;
+  text-align: center;
+  padding: 0 1.5rem;
+}
+
+.howItWorksSection h2, .faqSection h2 {
+  font-size: 2.25rem;
+  margin-bottom: 3rem;
+  font-weight: 700;
+}
+
+.stepsGrid, .faqGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 2rem;
+  text-align: left;
+}
+
+.step, .faqItem {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 2rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.step:hover, .faqItem:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.stepIcon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background-image: var(--primary-gradient);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.step h3, .faqItem h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.step p, .faqItem p {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
