@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import styles from './Feedback.module.css';
 
-// SVG icons as components for simplicity
+// Ícones SVG
 const CheckCircle = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={styles.iconSuccess}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
 );
@@ -10,14 +10,19 @@ const XCircle = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={styles.iconError}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
 );
 
-
 type FeedbackProps = {
   success: boolean;
   tokenAddress?: string;
   errorMessage?: string;
+  txId?: string | null; // Adicionado para receber o ID da transação
 };
 
-export default function Feedback({ success, tokenAddress, errorMessage }: FeedbackProps) {
+export default function Feedback({ success, tokenAddress, errorMessage, txId }: FeedbackProps) {
+  // Constrói o link do explorador de blocos, priorizando o ID da transação para verificação imediata.
+  const explorerLink = txId 
+    ? `https://solscan.io/tx/${txId}`
+    : `https://solscan.io/token/${tokenAddress}`;
+
   if (success) {
     return (
       <Card className={styles.success}>
@@ -28,14 +33,15 @@ export default function Feedback({ success, tokenAddress, errorMessage }: Feedba
           </div>
         </CardHeader>
         <CardContent>
+          <p>Endereço do token:</p>
           <p className={styles.address}>{tokenAddress}</p>
           <a
-            href={`https://solscan.io/token/${tokenAddress}?cluster=devnet`}
+            href={explorerLink}
             target="_blank"
             rel="noopener noreferrer"
             className={styles.link}
           >
-            Ver no Solscan (Devnet)
+            {txId ? 'Ver transação no Solscan' : 'Ver token no Solscan'}
           </a>
         </CardContent>
       </Card>
@@ -51,8 +57,9 @@ export default function Feedback({ success, tokenAddress, errorMessage }: Feedba
         </div>
       </CardHeader>
       <CardContent>
-        <p className={styles.errorMessage}>{errorMessage || "Algo deu errado durante a criação do token."}</p>
+        <p className={styles.errorMessage}>{decodeURIComponent(errorMessage || "Algo deu errado durante a criação do token.")}</p>
       </CardContent>
     </Card>
   );
 }
+

@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
+import { DEV_WALLET_ADDRESS, RPC_ENDPOINT } from "@/lib/constants";
 
 // RF06: Configuração de Rede e Taxa de Serviço
-// Este endpoint retorna as URLs de RPC disponíveis e a carteira para a taxa de serviço.
+// Este endpoint retorna a URL de RPC e a carteira para a taxa de serviço.
 export async function GET() {
   try {
     const config = {
-      rpcUrls: {
-        mainnet: process.env.MAINNET_RPC_URL || "https://api.mainnet-beta.solana.com",
-        devnet: process.env.DEVNET_RPC_URL || "https://api.devnet.solana.com",
-      },
-      serviceFeeWallet: process.env.SERVICE_FEE_WALLET || "YOUR_SERVICE_FEE_WALLET_PUBLIC_KEY_HERE", // Substitua por sua carteira
+      rpcUrl: RPC_ENDPOINT,
+      serviceFeeWallet: DEV_WALLET_ADDRESS.toBase58(),
     };
 
     return NextResponse.json(config);

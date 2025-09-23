@@ -4,20 +4,27 @@ import React, { FC, useMemo, ReactNode } from "react";
 import { ConnectionProvider, WalletProvider as SolanaWalletProvider } from "@solana/wallet-adapter-react";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { clusterApiUrl } from "@solana/web3.js";
 import { PhantomWalletAdapter, SolflareWalletAdapter } from "@solana/wallet-adapter-wallets";
+import { RPC_ENDPOINT } from "@/lib/constants"; // Importar o endpoint RPC
 
 require("@solana/wallet-adapter-react-ui/styles.css");
 
 export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const network = WalletAdapterNetwork.Devnet;
-  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+  /**
+   * RF-04: Configurar a rede para mainnet-beta, conforme o endpoint RPC fornecido.
+   * A aplicação agora irá interagir com a rede principal da Solana.
+   */
+  const network = WalletAdapterNetwork.Mainnet;
+  
+  // Utiliza o endpoint RPC da Helius para maior confiabilidade e performance.
+  const endpoint = useMemo(() => RPC_ENDPOINT, []);
+
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
     ],
-    [network]
+    []
   );
 
   return (

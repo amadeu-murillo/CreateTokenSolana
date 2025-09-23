@@ -1,54 +1,124 @@
-import { NextResponse } from "next/server";
-import { Connection, Keypair, PublicKey, SystemProgram, clusterApiUrl } from "@solana/web3.js";
-import { MINT_SIZE, TOKEN_PROGRAM_ID, createInitializeMintInstruction, getMinimumBalanceForRentExemptMint, mintTo, createAssociatedTokenAccount, getAssociatedTokenAddress } from "@solana/spl-token";
+import { NextResponse } from 'next/server';
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+} from '@solana/web3.js';
+import {
+  MINT_SIZE,
+  TOKEN_PROGRAM_ID,
+  createInitializeMintInstruction,
+  getMinimumBalanceForRentExemptMint,
+  createAssociatedTokenAccountInstruction,
+  getAssociatedTokenAddress,
+  createMintToInstruction,
+  createSetAuthorityInstruction,
+  AuthorityType
+} from '@solana/spl-token';
+import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_LAMPORTS } from '@/lib/constants';
 
+// RF-07: Endpoint para Construção da Transação de Criação de Token
 export async function POST(request: Request) {
   try {
-    const { name, symbol, decimals, supply, imageUrl, wallet } = await request.json();
+    // 1. Extrair e validar os dados do corpo da requisição
+    const { decimals, supply, wallet } = await request.json();
 
-    if (!name || !symbol || !decimals || !supply || !wallet) {
-      return NextResponse.json({ error: "Dados incompletos" }, { status: 400 });
+    if (decimals === undefined || !supply || !wallet) {
+      return NextResponse.json({ error: 'Dados incompletos fornecidos (decimais, supply, wallet).' }, { status: 400 });
     }
 
-    const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
-    const payer = Keypair.generate(); // Em um app real, o usuário pagaria
+    const userPublicKey = new PublicKey(wallet);
+    const mintKeypair = Keypair.generate();
+    
+    // 2. Conectar-se à rede Solana (Mainnet)
+    const connection = new Connection(RPC_ENDPOINT, 'confirmed');
 
-    const airdropSignature = await connection.requestAirdrop(
-      payer.publicKey,
-      2 * 10 ** 9
+    // 3. Calcular o aluguel (rent exemption) para a nova conta do mint
+    const rentLamports = await getMinimumBalanceForRentExemptMint(connection);
+
+    // 4. Obter o endereço da Associated Token Account (ATA) do usuário
+    const associatedTokenAccount = await getAssociatedTokenAddress(
+      mintKeypair.publicKey,
+      userPublicKey
     );
-    await connection.confirmTransaction(airdropSignature);
 
-    const mint = Keypair.generate();
-    const lamports = await getMinimumBalanceForRentExemptMint(connection);
-
-    const transaction = new (await import("@solana/web3.js")).Transaction().add(
+    // 5. Construir a transação com todas as instruções necessárias
+    const transaction = new Transaction({
+        feePayer: userPublicKey,
+        // Definir um blockhash recente para evitar erros de transação expirada
+        ...(await connection.getLatestBlockhash('confirmed')),
+    }).add(
+      // Instrução 1: Transferir a taxa de serviço para a carteira de desenvolvimento
+      SystemProgram.transfer({
+        fromPubkey: userPublicKey,
+        toPubkey: DEV_WALLET_ADDRESS,
+        lamports: SERVICE_FEE_LAMPORTS,
+      }),
+      // Instrução 2: Criar a conta para o mint do novo token, paga pelo usuário
       SystemProgram.createAccount({
-        fromPubkey: payer.publicKey,
-        newAccountPubkey: mint.publicKey,
+        fromPubkey: userPublicKey,
+        newAccountPubkey: mintKeypair.publicKey,
         space: MINT_SIZE,
-        lamports,
+        lamports: rentLamports,
         programId: TOKEN_PROGRAM_ID,
       }),
+      // Instrução 3: Inicializar o mint com as propriedades do token
       createInitializeMintInstruction(
-        mint.publicKey,
+        mintKeypair.publicKey,
         decimals,
-        new PublicKey(wallet),
-        new PublicKey(wallet),
+        userPublicKey, // Mint Authority (usuário que pode criar novos tokens)
+        userPublicKey, // Freeze Authority (usuário que pode congelar contas de token)
         TOKEN_PROGRAM_ID
+      ),
+      // Instrução 4: Criar a conta de token associada (ATA) para a carteira do usuário
+      createAssociatedTokenAccountInstruction(
+        userPublicKey,
+        associatedTokenAccount,
+        userPublicKey,
+        mintKeypair.publicKey
+      ),
+      // Instrução 5: Mintar (criar) o fornecimento inicial para a ATA do usuário
+      createMintToInstruction(
+        mintKeypair.publicKey,
+        associatedTokenAccount,
+        userPublicKey, // Mint Authority
+        BigInt(supply * Math.pow(10, decimals)) // O fornecimento precisa ser em BigInt
+      ),
+      // Instrução 6 (Recomendado): Desabilitar futuras mintagens para um fornecimento fixo.
+      // A autoridade de mint é revogada passando `null` como a nova autoridade.
+      createSetAuthorityInstruction(
+        mintKeypair.publicKey,
+        userPublicKey,
+        AuthorityType.MintTokens,
+        null
       )
     );
-    
-    // Simulação de criação de token
-    console.log("Criando token com os seguintes dados:", { name, symbol, decimals, supply, imageUrl, wallet });
-    const tokenAddress = new Keypair().publicKey.toBase58();
-    
-    // Em uma implementação real, você usaria a transaction acima para criar o token
-    // const signature = await sendAndConfirmTransaction(connection, transaction, [payer, mint]);
 
-    return NextResponse.json({ success: true, tokenAddress });
+    // 6. Serializar a transação com assinatura parcial do mint
+    // A carteira do usuário no front-end será a primeira a assinar (como pagador).
+    // A assinatura do mintKeypair é necessária pois é uma nova conta sendo criada.
+    transaction.partialSign(mintKeypair);
+
+    const serializedTransaction = transaction.serialize({
+      requireAllSignatures: false, // A assinatura do usuário (pagador) ainda é necessária
+    });
+    
+    const base64Transaction = serializedTransaction.toString('base64');
+
+    // 7. Retornar a transação serializada e o endereço do mint para o front-end
+    return NextResponse.json({
+      transaction: base64Transaction,
+      mintAddress: mintKeypair.publicKey.toBase58(),
+    });
+
   } catch (error) {
-    console.error("Erro ao criar token:", error);
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
+    console.error('Erro detalhado ao criar transação:', error);
+    let errorMessage = 'Erro interno do servidor ao criar a transação.';
+    if (error instanceof Error) {
+        errorMessage = error.message;
+    }
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

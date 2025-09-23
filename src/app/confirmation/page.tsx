@@ -9,6 +9,7 @@ export default function ConfirmationPage() {
   const searchParams = useSearchParams();
   const status = searchParams.get("status");
   const tokenAddress = searchParams.get("tokenAddress");
+  const txId = searchParams.get("txId"); // Captura o ID da transação da URL
   const errorMessage = searchParams.get("error");
 
   return (
@@ -16,7 +17,11 @@ export default function ConfirmationPage() {
       <div className={styles.contentWrapper}>
         <h2 className={styles.title}>Status da Criação</h2>
         {status === "success" && tokenAddress ? (
-          <Feedback success={true} tokenAddress={tokenAddress} />
+          <Feedback 
+            success={true} 
+            tokenAddress={tokenAddress} 
+            txId={txId} // Passa o txId para o componente de feedback
+          />
         ) : (
           <Feedback success={false} errorMessage={errorMessage || "Ocorreu um erro desconhecido."} />
         )}
