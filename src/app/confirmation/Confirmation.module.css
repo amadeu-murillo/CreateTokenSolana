@@ -1,0 +1,29 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.contentWrapper {
+  width: 100%;
+  max-width: 28rem; /* 448px */
+}
+
+.title {
+  font-size: 1.875rem; /* 30px */
+  font-weight: 700;
+  margin-bottom: 1.5rem; /* 24px */
+  text-align: center;
+}
+
+.linkContainer {
+  margin-top: 1.5rem; /* 24px */
+  text-align: center;
+}
+
+.link {
+  color: var(--primary);
+  text-decoration: underline;
+}

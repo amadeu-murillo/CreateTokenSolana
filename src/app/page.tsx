@@ -1,22 +1,23 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import Link from "next/link";
+import styles from './Home.module.css';
 
 export default function Home() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <Card className="w-full max-w-lg text-center">
+    <div className={styles.container}>
+      <Card style={{width: '100%', maxWidth: '32rem'}}>
         <CardHeader>
-          <CardTitle className="text-3xl font-bold">Bem-vindo ao Create Token Solana 🚀</CardTitle>
-          <CardDescription className="text-lg text-muted-foreground pt-2">
+          <CardTitle>Bem-vindo ao Create Token Solana 🚀</CardTitle>
+          <CardDescription>
             Crie tokens SPL na blockchain Solana de forma simples, rápida e segura.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="mb-6">
+        <CardContent className={styles.cardContent}>
+          <p className={styles.description}>
             Conecte sua carteira, preencha os detalhes do seu token e lance-o na rede com apenas alguns cliques.
           </p>
-          <Button asChild size="lg">
+          <Button asChild>
             <Link href="/create">Comece a Criar Agora</Link>
           </Button>
         </CardContent>

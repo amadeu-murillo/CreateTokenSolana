@@ -1,0 +1,23 @@
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--card);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  padding: 1rem;
+  max-width: 28rem; /* 448px */
+}
+
+.card p {
+  margin-bottom: 0.5rem;
+}
+
+.divider {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.total {
+  font-weight: 700;
+  margin-bottom: 0 !important;
+}

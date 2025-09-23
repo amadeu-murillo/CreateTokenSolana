@@ -7,6 +7,7 @@ import { useCreateToken } from "@/hooks/useCreateToken";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import styles from "./TokenForm.module.css";
 
 export default function TokenForm() {
   const router = useRouter();
@@ -44,8 +45,8 @@ export default function TokenForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
+    <form onSubmit={handleSubmit} className={styles.form}>
+      <div className={styles.field}>
         <Label htmlFor="name">Nome do Token</Label>
         <Input
           id="name"
@@ -56,7 +57,7 @@ export default function TokenForm() {
           required
         />
       </div>
-      <div className="space-y-2">
+      <div className={styles.field}>
         <Label htmlFor="symbol">Símbolo</Label>
         <Input
           id="symbol"
@@ -68,7 +69,7 @@ export default function TokenForm() {
           required
         />
       </div>
-      <div className="space-y-2">
+      <div className={styles.field}>
         <Label htmlFor="decimals">Decimais</Label>
         <Input
           id="decimals"
@@ -81,7 +82,7 @@ export default function TokenForm() {
           required
         />
       </div>
-      <div className="space-y-2">
+      <div className={styles.field}>
         <Label htmlFor="supply">Fornecimento Total</Label>
         <Input
           id="supply"
@@ -92,7 +93,7 @@ export default function TokenForm() {
           required
         />
       </div>
-      <div className="space-y-2">
+      <div className={styles.field}>
         <Label htmlFor="imageUrl">URL da Imagem</Label>
         <Input
           id="imageUrl"
@@ -103,11 +104,11 @@ export default function TokenForm() {
         />
       </div>
 
-      <Button type="submit" className="w-full" disabled={isLoading || !publicKey}>
+      <Button type="submit" disabled={isLoading || !publicKey}>
         {isLoading ? "Criando..." : "Criar Token"}
       </Button>
 
-      {!publicKey && <p className="text-center text-sm text-yellow-600">Conecte sua carteira para criar um token.</p>}
+      {!publicKey && <p className={styles.warning}>Conecte sua carteira para criar um token.</p>}
     </form>
   );
 }

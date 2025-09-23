@@ -1,19 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import styles from './Settings.module.css';
 
 export default function SettingsPage() {
   const [network, setNetwork] = useState("devnet");
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold">Configurações</h2>
-      <label className="block">
-        <span className="text-gray-700">Rede:</span>
+    <div className={styles.container}>
+      <h2 className={styles.title}>Configurações</h2>
+      <label className={styles.label}>
+        <span className={styles.labelText}>Rede:</span>
         <select
           value={network}
           onChange={(e) => setNetwork(e.target.value)}
-          className="ml-2 border rounded p-1"
+          className={styles.select}
         >
           <option value="devnet">Devnet</option>
           <option value="mainnet-beta">Mainnet</option>

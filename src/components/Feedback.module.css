@@ -1,0 +1,48 @@
+.success {
+  border: 1px solid #10b981;
+}
+
+.error {
+  border: 1px solid #ef4444;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.iconSuccess {
+  color: #10b981;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.iconError {
+  color: #ef4444;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.address {
+  font-family: var(--font-mono);
+  word-break: break-all;
+  background-color: var(--muted);
+  padding: 0.5rem;
+  border-radius: var(--radius);
+}
+
+.link {
+  color: var(--primary);
+  text-decoration: underline;
+  margin-top: 1rem;
+  display: inline-block;
+}
+
+.errorMessage {
+  color: #b91c1c;
+}
+
+.dark .errorMessage {
+  color: #fca5a5;
+}

@@ -1,9 +1,10 @@
 import CostSummary from "@/components/CostSummary";
+import styles from './Costs.module.css';
 
 export default function CostsPage() {
   return (
-    <div>
-      <h2 className="text-2xl font-bold mb-4">Resumo de Custos</h2>
+    <div className={styles.container}>
+      <h2 className={styles.title}>Resumo de Custos</h2>
       <CostSummary />
     </div>
   );

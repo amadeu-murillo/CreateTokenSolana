@@ -1,0 +1,14 @@
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.cardContent {
+  text-align: center;
+}
+
+.description {
+  margin-bottom: 1.5rem; /* 24px */
+}
