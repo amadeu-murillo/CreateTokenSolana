@@ -1,7 +1,50 @@
 import { NextResponse } from 'next/server';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, ParsedInstruction, PartiallyDecodedInstruction, PublicKey } from '@solana/web3.js';
 import { RPC_ENDPOINT } from '@/lib/constants';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+
+// Melhoria: Interfaces para tipagem estrita da instrução parseada
+interface InitializeMintInfo {
+  mint: string;
+  decimals: number;
+  mintAuthority: string;
+  freezeAuthority?: string | null;
+}
+
+interface ParsedInitializeMintData {
+  type: 'initializeMint';
+  info: InitializeMintInfo;
+}
+
+// Define o tipo exato da instrução que estamos procurando
+type InitializeMintInstruction = ParsedInstruction & {
+  parsed: ParsedInitializeMintData;
+};
+
+// Type guard para verificar se a instrução é do tipo 'initializeMint' de forma segura
+function isInitializeMintInstruction(
+  instruction: ParsedInstruction | PartiallyDecodedInstruction
+): instruction is InitializeMintInstruction {
+  // Primeiro, verifica se é uma ParsedInstruction verificando a existência da propriedade 'parsed'
+  if (!('parsed' in instruction)) {
+    return false;
+  }
+  // Agora que sabemos que é uma ParsedInstruction, podemos acessar 'parsed' com segurança
+  const { parsed } = instruction;
+  return (
+    instruction.programId.equals(TOKEN_PROGRAM_ID) &&
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    'type' in parsed &&
+    parsed.type === 'initializeMint' &&
+    'info' in parsed &&
+    typeof parsed.info === 'object' &&
+    parsed.info !== null &&
+    'mint' in parsed.info &&
+    typeof parsed.info.mint === 'string'
+  );
+}
+
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -15,7 +58,6 @@ export async function GET(request: Request) {
         const connection = new Connection(RPC_ENDPOINT, 'confirmed');
         const publicKey = new PublicKey(wallet);
 
-        // Esta é uma abordagem simplificada. Para produção, um indexador como Helius é recomendado.
         const allSignatures = await connection.getSignaturesForAddress(publicKey, { limit: 100 });
 
         const tokenCreationTransactions = [];
@@ -24,15 +66,13 @@ export async function GET(request: Request) {
             const tx = await connection.getParsedTransaction(sigInfo.signature, { maxSupportedTransactionVersion: 0 });
             if (tx && tx.meta && tx.meta.err === null) {
                 for (const instruction of tx.transaction.message.instructions) {
-                    if (instruction.programId.equals(TOKEN_PROGRAM_ID)) {
-                        const parsedInstruction = instruction as any; // Simplificando a tipagem
-                        if (parsedInstruction.parsed?.type === 'initializeMint') {
-                             tokenCreationTransactions.push({
-                                signature: sigInfo.signature,
-                                mint: parsedInstruction.parsed.info.mint,
-                                blockTime: sigInfo.blockTime,
-                            });
-                        }
+                    // Usar o type guard aprimorado garante a tipagem correta
+                    if (isInitializeMintInstruction(instruction)) {
+                         tokenCreationTransactions.push({
+                            signature: sigInfo.signature,
+                            mint: instruction.parsed.info.mint,
+                            blockTime: sigInfo.blockTime,
+                        });
                     }
                 }
             }
@@ -49,3 +89,4 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
+

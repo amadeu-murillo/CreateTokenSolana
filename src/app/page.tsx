@@ -8,21 +8,15 @@ const IconFileText = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" he
 const IconCheckSquare = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
 const IconGift = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>;
 
-
 export default function Home() {
   return (
     <>
       <div className={styles.container}>
         <div className={styles.content}>
-          {/* SUGESTÃO: Título mais persuasivo */}
           <h1 className={styles.title}>Lance seu Token na Solana em Minutos</h1>
-          
-          {/* SUGESTÃO: Descrição mais detalhada */}
           <p className={styles.description}>
             Crie seu token SPL sem complicações. Conecte sua carteira, defina os detalhes e faça o lançamento de forma segura e transparente. Ideal para comunidades, projetos e desenvolvedores.
           </p>
-          
-          {/* SUGESTÃO: Novo componente para destacar a taxa */}
           <div className={styles.feeHighlight}>
             <p>
               <span>Taxa de Criação</span>
@@ -30,17 +24,14 @@ export default function Home() {
               <span>A mais baixa do mercado</span>
             </p>
           </div>
-
           <div className={styles.buttonContainer}>
             <Button asChild>
-              {/* SUGESTÃO: Call to action mais forte */}
               <Link href="/create">Criar Meu Token Agora</Link>
             </Button>
           </div>
         </div>
       </div>
 
-      {/* SUGESTÃO: Nova seção "Como Funciona" */}
       <section className={styles.howItWorksSection}>
         <h2>Como Funciona</h2>
         <div className={styles.stepsGrid}>
@@ -67,26 +58,26 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SUGESTÃO: Nova seção de FAQ para construir confiança */}
+      {/* Melhoria: Seção de FAQ com HTML semântico para acessibilidade */}
       <section className={styles.faqSection}>
         <h2>Perguntas Frequentes</h2>
         <div className={styles.faqGrid}>
-          <div className={styles.faqItem}>
-            <h3>Eu realmente sou o dono do token?</h3>
+          <details className={styles.faqItem}>
+            <summary><h3>Eu realmente sou o dono do token?</h3></summary>
             <p>Com certeza. A autoridade de "mint" (criar novos tokens) e "freeze" (congelar contas) é sua. Você tem controle total sobre o token criado.</p>
-          </div>
-          <div className={styles.faqItem}>
-            <h3>A plataforma guarda alguma chave privada?</h3>
+          </details>
+          <details className={styles.faqItem}>
+            <summary><h3>A plataforma guarda alguma chave privada?</h3></summary>
             <p>Não. Jamais. Todas as transações são assinadas com segurança dentro da sua própria carteira. Nós nunca temos acesso às suas chaves ou aos seus fundos.</p>
-          </div>
-          <div className={styles.faqItem}>
-            <h3>O que compõe o custo total?</h3>
+          </details>
+          <details className={styles.faqItem}>
+            <summary><h3>O que compõe o custo total?</h3></summary>
             <p>O custo total é a soma da taxa de aluguel da rede Solana (para tornar a conta do token permanente), uma pequena taxa de transação e nossa taxa de serviço de 0.092 SOL.</p>
-          </div>
-          <div className={styles.faqItem}>
-            <h3>Posso criar um token para minha comunidade?</h3>
+          </details>
+          <details className={styles.faqItem}>
+            <summary><h3>Posso criar um token para minha comunidade?</h3></summary>
             <p>Sim! Tokens SPL são perfeitos para comunidades, projetos de jogos, DAOs, programas de fidelidade e muito mais. Use sua criatividade!</p>
-          </div>
+          </details>
         </div>
       </section>
     </>
