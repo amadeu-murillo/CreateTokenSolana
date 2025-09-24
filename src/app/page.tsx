@@ -25,9 +25,11 @@ export default function Home() {
             </p>
           </div>
           <div className={styles.buttonContainer}>
-            <Button asChild>
-              <Link href="/create">Criar Meu Token Agora</Link>
-            </Button>
+              <Link href="/create">
+                <Button asChild>
+                  Criar Meu Token Agora
+                </Button>
+              </Link>
           </div>
         </div>
       </div>

@@ -1,14 +1,34 @@
 "use client";
 
-import { useReducer, useCallback } from "react";
-import { useCreateToken } from "@/hooks/useCreateToken";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import styles from "@/components/TokenForm.module.css";
+import React, { useReducer, useState, useEffect, useRef } from "react";
+import { useCreateToken } from "../hooks/useCreateToken";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import styles from "./TokenForm.module.css";
 import TokenPreview from "./TokenPreview";
 
-// Melhoria: Centralização do estado do formulário com useReducer
+// --- COMPONENTE TOOLTIP ---
+const Tooltip = ({ text, children }: { text: string; children: React.ReactNode }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div className={styles.tooltipContainer} onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      {children}
+      {show && <div className={styles.tooltip}>{text}</div>}
+    </div>
+  );
+};
+
+const InfoIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={styles.infoIcon}>
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+    </svg>
+);
+// --- FIM DO COMPONENTE TOOLTIP ---
+
+
 interface FormErrors {
   name?: string;
   symbol?: string;
@@ -56,7 +76,6 @@ function formReducer(state: State, action: Action): State {
   }
 }
 
-// Função de validação fora do componente para ser pura
 const validateForm = (state: Omit<State, 'errors' | 'showAdvanced'>): FormErrors => {
     const newErrors: FormErrors = {};
     if (!state.name) newErrors.name = "O nome do token é obrigatório.";
@@ -85,12 +104,24 @@ export default function TokenForm() {
   const { createToken, isLoading } = useCreateToken();
   const [state, dispatch] = useReducer(formReducer, initialState);
   const { name, symbol, decimals, supply, imageUrl, showAdvanced, mintAuthority, freezeAuthority, errors } = state;
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   
   const handleFieldChange = (field: keyof Omit<State, 'errors'>, value: any) => {
     dispatch({ type: 'SET_FIELD', field, value });
     // Valida o campo em tempo real após a mudança
     const newErrors = validateForm({ ...state, [field]: value });
     dispatch({ type: 'SET_ERRORS', errors: { ...errors, [field]: newErrors[field as keyof FormErrors] } });
+
+    // Feedback visual de digitação
+    setIsTyping(true);
+    if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+    }
+    typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+    }, 500); // Para o efeito após 500ms de inatividade
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -158,10 +189,16 @@ export default function TokenForm() {
                     <div className={styles.checkboxWrapper}>
                         <input type="checkbox" id="mintAuthority" checked={mintAuthority} onChange={(e) => handleFieldChange('mintAuthority', e.target.checked)} />
                         <Label htmlFor="mintAuthority">Manter autoridade para criar mais tokens</Label>
+                        <Tooltip text="Marcado: Você poderá criar mais tokens no futuro, aumentando o fornecimento. Desmarcado: O fornecimento total será fixo para sempre, o que pode gerar mais confiança para os investidores.">
+                           <InfoIcon />
+                        </Tooltip>
                     </div>
                      <div className={styles.checkboxWrapper}>
                         <input type="checkbox" id="freezeAuthority" checked={freezeAuthority} onChange={(e) => handleFieldChange('freezeAuthority', e.target.checked)} />
                         <Label htmlFor="freezeAuthority">Manter autoridade para congelar tokens</Label>
+                        <Tooltip text="Marcado: Você poderá congelar tokens em qualquer carteira. Útil para fins regulatórios ou para bloquear contas maliciosas. Desmarcado: Ninguém poderá ter seus tokens congelados, promovendo maior descentralização.">
+                           <InfoIcon />
+                        </Tooltip>
                     </div>
                 </div>
             )}
@@ -173,8 +210,14 @@ export default function TokenForm() {
       </form>
 
       <div className={styles.previewContainer}>
-        <TokenPreview name={name} symbol={symbol} imageUrl={imageUrl} supply={supply} />
+        <TokenPreview 
+            name={name} 
+            symbol={symbol} 
+            imageUrl={imageUrl} 
+            supply={supply}
+        />
       </div>
     </div>
   );
 }
+
