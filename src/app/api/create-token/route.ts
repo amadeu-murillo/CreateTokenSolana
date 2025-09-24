@@ -20,7 +20,7 @@ import {
   createSetAuthorityInstruction,
   AuthorityType
 } from '@solana/spl-token';
-import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_LAMPORTS } from '@/lib/constants';
+import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_TOKEN_LAMPORTS } from '@/lib/constants';
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { createV1, TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
 import { fromWeb3JsKeypair, fromWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       SystemProgram.transfer({
         fromPubkey: userPublicKey,
         toPubkey: DEV_WALLET_ADDRESS,
-        lamports: SERVICE_FEE_LAMPORTS,
+        lamports: SERVICE_FEE_CREATE_TOKEN_LAMPORTS,
       }),
       SystemProgram.createAccount({
         fromPubkey: userPublicKey,
