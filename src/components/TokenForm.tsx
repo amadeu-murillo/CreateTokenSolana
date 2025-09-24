@@ -205,7 +205,7 @@ export default function TokenForm() {
         </div>
 
         <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Criando..." : "Criar Token"}
+          {isLoading ? "Criando..." : "Criar Token (~0.094 SOL)"}
         </Button>
       </form>
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { getMinimumBalanceForRentExemptMint } from "@solana/spl-token";
-import { RPC_ENDPOINT, SERVICE_FEE_SOL } from "@/lib/constants";
+import { RPC_ENDPOINT, SERVICE_FEE_CREATE_TOKEN_SOL } from "@/lib/constants";
 
 // RF05: Gestão de Custos
 // Este endpoint calcula e retorna os custos estimados para a criação de um token na mainnet.
@@ -22,7 +22,7 @@ export async function GET() {
     const networkCostInSol = networkCostLamports / LAMPORTS_PER_SOL;
 
     // 3. Taxa de Serviço
-    const serviceFee = SERVICE_FEE_SOL;
+    const serviceFee = SERVICE_FEE_CREATE_TOKEN_SOL;
 
     // 4. Custo Total
     const totalCost = networkCostInSol + serviceFee;
@@ -42,3 +42,4 @@ export async function GET() {
     );
   }
 }
+
