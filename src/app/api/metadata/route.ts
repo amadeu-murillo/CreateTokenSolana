@@ -1,37 +1,51 @@
-import { NextResponse } from 'next/server';
-import { type NextRequest } from 'next/server'
+// src/app/api/metadata/route.ts
 
-/**
- * Endpoint para servir o JSON de metadados do token, seguindo o padrão da Metaplex.
- * As carteiras e exploradores de blocos usarão a URI deste endpoint para buscar
- * as informações (nome, símbolo, imagem) do token.
- */
+import { NextRequest, NextResponse } from 'next/server';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { RPC_ENDPOINT } from '@/lib/constants';
+import { getMint } from '@solana/spl-token';
+import { Metadata, PROGRAM_ID as METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
+
 export async function GET(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams
-    const name = searchParams.get('name');
-    const symbol = searchParams.get('symbol');
-    const imageUrl = searchParams.get('imageUrl');
+  const searchParams = request.nextUrl.searchParams;
+  const mintAddress = searchParams.get('mint');
 
-    if (!name || !symbol || !imageUrl) {
-      return NextResponse.json({ error: 'Parâmetros ausentes: name, symbol e imageUrl são obrigatórios.' }, { status: 400 });
+  if (!mintAddress) {
+    return NextResponse.json({ error: 'Endereço de mint não fornecido.' }, { status: 400 });
+  }
+
+  try {
+    const mintPublicKey = new PublicKey(mintAddress);
+    const connection = new Connection(RPC_ENDPOINT, 'confirmed');
+
+    // Encontrar a conta de metadados associada ao mint
+    const metadataPDA = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("metadata"),
+        METADATA_PROGRAM_ID.toBuffer(),
+        mintPublicKey.toBuffer(),
+      ],
+      METADATA_PROGRAM_ID
+    )[0];
+
+    const metadataAccount = await connection.getAccountInfo(metadataPDA);
+    if (!metadataAccount) {
+        return NextResponse.json({ error: "Metadados não encontrados." }, { status: 404 });
     }
 
-    // Construção do objeto de metadados
-    const metadata = {
-      name: decodeURIComponent(name),
-      symbol: decodeURIComponent(symbol),
-      description: `Token ${decodeURIComponent(name)} criado na plataforma.`,
-      image: decodeURIComponent(imageUrl),
-    };
+    const [metadata] = Metadata.deserialize(metadataAccount.data);
 
-    return NextResponse.json(metadata);
+    // ✅ Retorna o JSON no formato padrão
+    return NextResponse.json({
+      name: metadata.data.name.replace(/\0/g, ''),
+      symbol: metadata.data.symbol.replace(/\0/g, ''),
+      image: metadata.data.uri.replace(/\0/g, ''), // Supondo que a URI é a imagem
+      description: `Token ${metadata.data.name.replace(/\0/g, '')}`,
+      attributes: [],
+    });
 
   } catch (error) {
-    console.error("Erro ao gerar metadados:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor ao gerar metadados." },
-      { status: 500 }
-    );
+    console.error("Erro ao buscar metadados:", error);
+    return NextResponse.json({ error: 'Falha ao buscar metadados.' }, { status: 500 });
   }
 }

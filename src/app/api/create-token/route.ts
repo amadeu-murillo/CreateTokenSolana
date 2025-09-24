@@ -1,4 +1,5 @@
 // src/app/api/create-token/route.ts
+
 import { NextResponse } from 'next/server';
 import {
   Connection,
@@ -6,6 +7,7 @@ import {
   PublicKey,
   SystemProgram,
   Transaction,
+  ComputeBudgetProgram,
 } from '@solana/web3.js';
 import {
   MINT_SIZE,
@@ -20,15 +22,14 @@ import {
 } from '@solana/spl-token';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_LAMPORTS } from '@/lib/constants';
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
-import { createV1, mplTokenMetadata, TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
-import { walletAdapterIdentity } from '@metaplex-foundation/umi-signer-wallet-adapters';
-import { setComputeUnitLimit } from '@metaplex-foundation/mpl-toolbox';
+import { createV1, TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
 import { fromWeb3JsKeypair, fromWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
-import { transactionBuilder, createSignerFromKeypair, percentAmount } from '@metaplex-foundation/umi'; // <<< CORREÇÃO AQUI
+import { createSignerFromKeypair, percentAmount, signerIdentity } from '@metaplex-foundation/umi';
 
 export async function POST(request: Request) {
   try {
     const { name, symbol, imageUrl, decimals, supply, wallet, mintAuthority, freezeAuthority } = await request.json();
+    const { origin } = new URL(request.url); // Pega a URL base da sua aplicação
 
     if (!name || !symbol || !imageUrl || decimals === undefined || !supply || !wallet) {
       return NextResponse.json({ error: 'Dados incompletos fornecidos.' }, { status: 400 });
@@ -38,27 +39,28 @@ export async function POST(request: Request) {
     const mintKeypair = Keypair.generate();
     
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
-
     const umi = createUmi(RPC_ENDPOINT);
     
-    // Adaptar o Keypair do web3.js para um Signer do Umi
+    // Assinatura para a conta do mint
     const umiSigner = createSignerFromKeypair(umi, fromWeb3JsKeypair(mintKeypair));
+    umi.use(signerIdentity(umiSigner));
     
-    // Construir as instruções com Umi
+    // ✅ CORREÇÃO: Construir a URI de metadados que aponta para nossa própria API
+    const metadataUri = `${origin}/api/metadata?mint=${mintKeypair.publicKey.toBase58()}`;
+    
+    // Construir a instrução de metadados com a URI correta e curta
     const createMetadataIx = createV1(umi, {
         mint: fromWeb3JsPublicKey(mintKeypair.publicKey),
         authority: umiSigner,
         name: name,
         symbol: symbol,
-        uri: imageUrl,
-        sellerFeeBasisPoints: percentAmount(0, 2), // <<< CORREÇÃO AQUI
+        uri: metadataUri, // ✅ USA A NOVA URI CURTA
+        sellerFeeBasisPoints: percentAmount(0, 2),
         tokenStandard: TokenStandard.Fungible,
         isMutable: true,
-        collection: null,
-        uses: null,
     }).getInstructions();
 
-    // Converter as instruções do Umi para o formato do web3.js
+    // O resto do seu código continua aqui...
     const web3Instructions = createMetadataIx.map(ix => ({
         keys: ix.keys.map(key => ({
             pubkey: new PublicKey(key.pubkey),
@@ -78,7 +80,15 @@ export async function POST(request: Request) {
     const transaction = new Transaction({
         feePayer: userPublicKey,
         ...(await connection.getLatestBlockhash('confirmed')),
-    }).add(
+    });
+
+    // Adicionar instruções de compute budget (boa prática)
+    transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1000 })
+    );
+
+    transaction.add(
       SystemProgram.transfer({
         fromPubkey: userPublicKey,
         toPubkey: DEV_WALLET_ADDRESS,
