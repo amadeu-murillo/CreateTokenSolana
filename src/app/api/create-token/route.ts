@@ -1,3 +1,4 @@
+// src/app/api/create-token/route.ts
 import { NextResponse } from 'next/server';
 import {
   Connection,
@@ -18,45 +19,71 @@ import {
   AuthorityType
 } from '@solana/spl-token';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_LAMPORTS } from '@/lib/constants';
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
+import { createV1, mplTokenMetadata, TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
+import { walletAdapterIdentity } from '@metaplex-foundation/umi-signer-wallet-adapters';
+import { setComputeUnitLimit } from '@metaplex-foundation/mpl-toolbox';
+import { fromWeb3JsKeypair, fromWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
+import { transactionBuilder, createSignerFromKeypair, percentAmount } from '@metaplex-foundation/umi'; // <<< CORREÇÃO AQUI
 
-// RF-07: Endpoint para Construção da Transação de Criação de Token
 export async function POST(request: Request) {
   try {
-    // 1. Extrair e validar os dados do corpo da requisição
-    const { decimals, supply, wallet, mintAuthority, freezeAuthority } = await request.json();
+    const { name, symbol, imageUrl, decimals, supply, wallet, mintAuthority, freezeAuthority } = await request.json();
 
-    if (decimals === undefined || !supply || !wallet) {
-      return NextResponse.json({ error: 'Dados incompletos fornecidos (decimais, supply, wallet).' }, { status: 400 });
+    if (!name || !symbol || !imageUrl || decimals === undefined || !supply || !wallet) {
+      return NextResponse.json({ error: 'Dados incompletos fornecidos.' }, { status: 400 });
     }
 
     const userPublicKey = new PublicKey(wallet);
     const mintKeypair = Keypair.generate();
     
-    // 2. Conectar-se à rede Solana (Mainnet)
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
 
-    // 3. Calcular o aluguel (rent exemption) para a nova conta do mint
-    const rentLamports = await getMinimumBalanceForRentExemptMint(connection);
+    const umi = createUmi(RPC_ENDPOINT);
+    
+    // Adaptar o Keypair do web3.js para um Signer do Umi
+    const umiSigner = createSignerFromKeypair(umi, fromWeb3JsKeypair(mintKeypair));
+    
+    // Construir as instruções com Umi
+    const createMetadataIx = createV1(umi, {
+        mint: fromWeb3JsPublicKey(mintKeypair.publicKey),
+        authority: umiSigner,
+        name: name,
+        symbol: symbol,
+        uri: imageUrl,
+        sellerFeeBasisPoints: percentAmount(0, 2), // <<< CORREÇÃO AQUI
+        tokenStandard: TokenStandard.Fungible,
+        isMutable: true,
+        collection: null,
+        uses: null,
+    }).getInstructions();
 
-    // 4. Obter o endereço da Associated Token Account (ATA) do usuário
+    // Converter as instruções do Umi para o formato do web3.js
+    const web3Instructions = createMetadataIx.map(ix => ({
+        keys: ix.keys.map(key => ({
+            pubkey: new PublicKey(key.pubkey),
+            isSigner: key.isSigner,
+            isWritable: key.isWritable,
+        })),
+        programId: new PublicKey(ix.programId),
+        data: Buffer.from(ix.data),
+    }));
+
+    const rentLamports = await getMinimumBalanceForRentExemptMint(connection);
     const associatedTokenAccount = await getAssociatedTokenAddress(
       mintKeypair.publicKey,
       userPublicKey
     );
 
-    // 5. Construir a transação com todas as instruções necessárias
     const transaction = new Transaction({
         feePayer: userPublicKey,
-        // Definir um blockhash recente para evitar erros de transação expirada
         ...(await connection.getLatestBlockhash('confirmed')),
     }).add(
-      // Instrução 1: Transferir a taxa de serviço para a carteira de desenvolvimento
       SystemProgram.transfer({
         fromPubkey: userPublicKey,
         toPubkey: DEV_WALLET_ADDRESS,
         lamports: SERVICE_FEE_LAMPORTS,
       }),
-      // Instrução 2: Criar a conta para o mint do novo token, paga pelo usuário
       SystemProgram.createAccount({
         fromPubkey: userPublicKey,
         newAccountPubkey: mintKeypair.publicKey,
@@ -64,31 +91,28 @@ export async function POST(request: Request) {
         lamports: rentLamports,
         programId: TOKEN_PROGRAM_ID,
       }),
-      // Instrução 3: Inicializar o mint com as propriedades do token
       createInitializeMintInstruction(
         mintKeypair.publicKey,
         decimals,
-        userPublicKey, // Mint Authority (usuário que pode criar novos tokens)
-        freezeAuthority ? userPublicKey : null, // Freeze Authority (usuário que pode congelar contas de token)
+        userPublicKey,
+        freezeAuthority ? userPublicKey : null,
         TOKEN_PROGRAM_ID
       ),
-      // Instrução 4: Criar la conta de token associada (ATA) para a carteira do usuário
       createAssociatedTokenAccountInstruction(
         userPublicKey,
         associatedTokenAccount,
         userPublicKey,
         mintKeypair.publicKey
       ),
-      // Instrução 5: Mintar (criar) o fornecimento inicial para a ATA do usuário
       createMintToInstruction(
         mintKeypair.publicKey,
         associatedTokenAccount,
-        userPublicKey, // Mint Authority
-        BigInt(supply * Math.pow(10, decimals)) // O fornecimento precisa ser em BigInt
-      )
+        userPublicKey,
+        BigInt(supply * Math.pow(10, decimals))
+      ),
+      ...web3Instructions
     );
 
-    // Instrução 6 (Opcional): Revogar a autoridade de mint se o usuário desejar
     if (!mintAuthority) {
         transaction.add(
             createSetAuthorityInstruction(
@@ -100,18 +124,14 @@ export async function POST(request: Request) {
         );
     }
 
-    // 6. Serializar a transação com assinatura parcial do mint
-    // A carteira do usuário no front-end será a primeira a assinar (como pagador).
-    // A assinatura do mintKeypair é necessária pois é uma nova conta sendo criada.
     transaction.partialSign(mintKeypair);
 
     const serializedTransaction = transaction.serialize({
-      requireAllSignatures: false, // A assinatura do usuário (pagador) ainda é necessária
+      requireAllSignatures: false,
     });
     
     const base64Transaction = serializedTransaction.toString('base64');
 
-    // 7. Retornar a transação serializada e o endereço do mint para o front-end
     return NextResponse.json({
       transaction: base64Transaction,
       mintAddress: mintKeypair.publicKey.toBase58(),
