@@ -20,12 +20,12 @@ const TokenPreview = ({ name, symbol, imageUrl, supply }: TokenPreviewProps) => 
             </CardHeader>
             <CardContent>
                 <div className={styles.tokenDisplay}>
-                    <img 
-                      src={imageUrl || './favicon.ico'} 
-                      alt="Pré-visualização do token" 
-                      className={styles.tokenImage}
-                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/80'; }}
-                    />
+                    <img
+    src={imageUrl || './favicon.ico'}
+    alt="Pré-visualização do token"
+    className={styles.tokenImage}
+    onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/80'; }}
+/>
 
                     <div className={styles.tokenInfo}>
                         <p className={styles.tokenName}>{name || 'Meu Token'}</p>

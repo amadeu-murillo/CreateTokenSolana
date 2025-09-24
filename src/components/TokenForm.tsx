@@ -210,12 +210,12 @@ export default function TokenForm() {
       </form>
 
       <div className={styles.previewContainer}>
-        <TokenPreview 
-            name={name} 
-            symbol={symbol} 
-            imageUrl={imageUrl} 
-            supply={supply}
-        />
+        <TokenPreview
+    name={name}
+    symbol={symbol}
+    imageUrl={imageUrl}
+    supply={supply}
+/>
       </div>
     </div>
   );
