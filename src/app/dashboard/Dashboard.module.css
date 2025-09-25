@@ -48,6 +48,8 @@
   font-size: 0.75rem;
   color: hsl(var(--muted-foreground));
   margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .mintAddress {
@@ -106,24 +108,32 @@
   transform: scale(1.05);
 }
 
-/* Notification Styles */
-.notification {
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    border-radius: var(--radius);
-    border: 1px solid;
+/* Estilos para o estado vazio */
+.emptyStateContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
 }
-.notification.success {
-    background-color: hsla(145, 63%, 49%, 0.1);
-    border-color: hsla(145, 63%, 49%, 0.5);
-    color: hsl(145, 63%, 40%);
+
+.emptyStateIcon {
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 1.5rem;
 }
-.notification.error {
-    background-color: hsla(0, 72%, 51%, 0.1);
-    border-color: hsla(0, 72%, 51%, 0.5);
-    color: hsl(var(--destructive));
+
+.emptyStateContainer h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
 }
-.notification a {
-    text-decoration: underline;
-    margin-left: 0.5rem;
+
+.emptyStateContainer p {
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 1.5rem;
+}
+
+.emptyStateButton {
+  max-width: 250px;
 }

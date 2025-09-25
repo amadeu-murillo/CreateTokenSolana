@@ -5,10 +5,11 @@
   margin-left: auto;
   margin-right: auto;
   align-items: start;
-  grid-template-columns: 1fr; /* Padrão de uma coluna para mobile */
+  /* Melhoria de Responsividade: Garante uma única coluna em telas menores por padrão */
+  grid-template-columns: 1fr;
 }
 
-/* Layout de duas colunas para telas maiores */
+/* Layout de duas colunas para telas maiores (desktop) */
 @media (min-width: 1024px) {
   .grid {
     grid-template-columns: 2fr 1fr;

@@ -48,3 +48,4 @@ const Notification: React.FC<NotificationProps> = ({ type, message, txId, onClos
 };
 
 export default Notification;
+

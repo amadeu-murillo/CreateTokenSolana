@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { VersionedTransaction } from "@solana/web3.js"; // MODIFICAÇÃO
+import { VersionedTransaction } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 
 interface TokenData {
@@ -21,21 +21,22 @@ interface TokenData {
 
 function getFriendlyErrorMessage(error: any): string {
     const message = error.message || String(error);
+    console.error("Create token error:", error);
 
     if (message.includes("User rejected the request")) {
-        return "Transação rejeitada pelo usuário na carteira.";
+        return "Transação rejeitada pelo utilizador na carteira.";
     }
     if (message.includes("not enough SOL")) {
-        return "Falha na transação. Verifique se você possui SOL suficiente para os custos.";
+        return "Falha na transação. Verifique se possui SOL suficiente para os custos.";
     }
     if (message.includes("Transaction simulation failed")) {
-        return "A simulação da transação falhou. Isto pode ser um problema temporário na rede.";
+        return "A simulação da transação falhou. Isto pode ser um problema temporário na rede ou dados inválidos.";
     }
      if (message.includes("blockhash")) {
         return "O blockhash da transação expirou. Por favor, tente novamente.";
     }
 
-    return message;
+    return "Ocorreu um erro ao criar o token. Verifique o console para mais detalhes.";
 }
 
 export const useCreateToken = () => {
@@ -47,7 +48,7 @@ export const useCreateToken = () => {
 
   const createToken = async (tokenData: TokenData) => {
     if (!publicKey || !sendTransaction) {
-      const errorMessage = "Carteira não conectada. Por favor, conecte sua carteira para continuar.";
+      const errorMessage = "Carteira não conectada. Por favor, conecte a sua carteira para continuar.";
       setError(errorMessage);
       alert(errorMessage);
       return null;
@@ -76,7 +77,6 @@ export const useCreateToken = () => {
       }
       
       const transactionBuffer = Buffer.from(result.transaction, 'base64');
-      // MODIFICAÇÃO: Desserializando como VersionedTransaction
       const transaction = VersionedTransaction.deserialize(transactionBuffer);
       
       const signature = await sendTransaction(transaction, connection);
@@ -94,7 +94,6 @@ export const useCreateToken = () => {
       return { signature, mintAddress: result.mintAddress };
 
     } catch (err: any) {
-      console.error("Erro no processo de criação do token:", err);
       const friendlyMessage = getFriendlyErrorMessage(err);
       setError(friendlyMessage);
       router.push(`/confirmation?status=error&error=${encodeURIComponent(friendlyMessage)}`);

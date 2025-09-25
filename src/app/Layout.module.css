@@ -126,45 +126,107 @@
 
 /* === FOOTER === */
 .footer {
-  padding: 2rem 0;
+  padding: 4rem 0 2rem; /* Aumenta o padding vertical */
   border-top: 1px solid hsl(var(--border));
-  background: linear-gradient(
-    to right,
-    hsl(var(--background)) 0%,
-    hsl(var(--background) / 0.85) 100%
-  );
+  background-color: hsl(var(--card)); /* Fundo mais sólido para o footer */
 }
 
 .footerContainer {
   display: flex;
   flex-direction: column;
+  gap: 3rem;
+}
+
+.footerGrid {
+  display: grid;
+  grid-template-columns: 1fr; /* Coluna única em mobile */
+  gap: 2.5rem;
+  width: 100%;
+}
+
+@media(min-width: 768px) {
+  .footerGrid {
+    grid-template-columns: 2fr 1fr 1fr; /* Layout de 3 colunas para desktop */
+  }
+}
+
+.footerBranding .logoLink {
+  margin-bottom: 1rem;
+}
+
+.footerTagline {
+  font-size: 0.9rem;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.6;
+  max-width: 320px;
+  margin-bottom: 1.5rem;
+}
+
+.footerSocials {
+  display: flex;
   gap: 1rem;
-  align-items: center;
-  justify-content: center;
+}
+
+.socialLink {
+  color: hsl(var(--muted-foreground));
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.socialLink:hover {
+  color: hsl(var(--primary));
+  transform: scale(1.1);
+}
+
+.socialLink svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.footerColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.footerColumnTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: hsl(var(--foreground));
+}
+
+.footerLink {
+  color: hsl(var(--muted-foreground));
+  transition: color 0.2s ease;
+  text-decoration: none;
+}
+
+.footerLink:hover {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+}
+
+.footerBottom {
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 2rem;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .footerText {
   font-size: 0.85rem;
-  line-height: 1.6;
   color: hsl(var(--muted-foreground));
 }
 
-/* Links do footer */
-.footerLinks {
-  display: flex;
-  gap: 1.2rem;
-  font-size: 0.9rem;
+.footerDisclaimer {
+  font-size: 0.75rem;
+  color: hsla(var(--muted-foreground), 0.7);
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-.footerLinks a {
-  color: hsl(var(--muted-foreground));
-  transition: color 0.2s ease;
-}
-
-.footerLinks a:hover {
-  color: hsl(var(--foreground));
-}
 
 /* Animação */
 @keyframes fadeInUp {

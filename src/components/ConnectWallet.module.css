@@ -6,7 +6,7 @@
 
 .address {
   font-size: 0.875rem;
-  font-family: var(--font-mono);
+  font-family: monospace; /* Usando a variável de fonte mono */
   background-color: hsl(var(--muted));
   color: hsl(var(--muted-foreground));
   padding: 0.5rem 0.75rem;
@@ -21,20 +21,33 @@
     }
 }
 
-/* Sobrescrever os estilos do botão do adaptador de carteira */
+/* Unificação de Estilos de Botões */
+/* Sobrescreve os estilos do WalletMultiButton para alinhá-lo com o design system. */
 .container :global(.wallet-adapter-button) {
     background-image: var(--primary-gradient) !important;
-    color: white !important;
+    background-size: 200% auto;
+    color: hsl(var(--primary-foreground)) !important;
     transition: all 0.2s ease-in-out !important;
     border-radius: var(--radius) !important;
-    height: 2.5rem !important;
-    padding: 0 1.5rem !important;
-    font-weight: 500 !important;
+    height: 2.75rem !important; /* Altura ajustada */
+    padding: 0.75rem 1.5rem !important; /* Padding ajustado */
+    font-weight: 600 !important; /* Peso da fonte ajustado */
     border: none !important;
+    box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.1);
+    text-transform: none !important;
+    letter-spacing: 0.02em;
 }
 
-.container :global(.wallet-adapter-button:hover) {
-    transform: scale(1.02);
+.container :global(.wallet-adapter-button:hover:not(:disabled)) {
+    background-position: right center !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px 0 rgba(0, 0, 0, 0.15) !important;
     opacity: 1 !important;
 }
 
+.container :global(.wallet-adapter-button:disabled) {
+    opacity: 0.5 !important;
+    cursor: not-allowed;
+}
+
+/* Removemos o :focus-visible daqui para usar o global */

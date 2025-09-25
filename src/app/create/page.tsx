@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 
 
 // SVG Icons as components
+const Layers = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
 const TextCursorInput = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h1a3 3 0 0 1 3 3v13"/><path d="M11 4h1a3 3 0 0 1 3 3v13"/><path d="M17 4h1a3 3 0 0 1 3 3v13"/><path d="M12 20h10"/></svg>;
 const CircleDot = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg>;
 const Coins = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="M16.71 13.88.71 4.12"/></svg>;
@@ -19,9 +20,14 @@ const ImageIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" heigh
 
 const tutorialSteps = [
     {
+        icon: <Layers />,
+        title: "Padrão do Token",
+        description: "SPL Padrão: ideal para a maioria dos casos, com máxima compatibilidade. Token-2022: permite funcionalidades avançadas, como taxas de transferência."
+    },
+    {
         icon: <TextCursorInput />,
         title: "Nome e Símbolo",
-        description: "A identidade do seu token. O nome é como ele será conhecido (ex: MyToken), e o símbolo é a sua abreviação (ex: MYT)."
+        description: "A identidade do seu token. O nome é como ele será conhecido (ex: Meu Token), e o símbolo é a sua abreviação (ex: MEU)."
     },
     {
         icon: <CircleDot />,
@@ -31,7 +37,7 @@ const tutorialSteps = [
     {
         icon: <Coins />,
         title: "Fornecimento Total",
-        description: "A quantidade total de tokens que serão criados e colocados em circulação. Este número é fixo após a criação."
+        description: "A quantidade total de tokens que serão criados. Este número pode ser fixo ou não, dependendo das 'Opções de Autoridade'."
     },
     {
         icon: <ImageIcon />,

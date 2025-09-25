@@ -1,7 +1,22 @@
-.container {
-  max-width: 36rem; /* 576px */
+/* Layout principal em grid para desktop */
+.grid {
+  display: grid;
+  gap: 2.5rem;
+  max-width: 72rem;
   margin-left: auto;
   margin-right: auto;
+  align-items: start;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.formContainer {
+  width: 100%;
 }
 
 .form {
@@ -50,4 +65,62 @@
 .success a {
   color: hsl(var(--primary));
   text-decoration: underline;
+}
+
+
+/* --- Estilos da Sidebar e Cards de Guia --- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  position: sticky;
+  top: 6rem;
+}
+
+.sidebarTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+  margin-bottom: -0.5rem;
+}
+
+.tutorialCard {
+  background-color: hsla(var(--card), 0.5);
+  border: 1px solid hsl(var(--border));
+}
+
+.tutorialCard > :global(div) {
+  padding: 1.25rem !important;
+}
+
+.tutorialCardContent {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.tutorialIcon {
+  color: hsl(var(--primary));
+  margin-top: 2px;
+}
+
+.tutorialIcon svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.tutorialTitle {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: hsl(var(--foreground));
+  font-size: 1rem;
+}
+
+.tutorialDescription {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
