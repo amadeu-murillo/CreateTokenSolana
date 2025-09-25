@@ -84,9 +84,13 @@ export async function GET(request: Request) {
         console.error('Erro ao buscar histórico de tokens:', error);
         let errorMessage = 'Erro interno do servidor ao buscar o histórico.';
         if (error instanceof Error) {
+            // MODIFICAÇÃO: Tratamento de erro específico para o problema de RPC
+            if (error.message.includes('Failed to query long-term storage')) {
+                errorMessage = 'Não foi possível carregar o histórico completo. O nó RPC da Solana está com dificuldades para aceder a dados antigos. Por favor, tente novamente mais tarde.';
+                return NextResponse.json({ error: errorMessage }, { status: 503 }); // Service Unavailable
+            }
             errorMessage = error.message;
         }
         return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
-

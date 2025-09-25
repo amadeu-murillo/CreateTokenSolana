@@ -34,6 +34,43 @@ position: sticky;
 top: 6rem;
 }
 
+/* Opções de Rádio para Padrão de Token */
+.radioGroup {
+  display: flex;
+  gap: 1rem;
+  background-color: hsl(var(--muted) / 0.4);
+  padding: 0.5rem;
+  border-radius: var(--radius);
+}
+
+.radioLabel {
+  flex: 1;
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  border-radius: calc(var(--radius) - 4px);
+  text-align: center;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+}
+
+.radioLabel input {
+  display: none;
+}
+
+.radioLabel span {
+  display: block;
+}
+
+.radioLabel input:checked + span {
+  color: hsl(var(--primary-foreground));
+}
+
+.radioLabel:has(input:checked) {
+    background-image: var(--primary-gradient);
+    color: white;
+}
+
+
 /* Advanced Options */
 .advancedSection {
 border-top: 1px solid hsl(var(--border));
@@ -55,7 +92,7 @@ margin-bottom: 0.5rem;
 .advancedContent {
 display: flex;
 flex-direction: column;
-gap: 1rem; /* Aumenta o espaçamento */
+gap: 1rem;
 padding: 1rem;
 background-color: hsla(var(--muted), 0.3);
 border-radius: var(--radius);
@@ -64,13 +101,13 @@ border-radius: var(--radius);
 .checkboxWrapper {
 display: flex;
 align-items: center;
-gap: 0.75rem; /* Aumenta o espaçamento */
+gap: 0.75rem;
 }
 
 .checkboxWrapper input {
 width: 1rem;
 height: 1rem;
-accent-color: hsl(var(--primary)); /* Cor do checkbox */
+accent-color: hsl(var(--primary));
 }
 
 .checkboxWrapper label {
@@ -113,4 +150,10 @@ animation: fadeIn 0.2s ease-out forwards;
 to {
 opacity: 1;
 }
+}
+
+.feeInputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
 }

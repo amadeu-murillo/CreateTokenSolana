@@ -27,3 +27,22 @@
   color: var(--primary);
   text-decoration: underline;
 }
+
+/* Estilos para o Call-to-Action */
+.ctaContainer {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background-color: hsla(var(--primary), 0.05);
+    border: 1px solid hsla(var(--primary), 0.2);
+    border-radius: var(--radius);
+    text-align: center;
+}
+
+.ctaContainer p {
+    margin-bottom: 1rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.ctaButton {
+    width: 100%;
+}

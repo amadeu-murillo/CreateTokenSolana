@@ -12,13 +12,16 @@ import {
 import {
   MINT_SIZE,
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
   createInitializeMintInstruction,
-  getMinimumBalanceForRentExemptMint,
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddress,
   createMintToInstruction,
   createSetAuthorityInstruction,
-  AuthorityType
+  AuthorityType,
+  ExtensionType,
+  getMintLen,
+  createInitializeTransferFeeConfigInstruction,
 } from '@solana/spl-token';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_TOKEN_LAMPORTS } from '@/lib/constants';
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
@@ -28,10 +31,24 @@ import { createSignerFromKeypair, percentAmount, signerIdentity } from '@metaple
 
 export async function POST(request: Request) {
   try {
-    const { name, symbol, imageUrl, decimals, supply, wallet, mintAuthority, freezeAuthority } = await request.json();
-    const { origin } = new URL(request.url); // Pega a URL base da sua aplicação
+    const { 
+        name, 
+        symbol, 
+        imageUrl, 
+        decimals, 
+        supply, 
+        wallet, 
+        mintAuthority, 
+        freezeAuthority,
+        // MODIFICAÇÃO: Recebe novos campos do frontend
+        tokenStandard, 
+        transferFee, 
+        isMetadataMutable 
+    } = await request.json();
 
-    if (!name || !symbol || !imageUrl || decimals === undefined || !supply || !wallet) {
+    const { origin } = new URL(request.url);
+
+    if (!name || !symbol || !imageUrl || decimals === undefined || !supply || !wallet || !tokenStandard) {
       return NextResponse.json({ error: 'Dados incompletos fornecidos.' }, { status: 400 });
     }
 
@@ -41,40 +58,27 @@ export async function POST(request: Request) {
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
     const umi = createUmi(RPC_ENDPOINT);
     
-    // Assinatura para a conta do mint
     const umiSigner = createSignerFromKeypair(umi, fromWeb3JsKeypair(mintKeypair));
     umi.use(signerIdentity(umiSigner));
     
-    // ✅ CORREÇÃO: Construir a URI de metadados que aponta para nossa própria API
     const metadataUri = `${origin}/api/metadata?mint=${mintKeypair.publicKey.toBase58()}`;
     
-    // Construir a instrução de metadados com a URI correta e curta
-    const createMetadataIx = createV1(umi, {
-        mint: fromWeb3JsPublicKey(mintKeypair.publicKey),
-        authority: umiSigner,
-        name: name,
-        symbol: symbol,
-        uri: metadataUri, // ✅ USA A NOVA URI CURTA
-        sellerFeeBasisPoints: percentAmount(0, 2),
-        tokenStandard: TokenStandard.Fungible,
-        isMutable: true,
-    }).getInstructions();
+    // MODIFICAÇÃO: Lógica para determinar o programId (SPL ou Token-2022)
+    const programId = tokenStandard === 'token-2022' ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
 
-    // O resto do seu código continua aqui...
-    const web3Instructions = createMetadataIx.map(ix => ({
-        keys: ix.keys.map(key => ({
-            pubkey: new PublicKey(key.pubkey),
-            isSigner: key.isSigner,
-            isWritable: key.isWritable,
-        })),
-        programId: new PublicKey(ix.programId),
-        data: Buffer.from(ix.data),
-    }));
+    // MODIFICAÇÃO: Lógica para calcular o tamanho do mint com base nas extensões
+    // Determine o tamanho da conta do mint com base nas extensões
+    const extensions = tokenStandard === 'token-2022' ? [ExtensionType.TransferFeeConfig] : [];
+    const mintLen = getMintLen(extensions);
+    
+    // MODIFICAÇÃO: Corrigido o nome da função para obter o rent.
+    const rentLamports = await connection.getMinimumBalanceForRentExemption(mintLen);
 
-    const rentLamports = await getMinimumBalanceForRentExemptMint(connection);
     const associatedTokenAccount = await getAssociatedTokenAddress(
       mintKeypair.publicKey,
-      userPublicKey
+      userPublicKey,
+      false, // allowOwnerOffCurve
+      programId // Use o programId correto
     );
 
     const transaction = new Transaction({
@@ -82,9 +86,8 @@ export async function POST(request: Request) {
         ...(await connection.getLatestBlockhash('confirmed')),
     });
 
-    // Adicionar instruções de compute budget (boa prática)
     transaction.add(
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }), // Aumenta o limite para transações mais complexas
         ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1000 })
     );
 
@@ -97,31 +100,74 @@ export async function POST(request: Request) {
       SystemProgram.createAccount({
         fromPubkey: userPublicKey,
         newAccountPubkey: mintKeypair.publicKey,
-        space: MINT_SIZE,
+        space: mintLen, // Usa o tamanho calculado
         lamports: rentLamports,
-        programId: TOKEN_PROGRAM_ID,
-      }),
+        programId: programId, // Usa o programId correto
+      })
+    );
+      
+    // MODIFICAÇÃO: Adiciona a instrução de taxa de transferência se for Token-2022
+    if (tokenStandard === 'token-2022' && transferFee && transferFee.basisPoints > 0) {
+        transaction.add(
+            createInitializeTransferFeeConfigInstruction(
+                mintKeypair.publicKey,
+                userPublicKey, // transferFeeConfigAuthority
+                userPublicKey, // withdrawWithheldAuthority
+                transferFee.basisPoints,
+                BigInt(transferFee.maxFee),
+                programId
+            )
+        );
+    }
+
+    transaction.add(
       createInitializeMintInstruction(
         mintKeypair.publicKey,
         decimals,
         userPublicKey,
         freezeAuthority ? userPublicKey : null,
-        TOKEN_PROGRAM_ID
+        programId // Usa o programId correto
       ),
-      createAssociatedTokenAccountInstruction(
+       createAssociatedTokenAccountInstruction(
         userPublicKey,
         associatedTokenAccount,
         userPublicKey,
-        mintKeypair.publicKey
+        mintKeypair.publicKey,
+        programId
       ),
       createMintToInstruction(
         mintKeypair.publicKey,
         associatedTokenAccount,
         userPublicKey,
-        BigInt(supply * Math.pow(10, decimals))
-      ),
-      ...web3Instructions
+        BigInt(supply * Math.pow(10, decimals)),
+        [],
+        programId
+      )
     );
+      
+    // MODIFICAÇÃO: Lógica de metadados movida para depois das instruções principais
+    const createMetadataIx = createV1(umi, {
+        mint: fromWeb3JsPublicKey(mintKeypair.publicKey),
+        authority: umiSigner,
+        name: name,
+        symbol: symbol,
+        uri: metadataUri,
+        sellerFeeBasisPoints: percentAmount(0, 2),
+        tokenStandard: tokenStandard === 'token-2022' ? TokenStandard.Fungible : TokenStandard.FungibleAsset,
+        isMutable: isMetadataMutable, // Usa o valor do formulário
+    }).getInstructions();
+
+    const web3Instructions = createMetadataIx.map(ix => ({
+        keys: ix.keys.map(key => ({
+            pubkey: new PublicKey(key.pubkey),
+            isSigner: key.isSigner,
+            isWritable: key.isWritable,
+        })),
+        programId: new PublicKey(ix.programId),
+        data: Buffer.from(ix.data),
+    }));
+      
+    transaction.add(...web3Instructions);
 
     if (!mintAuthority) {
         transaction.add(
@@ -129,17 +175,16 @@ export async function POST(request: Request) {
                 mintKeypair.publicKey,
                 userPublicKey,
                 AuthorityType.MintTokens,
-                null
+                null,
+                [],
+                programId
             )
         );
     }
-
+      
     transaction.partialSign(mintKeypair);
 
-    const serializedTransaction = transaction.serialize({
-      requireAllSignatures: false,
-    });
-    
+    const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
     const base64Transaction = serializedTransaction.toString('base64');
 
     return NextResponse.json({
@@ -156,3 +201,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+

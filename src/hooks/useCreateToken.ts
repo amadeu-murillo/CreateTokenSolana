@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
+import { Transaction } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 
+// Interface atualizada para incluir os novos campos
 interface TokenData {
   name: string;
   symbol: string;
@@ -11,6 +12,12 @@ interface TokenData {
   imageUrl: string; 
   mintAuthority: boolean;
   freezeAuthority: boolean;
+  tokenStandard: 'spl' | 'token-2022';
+  transferFee: {
+      basisPoints: number;
+      maxFee: number;
+  };
+  isMetadataMutable: boolean;
 }
 
 function getFriendlyErrorMessage(error: any): string {
@@ -48,11 +55,18 @@ export const useCreateToken = () => {
       return null;
     }
 
+    // MODIFICAÇÃO: Adicionada verificação para garantir que a conexão não é nula.
+    if (!connection) {
+        const errorMessage = "A conexão com a rede Solana não foi estabelecida. Tente novamente.";
+        setError(errorMessage);
+        alert(errorMessage);
+        return null;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      // 1. Chamar o backend para obter a transação a ser assinada
       const response = await fetch('/api/create-token', {
         method: 'POST',
         headers: {
@@ -66,16 +80,13 @@ export const useCreateToken = () => {
       if (!response.ok) {
         throw new Error(result.error || 'Falha ao preparar a transação no servidor.');
       }
-
-      // 2. Desserializar a transação recebida do backend
+      
       const transactionBuffer = Buffer.from(result.transaction, 'base64');
       const transaction = Transaction.from(transactionBuffer);
       
-      // 3. Usar o 'sendTransaction' do adapter para o usuário assinar e enviar
       const signature = await sendTransaction(transaction, connection);
       console.log(`Transação enviada com a assinatura: ${signature}`);
 
-      // 4. Aguardar a confirmação da transação na blockchain
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
       await connection.confirmTransaction({
         signature,
@@ -84,7 +95,6 @@ export const useCreateToken = () => {
       }, 'confirmed');
       console.log('Transação confirmada!');
 
-      // 5. Redirecionar para a página de confirmação com sucesso
       router.push(`/confirmation?status=success&tokenAddress=${result.mintAddress}&txId=${signature}`);
 
       return { signature, mintAddress: result.mintAddress };
@@ -93,7 +103,6 @@ export const useCreateToken = () => {
       console.error("Erro no processo de criação do token:", err);
       const friendlyMessage = getFriendlyErrorMessage(err);
       setError(friendlyMessage);
-      // 6. Redirecionar para a página de confirmação com erro
       router.push(`/confirmation?status=error&error=${encodeURIComponent(friendlyMessage)}`);
       return null;
     } finally {
@@ -103,3 +112,4 @@ export const useCreateToken = () => {
 
   return { createToken, isLoading, error };
 };
+

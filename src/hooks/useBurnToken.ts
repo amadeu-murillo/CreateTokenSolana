@@ -30,6 +30,10 @@ export const useBurnToken = () => {
       setError("Carteira não conectada.");
       return;
     }
+    if (!connection) {
+        setError("A conexão com a rede Solana não foi estabelecida. Tente novamente.");
+        return;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -65,3 +69,4 @@ export const useBurnToken = () => {
 
   return { burnToken, isLoading, error, signature };
 };
+

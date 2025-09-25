@@ -2,34 +2,32 @@ import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { Transaction } from "@solana/web3.js";
 
+interface CreateLpData {
+    mint: string;
+    quoteMint: string;
+    baseAmount: number;
+    quoteAmount: number;
+}
+
 function getFriendlyErrorMessage(error: any): string {
     const message = error.message || String(error);
     if (message.includes("User rejected the request")) {
         return "Transação rejeitada pelo usuário na carteira.";
     }
-    return "Ocorreu um erro durante o airdrop.";
+    return "Ocorreu um erro ao criar o pool de liquidez.";
 }
 
-interface Recipient {
-    address: string;
-    amount: number;
-}
-
-export const useAirdrop = () => {
+export const useCreateLiquidityPool = () => {
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
 
-  const performAirdrop = async (mint: string, recipients: Recipient[]) => {
+  const createLiquidityPool = async (data: CreateLpData) => {
     if (!publicKey || !sendTransaction) {
       setError("Carteira não conectada.");
       return;
-    }
-    if (!connection) {
-        setError("A conexão com a rede Solana não foi estabelecida. Tente novamente.");
-        return;
     }
 
     setIsLoading(true);
@@ -37,10 +35,10 @@ export const useAirdrop = () => {
     setSignature(null);
 
     try {
-      const response = await fetch('/api/airdrop', {
+      const response = await fetch('/api/create-lp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mint, recipients, wallet: publicKey.toBase58() }),
+        body: JSON.stringify({ ...data, wallet: publicKey.toBase58() }),
       });
 
       const result = await response.json();
@@ -64,6 +62,5 @@ export const useAirdrop = () => {
     }
   };
 
-  return { performAirdrop, isLoading, error, signature };
+  return { createLiquidityPool, isLoading, error, signature };
 };
-

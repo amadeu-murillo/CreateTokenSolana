@@ -21,6 +21,10 @@ export const useManageAuthority = () => {
       setError("Carteira não conectada.");
       return null;
     }
+    if (!connection) {
+        setError("A conexão com a rede Solana não foi estabelecida. Tente novamente.");
+        return null;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -53,3 +57,4 @@ export const useManageAuthority = () => {
 
   return { manageAuthority, isLoading, error };
 };
+
