@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import ManageAuthorityModal from "@/components/ManageAuthorityModal";
 import { useManageAuthority } from "@/hooks/useManageAuthority";
 import styles from './Dashboard.module.css';
+import Notification from "@/components/ui/Notification"; // Importar o novo componente
 
 interface TokenHistoryItem {
     signature: string;
@@ -19,6 +20,13 @@ type AuthorityModalState = {
     mint: string | null;
     type: 'mint' | 'freeze' | null;
 };
+
+// Modificação: O estado da notificação agora inclui um txId opcional
+type NotificationState = {
+    type: 'success' | 'error';
+    message: string;
+    txId?: string | null;
+} | null;
 
 const HistoryItem = ({ item, onManageAuthorityClick }: { item: TokenHistoryItem, onManageAuthorityClick: (mint: string, type: 'mint' | 'freeze') => void }) => (
     <div className={styles.historyItem}>
@@ -51,7 +59,7 @@ export default function DashboardPage() {
     const [history, setHistory] = useState<TokenHistoryItem[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [errorHistory, setErrorHistory] = useState<string | null>(null);
-    const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+    const [notification, setNotification] = useState<NotificationState>(null);
 
     const { manageAuthority, isLoading: isManagingAuthority, error: manageAuthorityError } = useManageAuthority();
 
@@ -92,9 +100,11 @@ export default function DashboardPage() {
         const signature = await manageAuthority(modalState.mint, modalState.type);
 
         if (signature) {
-             setNotification({type: 'success', message: `Autoridade removida com sucesso! Transação: ${signature}`});
+             // Modificação: Atualiza o estado da notificação com txId para sucesso
+             setNotification({type: 'success', message: `Autoridade removida com sucesso!`, txId: signature});
              fetchHistory(); // Re-fetch history to reflect changes
         } else {
+             // Modificação: Atualiza o estado da notificação para erro
              setNotification({type: 'error', message: manageAuthorityError || "Falha ao remover autoridade."});
         }
         setModalState({ isOpen: false, mint: null, type: null });
@@ -102,13 +112,14 @@ export default function DashboardPage() {
 
     return (
         <div className={styles.container}>
+             {/* Modificação: Usa o novo componente de Notificação */}
              {notification && (
-                <div className={`${styles.notification} ${notification.type === 'success' ? styles.success : styles.error}`}>
-                    <p>{notification.message}</p>
-                    {notification.type === 'success' && 
-                        <a href={`https://solscan.io/tx/${notification.message.split(': ')[1]}`} target="_blank" rel="noopener noreferrer">Ver no Solscan</a>
-                    }
-                </div>
+                <Notification
+                    type={notification.type}
+                    message={notification.message}
+                    txId={notification.txId}
+                    onClose={() => setNotification(null)}
+                />
             )}
             <Card>
                 <CardHeader>

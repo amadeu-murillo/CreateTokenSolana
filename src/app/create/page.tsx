@@ -1,7 +1,15 @@
+import { Metadata } from 'next';
 import TokenForm from "@/components/TokenForm";
 import CostSummary from "@/components/CostSummary";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import styles from './Create.module.css';
+
+// Adicionar metadados para SEO
+export const metadata: Metadata = {
+  title: 'Crie seu Token SPL na Solana',
+  description: 'Crie e lance sua própria criptomoeda ou token na blockchain Solana de forma rápida, barata e segura. Personalize nome, símbolo, imagem e fornecimento total.',
+};
+
 
 // SVG Icons as components
 const TextCursorInput = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h1a3 3 0 0 1 3 3v13"/><path d="M11 4h1a3 3 0 0 1 3 3v13"/><path d="M17 4h1a3 3 0 0 1 3 3v13"/><path d="M12 20h10"/></svg>;
@@ -69,4 +77,3 @@ export default function CreatePage() {
     </div>
   );
 }
-

@@ -1,14 +1,27 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { VersionedTransaction } from "@solana/web3.js"; // MODIFICAÇÃO
+import { VersionedTransaction } from "@solana/web3.js";
 
+// Função de tratamento de erro aprimorada e padronizada
 function getFriendlyErrorMessage(error: any): string {
     const message = error.message || String(error);
+    console.error("Airdrop error:", error);
+
     if (message.includes("User rejected the request")) {
         return "Transação rejeitada pelo usuário na carteira.";
     }
-    return "Ocorreu um erro durante o airdrop.";
+    if (message.includes("not enough SOL")) {
+        return "Falha na transação. Verifique se você possui SOL suficiente para as taxas.";
+    }
+    if (message.includes("Transaction simulation failed")) {
+        return "A simulação da transação falhou. Verifique os endereços dos destinatários e se você possui os tokens.";
+    }
+    if (message.includes("blockhash")) {
+        return "O blockhash da transação expirou. Por favor, tente novamente.";
+    }
+    return "Ocorreu um erro durante o airdrop. Verifique o console para mais detalhes.";
 }
+
 
 interface Recipient {
     address: string;
@@ -47,7 +60,6 @@ export const useAirdrop = () => {
       if (!response.ok) throw new Error(result.error);
       
       const transactionBuffer = Buffer.from(result.transaction, 'base64');
-      // MODIFICAÇÃO: Desserializando como VersionedTransaction
       const transaction = VersionedTransaction.deserialize(transactionBuffer);
       
       const sig = await sendTransaction(transaction, connection);

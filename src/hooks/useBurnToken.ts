@@ -1,18 +1,26 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { VersionedTransaction } from "@solana/web3.js"; // MODIFICAÇÃO
+import { VersionedTransaction } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 
+// Função de tratamento de erro aprimorada e padronizada
 function getFriendlyErrorMessage(error: any): string {
     const message = error.message || String(error);
+    console.error("Burn token error:", error);
 
     if (message.includes("User rejected the request")) {
         return "Transação rejeitada pelo usuário na carteira.";
     }
     if (message.includes("not enough SOL")) {
-        return "Falha na transação. Verifique se você possui SOL suficiente para os custos.";
+        return "Falha na transação. Verifique se você possui SOL suficiente para as taxas.";
     }
-    return "Ocorreu um erro. Por favor, tente novamente.";
+    if (message.includes("Transaction simulation failed")) {
+        return "A simulação da transação falhou. Verifique se o endereço do token está correto e se você possui a quantidade a ser queimada.";
+    }
+    if (message.includes("blockhash")) {
+        return "O blockhash da transação expirou. Por favor, tente novamente.";
+    }
+    return "Ocorreu um erro ao queimar os tokens. Verifique o console para mais detalhes.";
 }
 
 export const useBurnToken = () => {
@@ -48,7 +56,6 @@ export const useBurnToken = () => {
       if (!response.ok) throw new Error(result.error);
       
       const transactionBuffer = Buffer.from(result.transaction, 'base64');
-      // MODIFICAÇÃO: Desserializando como VersionedTransaction
       const transaction = VersionedTransaction.deserialize(transactionBuffer);
       
       const sig = await sendTransaction(transaction, connection);

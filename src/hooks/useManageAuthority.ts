@@ -1,13 +1,25 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { VersionedTransaction } from "@solana/web3.js"; // MODIFICAÇÃO
+import { VersionedTransaction } from "@solana/web3.js";
 
+// Função de tratamento de erro aprimorada e padronizada
 function getFriendlyErrorMessage(error: any): string {
     const message = error.message || String(error);
+    console.error("Manage authority error:", error);
+
     if (message.includes("User rejected the request")) {
-        return "Transação rejeitada pelo usuário.";
+        return "Transação rejeitada pelo usuário na carteira.";
     }
-    return "Ocorreu um erro ao tentar remover a autoridade.";
+    if (message.includes("not enough SOL")) {
+        return "Falha na transação. Verifique se você possui SOL suficiente para as taxas.";
+    }
+    if (message.includes("Transaction simulation failed")) {
+        return "A simulação da transação falhou. Verifique se você ainda possui a autoridade sobre este token.";
+    }
+    if (message.includes("blockhash")) {
+        return "O blockhash da transação expirou. Por favor, tente novamente.";
+    }
+    return "Ocorreu um erro ao remover a autoridade. Verifique o console para mais detalhes.";
 }
 
 export const useManageAuthority = () => {
@@ -40,7 +52,6 @@ export const useManageAuthority = () => {
       if (!response.ok) throw new Error(result.error);
       
       const transactionBuffer = Buffer.from(result.transaction, 'base64');
-       // MODIFICAÇÃO: Desserializando como VersionedTransaction
       const transaction = VersionedTransaction.deserialize(transactionBuffer);
       
       const signature = await sendTransaction(transaction, connection);
