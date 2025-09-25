@@ -119,14 +119,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     <p className={styles.footerTagline}>
                       A forma mais fácil e segura de lançar e gerenciar tokens na rede Solana.
                     </p>
-                    <div className={styles.footerSocials}>
-                        <a href="#" target="_blank" rel="noopener noreferrer" className={styles.socialLink} aria-label="GitHub">
-                            <IconGitHub />
-                        </a>
-                        <a href="#" target="_blank" rel="noopener noreferrer" className={styles.socialLink} aria-label="Twitter">
-                            <IconTwitter />
-                        </a>
-                    </div>
+                    
                   </div>
                   <div className={styles.footerColumn}>
                     <h4 className={styles.footerColumnTitle}>Ferramentas</h4>
