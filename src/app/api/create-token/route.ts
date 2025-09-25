@@ -9,6 +9,7 @@ import {
   ComputeBudgetProgram,
   TransactionMessage,
   VersionedTransaction,
+  TransactionInstruction,
 } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
@@ -27,7 +28,7 @@ import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_TOKEN_LAMPORTS } f
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { createV1, TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
 import { fromWeb3JsKeypair, fromWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
-import { createSignerFromKeypair, percentAmount, signerIdentity } from '@metaplex-foundation/umi';
+import { createNoopSigner, createSignerFromKeypair, percentAmount, signerIdentity } from '@metaplex-foundation/umi';
 
 export async function POST(request: Request) {
   try {
@@ -57,8 +58,9 @@ export async function POST(request: Request) {
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
     const umi = createUmi(RPC_ENDPOINT);
     
-    const umiSigner = createSignerFromKeypair(umi, fromWeb3JsKeypair(mintKeypair));
-    umi.use(signerIdentity(umiSigner));
+    const userUmiSigner = createNoopSigner(fromWeb3JsPublicKey(userPublicKey));
+    umi.use(signerIdentity(userUmiSigner));
+    const mintKeypairSigner = createSignerFromKeypair(umi, fromWeb3JsKeypair(mintKeypair));
     
     const metadataUri = `${origin}/api/metadata?mint=${mintKeypair.publicKey.toBase58()}`;
     
@@ -78,7 +80,7 @@ export async function POST(request: Request) {
       programId
     );
 
-    const instructions = [
+    const instructions: TransactionInstruction[] = [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
         ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
         SystemProgram.transfer({
@@ -133,15 +135,19 @@ export async function POST(request: Request) {
       )
     );
       
+    // CORREÇÃO: A autoridade para criar os metadados DEVE ser a autoridade de mint do token,
+    // que é a carteira do usuário (userUmiSigner).
     const createMetadataIx = createV1(umi, {
         mint: fromWeb3JsPublicKey(mintKeypair.publicKey),
-        authority: umiSigner,
+        authority: userUmiSigner, // <-- A CORREÇÃO ESTÁ AQUI
         name: name,
         symbol: symbol,
         uri: metadataUri,
         sellerFeeBasisPoints: percentAmount(0, 2),
-        tokenStandard: tokenStandard === 'token-2022' ? TokenStandard.Fungible : TokenStandard.FungibleAsset,
+        tokenStandard: TokenStandard.Fungible,
         isMutable: isMetadataMutable,
+        payer: userUmiSigner,
+        updateAuthority: userUmiSigner,
     }).getInstructions();
 
     const web3Instructions = createMetadataIx.map(ix => ({
@@ -171,7 +177,6 @@ export async function POST(request: Request) {
       
     const { blockhash } = await connection.getLatestBlockhash('confirmed');
     
-    // MODIFICAÇÃO: Construindo e serializando uma VersionedTransaction
     const messageV0 = new TransactionMessage({
         payerKey: userPublicKey,
         recentBlockhash: blockhash,
@@ -198,3 +203,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+

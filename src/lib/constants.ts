@@ -6,7 +6,7 @@ import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
  */
 export const DEV_WALLET_ADDRESS = new PublicKey(
     /*process.env.NEXT_PUBLIC_DEV_WALLET_ADDRESS || '4hSVNpgfh1tzn91jgbpH6fVEQ25b63Vd9cvLMJhE3FEf'*/
-     '4hSVNpgfh1tzn91jgbpH6fVEQ25b63Vd9cvLMJhE3FEf'
+     'CP6teSg2LUxQsSBBtwZ9xjG2aZjjznhfCvGED9LNgjrJ'
 );
 
 /**
