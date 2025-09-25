@@ -6,11 +6,11 @@ import {
   Keypair,
   PublicKey,
   SystemProgram,
-  Transaction,
   ComputeBudgetProgram,
+  TransactionMessage,
+  VersionedTransaction,
 } from '@solana/web3.js';
 import {
-  MINT_SIZE,
   TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
   createInitializeMintInstruction,
@@ -40,7 +40,6 @@ export async function POST(request: Request) {
         wallet, 
         mintAuthority, 
         freezeAuthority,
-        // MODIFICAÇÃO: Recebe novos campos do frontend
         tokenStandard, 
         transferFee, 
         isMetadataMutable 
@@ -63,56 +62,45 @@ export async function POST(request: Request) {
     
     const metadataUri = `${origin}/api/metadata?mint=${mintKeypair.publicKey.toBase58()}`;
     
-    // MODIFICAÇÃO: Lógica para determinar o programId (SPL ou Token-2022)
     const programId = tokenStandard === 'token-2022' ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
 
-    // MODIFICAÇÃO: Lógica para calcular o tamanho do mint com base nas extensões
-    // Determine o tamanho da conta do mint com base nas extensões
-    const extensions = tokenStandard === 'token-2022' ? [ExtensionType.TransferFeeConfig] : [];
+    const extensions = tokenStandard === 'token-2022' && transferFee.basisPoints > 0 
+        ? [ExtensionType.TransferFeeConfig] 
+        : [];
     const mintLen = getMintLen(extensions);
     
-    // MODIFICAÇÃO: Corrigido o nome da função para obter o rent.
     const rentLamports = await connection.getMinimumBalanceForRentExemption(mintLen);
 
     const associatedTokenAccount = await getAssociatedTokenAddress(
       mintKeypair.publicKey,
       userPublicKey,
-      false, // allowOwnerOffCurve
-      programId // Use o programId correto
+      false,
+      programId
     );
 
-    const transaction = new Transaction({
-        feePayer: userPublicKey,
-        ...(await connection.getLatestBlockhash('confirmed')),
-    });
+    const instructions = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
+        SystemProgram.transfer({
+            fromPubkey: userPublicKey,
+            toPubkey: DEV_WALLET_ADDRESS,
+            lamports: SERVICE_FEE_CREATE_TOKEN_LAMPORTS,
+        }),
+        SystemProgram.createAccount({
+            fromPubkey: userPublicKey,
+            newAccountPubkey: mintKeypair.publicKey,
+            space: mintLen,
+            lamports: rentLamports,
+            programId: programId,
+        }),
+    ];
 
-    transaction.add(
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }), // Aumenta o limite para transações mais complexas
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1000 })
-    );
-
-    transaction.add(
-      SystemProgram.transfer({
-        fromPubkey: userPublicKey,
-        toPubkey: DEV_WALLET_ADDRESS,
-        lamports: SERVICE_FEE_CREATE_TOKEN_LAMPORTS,
-      }),
-      SystemProgram.createAccount({
-        fromPubkey: userPublicKey,
-        newAccountPubkey: mintKeypair.publicKey,
-        space: mintLen, // Usa o tamanho calculado
-        lamports: rentLamports,
-        programId: programId, // Usa o programId correto
-      })
-    );
-      
-    // MODIFICAÇÃO: Adiciona a instrução de taxa de transferência se for Token-2022
     if (tokenStandard === 'token-2022' && transferFee && transferFee.basisPoints > 0) {
-        transaction.add(
+        instructions.push(
             createInitializeTransferFeeConfigInstruction(
                 mintKeypair.publicKey,
-                userPublicKey, // transferFeeConfigAuthority
-                userPublicKey, // withdrawWithheldAuthority
+                userPublicKey,
+                userPublicKey,
                 transferFee.basisPoints,
                 BigInt(transferFee.maxFee),
                 programId
@@ -120,13 +108,13 @@ export async function POST(request: Request) {
         );
     }
 
-    transaction.add(
+    instructions.push(
       createInitializeMintInstruction(
         mintKeypair.publicKey,
         decimals,
         userPublicKey,
         freezeAuthority ? userPublicKey : null,
-        programId // Usa o programId correto
+        programId
       ),
        createAssociatedTokenAccountInstruction(
         userPublicKey,
@@ -145,7 +133,6 @@ export async function POST(request: Request) {
       )
     );
       
-    // MODIFICAÇÃO: Lógica de metadados movida para depois das instruções principais
     const createMetadataIx = createV1(umi, {
         mint: fromWeb3JsPublicKey(mintKeypair.publicKey),
         authority: umiSigner,
@@ -154,7 +141,7 @@ export async function POST(request: Request) {
         uri: metadataUri,
         sellerFeeBasisPoints: percentAmount(0, 2),
         tokenStandard: tokenStandard === 'token-2022' ? TokenStandard.Fungible : TokenStandard.FungibleAsset,
-        isMutable: isMetadataMutable, // Usa o valor do formulário
+        isMutable: isMetadataMutable,
     }).getInstructions();
 
     const web3Instructions = createMetadataIx.map(ix => ({
@@ -167,10 +154,10 @@ export async function POST(request: Request) {
         data: Buffer.from(ix.data),
     }));
       
-    transaction.add(...web3Instructions);
+    instructions.push(...web3Instructions);
 
     if (!mintAuthority) {
-        transaction.add(
+        instructions.push(
             createSetAuthorityInstruction(
                 mintKeypair.publicKey,
                 userPublicKey,
@@ -182,10 +169,20 @@ export async function POST(request: Request) {
         );
     }
       
-    transaction.partialSign(mintKeypair);
+    const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    
+    // MODIFICAÇÃO: Construindo e serializando uma VersionedTransaction
+    const messageV0 = new TransactionMessage({
+        payerKey: userPublicKey,
+        recentBlockhash: blockhash,
+        instructions,
+    }).compileToV0Message();
 
-    const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
-    const base64Transaction = serializedTransaction.toString('base64');
+    const transaction = new VersionedTransaction(messageV0);
+    transaction.sign([mintKeypair]);
+
+    const serializedTransaction = transaction.serialize();
+    const base64Transaction = Buffer.from(serializedTransaction).toString('base64');
 
     return NextResponse.json({
       transaction: base64Transaction,
@@ -201,4 +198,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-

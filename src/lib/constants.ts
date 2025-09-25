@@ -2,13 +2,19 @@ import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 /**
  * RF-01: Chave da carteira de desenvolvimento para receber taxas de serviço.
+ * MODIFICAÇÃO: Lendo a partir de variáveis de ambiente para maior segurança.
  */
-export const DEV_WALLET_ADDRESS = new PublicKey('4hSVNpgfh1tzn91jgbpH6fVEQ25b63Vd9cvLMJhE3FEf');
+export const DEV_WALLET_ADDRESS = new PublicKey(
+    process.env.NEXT_PUBLIC_DEV_WALLET_ADDRESS || '4hSVNpgfh1tzn91jgbpH6fVEQ25b63Vd9cvLMJhE3FEf'
+);
 
 /**
  * RF-02: Endpoint RPC da Helius para a mainnet.
+ * MODIFICAÇÃO: A chave de API agora é gerenciada por variáveis de ambiente.
  */
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 export const RPC_ENDPOINT = 'https://mainnet.helius-rpc.com/?api-key=2e9c5f4b-aacf-4903-a787-0c431a50ffff';
+
 
 /**
  * RF-03: Taxas de serviço em SOL.

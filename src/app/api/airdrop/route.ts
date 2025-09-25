@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
-import { createTransferInstruction, getAssociatedTokenAddress, getOrCreateAssociatedTokenAccount } from '@solana/spl-token';
+import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, TransactionInstruction, ComputeBudgetProgram } from '@solana/web3.js';
+import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction, getMint } from '@solana/spl-token';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_AIRDROP_LAMPORTS } from '@/lib/constants';
 
 export async function POST(request: Request) {
@@ -15,41 +15,46 @@ export async function POST(request: Request) {
         const payerPublicKey = new PublicKey(wallet);
         const mintPublicKey = new PublicKey(mint);
 
-        const transaction = new Transaction({
-            feePayer: payerPublicKey,
-            ...(await connection.getLatestBlockhash('confirmed')),
-        });
+        // Buscar informações do mint para obter os decimais
+        const mintInfo = await getMint(connection, mintPublicKey);
 
-        // Adicionar taxa de serviço
-        transaction.add(
+        const instructions: TransactionInstruction[] = [
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 50000 * recipients.length }),
+            ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
             SystemProgram.transfer({
                 fromPubkey: payerPublicKey,
                 toPubkey: DEV_WALLET_ADDRESS,
                 lamports: SERVICE_FEE_AIRDROP_LAMPORTS,
             })
-        );
+        ];
         
         const sourceTokenAccount = await getAssociatedTokenAddress(mintPublicKey, payerPublicKey);
-
+        
+        // MODIFICAÇÃO: Lógica robusta para criar ATAs se não existirem
         for (const recipient of recipients) {
             try {
                 const destinationPublicKey = new PublicKey(recipient.address);
+                const destinationAta = await getAssociatedTokenAddress(mintPublicKey, destinationPublicKey);
                 
-                // A instrução getOrCreateAssociatedTokenAccount não pode ser usada aqui diretamente
-                // pois precisa ser assinada. Em vez disso, criamos a instrução para a transação.
-                // Esta abordagem assume que a conta de destino pode não existir.
-                const destinationTokenAccount = await getAssociatedTokenAddress(mintPublicKey, destinationPublicKey);
+                const accountInfo = await connection.getAccountInfo(destinationAta);
+                if (accountInfo === null) {
+                    // Adiciona instrução para criar a ATA de destino se não existir
+                    instructions.push(
+                        createAssociatedTokenAccountInstruction(
+                            payerPublicKey,
+                            destinationAta,
+                            destinationPublicKey,
+                            mintPublicKey
+                        )
+                    );
+                }
 
-                // Esta é uma simplificação. Uma implementação robusta verificaria se a conta existe
-                // e adicionaria `createAssociatedTokenAccountInstruction` se não existir.
-                // Por simplicidade, assumimos que a conta de destino já existe ou o cliente irá criá-la.
-
-                transaction.add(
+                instructions.push(
                     createTransferInstruction(
                         sourceTokenAccount,
-                        destinationTokenAccount,
+                        destinationAta,
                         payerPublicKey,
-                        recipient.amount * Math.pow(10, 9) // Novamente, assumindo 9 decimais
+                        BigInt(recipient.amount * Math.pow(10, mintInfo.decimals))
                     )
                 );
             } catch (e) {
@@ -57,12 +62,21 @@ export async function POST(request: Request) {
             }
         }
         
-        if (transaction.instructions.length <= 1) { // Apenas a taxa de serviço
+        if (instructions.length <= 1) { // Apenas a taxa de serviço
             return NextResponse.json({ error: 'Nenhum destinatário válido fornecido.' }, { status: 400 });
         }
+        
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        
+        const messageV0 = new TransactionMessage({
+            payerKey: payerPublicKey,
+            recentBlockhash: blockhash,
+            instructions,
+        }).compileToV0Message();
 
-        const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
-        const base64Transaction = serializedTransaction.toString('base64');
+        const transaction = new VersionedTransaction(messageV0);
+        const serializedTransaction = transaction.serialize();
+        const base64Transaction = Buffer.from(serializedTransaction).toString('base64');
 
         return NextResponse.json({ transaction: base64Transaction });
 

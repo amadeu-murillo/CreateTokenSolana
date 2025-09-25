@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { Connection, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
-import { createBurnInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, ComputeBudgetProgram } from '@solana/web3.js';
+import { createBurnInstruction, getAssociatedTokenAddress, getMint } from '@solana/spl-token';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_BURN_TOKEN_LAMPORTS } from '@/lib/constants';
 
 export async function POST(request: Request) {
@@ -15,34 +15,40 @@ export async function POST(request: Request) {
     const userPublicKey = new PublicKey(wallet);
     const mintPublicKey = new PublicKey(mint);
 
+    // Buscar as informações do mint para obter os decimais
+    const mintInfo = await getMint(connection, mintPublicKey);
+
     const associatedTokenAccount = await getAssociatedTokenAddress(mintPublicKey, userPublicKey);
 
-    const transaction = new Transaction({
-        feePayer: userPublicKey,
-        ...(await connection.getLatestBlockhash('confirmed')),
-    });
+    const instructions = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
+        SystemProgram.transfer({
+            fromPubkey: userPublicKey,
+            toPubkey: DEV_WALLET_ADDRESS,
+            lamports: SERVICE_FEE_BURN_TOKEN_LAMPORTS,
+        }),
+        createBurnInstruction(
+            associatedTokenAccount,
+            mintPublicKey,
+            userPublicKey,
+            BigInt(amount * Math.pow(10, mintInfo.decimals))
+        )
+    ];
 
-    // 1. Adicionar taxa de serviço
-    transaction.add(
-      SystemProgram.transfer({
-        fromPubkey: userPublicKey,
-        toPubkey: DEV_WALLET_ADDRESS,
-        lamports: SERVICE_FEE_BURN_TOKEN_LAMPORTS,
-      })
-    );
+    const { blockhash } = await connection.getLatestBlockhash('confirmed');
 
-    // 2. Adicionar instrução de queima de token
-    transaction.add(
-      createBurnInstruction(
-        associatedTokenAccount,
-        mintPublicKey,
-        userPublicKey,
-        amount * Math.pow(10, 9) // Assumindo 9 decimais, idealmente buscaria do mint
-      )
-    );
+    // MODIFICAÇÃO: Construindo e serializando uma VersionedTransaction
+    const messageV0 = new TransactionMessage({
+        payerKey: userPublicKey,
+        recentBlockhash: blockhash,
+        instructions,
+    }).compileToV0Message();
 
-    const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
-    const base64Transaction = serializedTransaction.toString('base64');
+    const transaction = new VersionedTransaction(messageV0);
+
+    const serializedTransaction = transaction.serialize();
+    const base64Transaction = Buffer.from(serializedTransaction).toString('base64');
 
     return NextResponse.json({
       transaction: base64Transaction,

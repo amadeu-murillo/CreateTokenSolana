@@ -16,6 +16,17 @@
   gap: 0.5rem;
 }
 
+.fieldDescription {
+    font-size: 0.8rem;
+    color: hsl(var(--muted-foreground));
+    margin-top: 0.25rem;
+}
+
+.link {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+}
+
 .error {
   margin-top: 1rem;
   color: hsl(var(--destructive));

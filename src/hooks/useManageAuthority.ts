@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Transaction } from "@solana/web3.js";
+import { VersionedTransaction } from "@solana/web3.js"; // MODIFICAÇÃO
 
 function getFriendlyErrorMessage(error: any): string {
     const message = error.message || String(error);
@@ -22,7 +22,7 @@ export const useManageAuthority = () => {
       return null;
     }
     if (!connection) {
-        setError("A conexão com a rede Solana não foi estabelecida. Tente novamente.");
+        setError("A conexão com a rede Solana não foi estabelecida.");
         return null;
     }
 
@@ -40,7 +40,8 @@ export const useManageAuthority = () => {
       if (!response.ok) throw new Error(result.error);
       
       const transactionBuffer = Buffer.from(result.transaction, 'base64');
-      const transaction = Transaction.from(transactionBuffer);
+       // MODIFICAÇÃO: Desserializando como VersionedTransaction
+      const transaction = VersionedTransaction.deserialize(transactionBuffer);
       
       const signature = await sendTransaction(transaction, connection);
       await connection.confirmTransaction(signature, 'confirmed');
@@ -57,4 +58,3 @@ export const useManageAuthority = () => {
 
   return { manageAuthority, isLoading, error };
 };
-

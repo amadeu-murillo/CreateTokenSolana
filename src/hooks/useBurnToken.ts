@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Transaction } from "@solana/web3.js";
+import { VersionedTransaction } from "@solana/web3.js"; // MODIFICAÇÃO
 import { useRouter } from "next/navigation";
 
-// Função genérica para tratar erros de transação
 function getFriendlyErrorMessage(error: any): string {
     const message = error.message || String(error);
 
@@ -13,7 +12,6 @@ function getFriendlyErrorMessage(error: any): string {
     if (message.includes("not enough SOL")) {
         return "Falha na transação. Verifique se você possui SOL suficiente para os custos.";
     }
-    // Adicione mais tratamentos de erro conforme necessário
     return "Ocorreu um erro. Por favor, tente novamente.";
 }
 
@@ -31,7 +29,7 @@ export const useBurnToken = () => {
       return;
     }
     if (!connection) {
-        setError("A conexão com a rede Solana não foi estabelecida. Tente novamente.");
+        setError("A conexão com a rede Solana não foi estabelecida.");
         return;
     }
 
@@ -50,7 +48,8 @@ export const useBurnToken = () => {
       if (!response.ok) throw new Error(result.error);
       
       const transactionBuffer = Buffer.from(result.transaction, 'base64');
-      const transaction = Transaction.from(transactionBuffer);
+      // MODIFICAÇÃO: Desserializando como VersionedTransaction
+      const transaction = VersionedTransaction.deserialize(transactionBuffer);
       
       const sig = await sendTransaction(transaction, connection);
       await connection.confirmTransaction(sig, 'confirmed');
@@ -69,4 +68,3 @@ export const useBurnToken = () => {
 
   return { burnToken, isLoading, error, signature };
 };
-

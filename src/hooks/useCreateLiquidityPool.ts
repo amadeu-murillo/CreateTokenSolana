@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Transaction } from "@solana/web3.js";
+import { VersionedTransaction } from "@solana/web3.js"; // MODIFICAÇÃO
 
 interface CreateLpData {
-    mint: string;
+    baseMint: string;
     quoteMint: string;
     baseAmount: number;
     quoteAmount: number;
+    marketId: string; // MODIFICAÇÃO: Adicionado Market ID
 }
 
 function getFriendlyErrorMessage(error: any): string {
@@ -45,7 +46,8 @@ export const useCreateLiquidityPool = () => {
       if (!response.ok) throw new Error(result.error);
       
       const transactionBuffer = Buffer.from(result.transaction, 'base64');
-      const transaction = Transaction.from(transactionBuffer);
+      // MODIFICAÇÃO: Desserializando como VersionedTransaction
+      const transaction = VersionedTransaction.deserialize(transactionBuffer);
       
       const sig = await sendTransaction(transaction, connection);
       await connection.confirmTransaction(sig, 'confirmed');
@@ -56,6 +58,7 @@ export const useCreateLiquidityPool = () => {
     } catch (err: any) {
       const friendlyMessage = getFriendlyErrorMessage(err);
       setError(friendlyMessage);
+      console.error(err);
       return null;
     } finally {
       setIsLoading(false);
