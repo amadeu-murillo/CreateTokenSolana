@@ -91,3 +91,30 @@
     text-decoration: underline;
     font-weight: 500;
 }
+/* src/app/create-liquidity-pool/CreateLiquidityPool.module.css */
+
+/* ... (adicionar ao final do arquivo) ... */
+
+.amountHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem; /* 4px */
+}
+
+.balance {
+    font-size: 0.875rem; /* 14px */
+    color: var(--text-secondary-color);
+}
+
+.amountInputContainer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem; /* 8px */
+}
+
+.maxButton {
+    height: 100%;
+    padding: 0.5rem 1rem; /* 8px 16px */
+    flex-shrink: 0;
+}

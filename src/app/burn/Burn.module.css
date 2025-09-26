@@ -113,3 +113,40 @@
   font-size: 0.875rem;
   line-height: 1.5;
 }
+
+/* src/app/burn/Burn.module.css */
+
+/* ... (estilos existentes) ... */
+
+.select {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    color: #333;
+    cursor: pointer;
+}
+
+.amountHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.balance {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.amountInputContainer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.maxButton {
+    height: 100%;
+    padding: 8px 16px;
+}

@@ -1,13 +1,26 @@
+// src/app/burn/page.tsx
+
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useBurnToken } from '@/hooks/useBurnToken';
+import { useUserTokens } from '@/hooks/useUserTokens'; // Importar o hook para buscar os tokens do usuário
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import styles from './Burn.module.css';
 import Link from 'next/link';
+
+// Definição da interface para o token do usuário
+interface UserToken {
+    mint: string;
+    amount: string;
+    decimals: number;
+    name?: string;
+    symbol?: string;
+    logoURI?: string;
+}
 
 // Ícones SVG para o guia
 const TokenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /></svg>;
@@ -16,24 +29,40 @@ const FlameIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" heigh
 const tutorialSteps = [
     {
         icon: <TokenIcon />,
-        title: "Endereço do Token (Mint)",
-        description: "Cole o endereço único do token que você deseja queimar. A queima removerá tokens permanentemente da circulação."
+        title: "Selecione o Token",
+        description: "Escolha o token que você deseja queimar diretamente da sua carteira. A queima removerá tokens permanentemente da circulação."
     },
     {
         icon: <FlameIcon />,
         title: "Quantidade a Queimar",
-        description: "Defina a quantidade exata de tokens a ser removida. Lembre-se, esta ação é irreversível e os tokens não podem ser recuperados."
+        description: "Defina a quantidade de tokens a ser removida. Você pode usar o botão 'MAX' para queimar todo o saldo ou inserir um valor manualmente."
     }
 ];
 
 export default function BurnPage() {
-    const [mint, setMint] = useState('');
+    const [selectedToken, setSelectedToken] = useState<UserToken | null>(null);
     const [amount, setAmount] = useState('');
     const { burnToken, isLoading, error, signature } = useBurnToken();
+    const { tokens: userTokens, isLoading: isLoadingUserTokens } = useUserTokens();
+
+    const handleTokenChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const mint = e.target.value;
+        const token = userTokens.find(t => t.mint === mint) || null;
+        setSelectedToken(token);
+        setAmount(''); // Resetar a quantidade ao trocar de token
+    };
+
+    const handleSetMaxAmount = () => {
+        if (selectedToken) {
+            setAmount(selectedToken.amount);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        await burnToken(mint, Number(amount));
+        if (selectedToken) {
+            await burnToken(selectedToken.mint, Number(amount));
+        }
     };
 
     return (
@@ -49,14 +78,50 @@ export default function BurnPage() {
                     <CardContent>
                         <form onSubmit={handleSubmit} className={styles.form}>
                             <div className={styles.field}>
-                                <Label htmlFor="mint">Endereço do Token (Mint)</Label>
-                                <Input id="mint" type="text" placeholder="Cole o endereço do mint do token" value={mint} onChange={(e) => setMint(e.target.value)} required />
+                                <Label htmlFor="token-select">Selecione o Token</Label>
+                                <select 
+    id="token-select" 
+    value={selectedToken?.mint || ''} 
+    onChange={handleTokenChange}
+    className={styles.select}
+    required
+>
+    <option value="" disabled>
+        {isLoadingUserTokens ? 'Carregando tokens...' : (userTokens.length > 0 ? 'Selecione um token' : 'Nenhum token encontrado')}
+    </option>
+    {userTokens.map(token => (
+        <option key={token.mint} value={token.mint}>
+            {token.name} ({token.symbol})
+        </option>
+    ))}
+</select>
                             </div>
-                            <div className={styles.field}>
-                                <Label htmlFor="amount">Quantidade a Queimar</Label>
-                                <Input id="amount" type="number" placeholder="Ex: 1000" value={amount} onChange={(e) => setAmount(e.target.value)} required min="0" />
-                            </div>
-                            <Button type="submit" disabled={isLoading || !mint || !amount}>
+
+                            {selectedToken && (
+                                <div className={styles.field}>
+                                    <div className={styles.amountHeader}>
+                                        <Label htmlFor="amount">Quantidade a Queimar</Label>
+                                        <span className={styles.balance}>Saldo: {selectedToken.amount} {selectedToken.symbol}</span>
+                                    </div>
+                                    <div className={styles.amountInputContainer}>
+                                        <Input 
+                                            id="amount" 
+                                            type="number" 
+                                            placeholder="Ex: 1000" 
+                                            value={amount} 
+                                            onChange={(e) => setAmount(e.target.value)} 
+                                            required 
+                                            min="0"
+                                            max={selectedToken.amount}
+                                        />
+                                        <Button type="button" onClick={handleSetMaxAmount} className={styles.maxButton}>
+                                            MAX
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            <Button type="submit" disabled={isLoading || !selectedToken || !amount}>
                                 {isLoading ? 'Queimando...' : `Queimar Tokens (Custo: 0.05 SOL + taxas)`}
                             </Button>
                         </form>

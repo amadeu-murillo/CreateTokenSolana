@@ -46,8 +46,6 @@ export async function POST(request: Request) {
         isMetadataMutable 
     } = await request.json();
 
-    const { origin } = new URL(request.url);
-
     if (!name || !symbol || !imageUrl || decimals === undefined || !supply || !wallet || !tokenStandard) {
       return NextResponse.json({ error: 'Dados incompletos fornecidos.' }, { status: 400 });
     }
@@ -60,9 +58,6 @@ export async function POST(request: Request) {
     
     const userUmiSigner = createNoopSigner(fromWeb3JsPublicKey(userPublicKey));
     umi.use(signerIdentity(userUmiSigner));
-    const mintKeypairSigner = createSignerFromKeypair(umi, fromWeb3JsKeypair(mintKeypair));
-    
-    const metadataUri = `${origin}/api/metadata?mint=${mintKeypair.publicKey.toBase58()}`;
     
     const programId = tokenStandard === 'token-2022' ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
 
@@ -135,14 +130,12 @@ export async function POST(request: Request) {
       )
     );
       
-    // CORREÇÃO: A autoridade para criar os metadados DEVE ser a autoridade de mint do token,
-    // que é a carteira do usuário (userUmiSigner).
     const createMetadataIx = createV1(umi, {
         mint: fromWeb3JsPublicKey(mintKeypair.publicKey),
-        authority: userUmiSigner, // <-- A CORREÇÃO ESTÁ AQUI
+        authority: userUmiSigner,
         name: name,
         symbol: symbol,
-        uri: metadataUri,
+        uri: imageUrl, // Alteração aqui: usar a URL da imagem diretamente
         sellerFeeBasisPoints: percentAmount(0, 2),
         tokenStandard: TokenStandard.Fungible,
         isMutable: isMetadataMutable,
@@ -203,4 +196,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-

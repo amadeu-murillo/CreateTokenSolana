@@ -1,15 +1,16 @@
 // src/app/create-liquidity-pool/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NATIVE_MINT } from "@solana/spl-token";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import styles from "./CreateLiquidityPool.module.css";
 
 // Hooks e sua constante de taxa
 import { useCreateLiquidityPool } from "@/hooks/useCreateLiquidityPool";
 import { useCreateMarket } from "@/hooks/useCreateMarket";
 import { useUserTokens } from "@/hooks/useUserTokens";
-import { SERVICE_FEE_CREATE_LP_SOL } from "@/lib/constants"; // Usando sua constante
+import { SERVICE_FEE_CREATE_LP_SOL } from "@/lib/constants";
 
 // Componentes de UI
 import { Button } from "@/components/ui/button";
@@ -28,20 +29,51 @@ export default function CreateLiquidityPoolPage() {
     const [baseTokenAmount, setBaseTokenAmount] = useState("");
     const [quoteTokenAmount, setQuoteTokenAmount] = useState("");
     const [statusMessage, setStatusMessage] = useState("");
+    const [solBalance, setSolBalance] = useState<number | null>(null);
 
+    const { connection } = useConnection();
+    const { publicKey } = useWallet();
     const { tokens, isLoading: isLoadingTokens } = useUserTokens();
     const { createMarket, isLoading: isCreatingMarket, error: marketError } = useCreateMarket();
     const { createLiquidityPool, isLoading: isCreatingPool, error: poolError, signature } = useCreateLiquidityPool();
 
+    // Busca o saldo de SOL do usuário
+    useEffect(() => {
+        if (publicKey) {
+            connection.getBalance(publicKey).then(balance => {
+                setSolBalance(balance / 1_000_000_000); // Converte lamports para SOL
+            });
+        }
+    }, [publicKey, connection]);
+
+    const selectedToken = tokens.find(t => t.mint === selectedTokenMint);
+
+    const handleSetMaxBaseAmount = () => {
+        if (selectedToken) {
+            setBaseTokenAmount(selectedToken.amount);
+        }
+    };
+
     const handleCreatePool = async () => {
-        if (!selectedTokenMint || !baseTokenAmount || !quoteTokenAmount) { setStatusMessage("Por favor, preencha todos os campos."); return; }
-        const selectedToken = tokens.find(t => t.mint === selectedTokenMint);
-        if (!selectedToken) { setStatusMessage("Token selecionado não encontrado na sua carteira."); return; }
+        if (!selectedTokenMint || !baseTokenAmount || !quoteTokenAmount) {
+            setStatusMessage("Por favor, preencha todos os campos.");
+            return;
+        }
+        if (!selectedToken) {
+            setStatusMessage("Token selecionado não encontrado na sua carteira.");
+            return;
+        }
         setStatusMessage("Passo 1: Criando o OpenBook Market...");
         const marketId = await createMarket(selectedTokenMint, NATIVE_MINT.toBase58(), selectedToken.decimals);
         if (marketId) {
             setStatusMessage("Passo 2: Adicionando liquidez ao pool...");
-            await createLiquidityPool({ marketId, baseAmount: parseFloat(baseTokenAmount), quoteAmount: parseFloat(quoteTokenAmount), baseMint: selectedTokenMint, quoteMint: NATIVE_MINT.toBase58() });
+            await createLiquidityPool({
+                marketId,
+                baseAmount: parseFloat(baseTokenAmount),
+                quoteAmount: parseFloat(quoteTokenAmount),
+                baseMint: selectedTokenMint,
+                quoteMint: NATIVE_MINT.toBase58()
+            });
             setStatusMessage("Processo iniciado. Verificando a transação...");
         } else {
             setStatusMessage("Falha ao criar o OpenBook Market. Verifique o console para mais detalhes.");
@@ -64,18 +96,37 @@ export default function CreateLiquidityPoolPage() {
                 <CardContent className={styles.cardContent}>
                     <div className={styles.inputGroup}>
                         <Label>Selecione seu Token</Label>
-                        <TokenSelector tokens={tokens} selectedTokenMint={selectedTokenMint} onSelectToken={setSelectedTokenMint} isLoading={isLoadingTokens} disabled={isLoading} />
+                        <TokenSelector 
+                            tokens={tokens} 
+                            selectedTokenMint={selectedTokenMint} 
+                            onSelectToken={(mint) => {
+                                setSelectedTokenMint(mint);
+                                setBaseTokenAmount(''); // Limpa a quantidade ao trocar de token
+                            }} 
+                            isLoading={isLoadingTokens} 
+                            disabled={isLoading} 
+                        />
                     </div>
+                    {selectedToken && (
+                        <div className={styles.inputGroup}>
+                             <div className={styles.amountHeader}>
+                                <Label htmlFor="base-amount">Quantidade do Seu Token (Base)</Label>
+                                <span className={styles.balance}>Saldo: {selectedToken.amount} {selectedToken.symbol}</span>
+                            </div>
+                            <div className={styles.amountInputContainer}>
+                                <Input id="base-amount" type="number" value={baseTokenAmount} onChange={(e) => setBaseTokenAmount(e.target.value)} placeholder="Ex: 10000" disabled={isLoading} />
+                                <Button type="button" onClick={handleSetMaxBaseAmount} className={styles.maxButton}>MAX</Button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className={styles.inputGroup}>
-                        <Label htmlFor="base-amount">Quantidade do Seu Token (Base)</Label>
-                        <Input id="base-amount" type="number" value={baseTokenAmount} onChange={(e) => setBaseTokenAmount(e.target.value)} placeholder="Ex: 10000" disabled={isLoading} />
-                    </div>
-                    <div className={styles.inputGroup}>
-                        <Label htmlFor="quote-amount">Quantidade de SOL (Quote)</Label>
+                        <div className={styles.amountHeader}>
+                            <Label htmlFor="quote-amount">Quantidade de SOL (Quote)</Label>
+                            {solBalance !== null && <span className={styles.balance}>Saldo: {solBalance.toFixed(4)} SOL</span>}
+                        </div>
                         <Input id="quote-amount" type="number" value={quoteTokenAmount} onChange={(e) => setQuoteTokenAmount(e.target.value)} placeholder="Ex: 10" disabled={isLoading} />
                     </div>
-
-                    
                 </CardContent>
                 <CardFooter className="flex-col items-start gap-4">
                     <Button onClick={handleCreatePool} disabled={isLoading || !selectedTokenMint || !baseTokenAmount || !quoteTokenAmount} className="w-full">
