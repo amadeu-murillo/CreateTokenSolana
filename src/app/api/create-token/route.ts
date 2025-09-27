@@ -13,22 +13,19 @@ import {
 } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
-  TOKEN_2022_PROGRAM_ID,
   createInitializeMintInstruction,
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddress,
   createMintToInstruction,
   createSetAuthorityInstruction,
   AuthorityType,
-  ExtensionType,
   getMintLen,
-  createInitializeTransferFeeConfigInstruction,
 } from '@solana/spl-token';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_TOKEN_LAMPORTS } from '@/lib/constants';
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { createV1, TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
 import { fromWeb3JsKeypair, fromWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
-import { createNoopSigner, createSignerFromKeypair, percentAmount, signerIdentity } from '@metaplex-foundation/umi';
+import { createNoopSigner, signerIdentity, percentAmount } from '@metaplex-foundation/umi';
 
 export async function POST(request: Request) {
   try {
@@ -41,12 +38,11 @@ export async function POST(request: Request) {
         wallet, 
         mintAuthority, 
         freezeAuthority,
-        tokenStandard, 
-        transferFee, 
         isMetadataMutable 
     } = await request.json();
 
-    if (!name || !symbol || !imageUrl || decimals === undefined || !supply || !wallet || !tokenStandard) {
+    // Validação Simplificada: removido tokenStandard e transferFee
+    if (!name || !symbol || !imageUrl || decimals === undefined || !supply || !wallet) {
       return NextResponse.json({ error: 'Dados incompletos fornecidos.' }, { status: 400 });
     }
 
@@ -56,15 +52,14 @@ export async function POST(request: Request) {
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
     const umi = createUmi(RPC_ENDPOINT);
     
+    // UMI precisa de um signer, mas como a transação será assinada no frontend,
+    // usamos um NoopSigner que apenas armazena a chave pública do usuário.
     const userUmiSigner = createNoopSigner(fromWeb3JsPublicKey(userPublicKey));
     umi.use(signerIdentity(userUmiSigner));
     
-    const programId = tokenStandard === 'token-2022' ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
-
-    const extensions = tokenStandard === 'token-2022' && transferFee.basisPoints > 0 
-        ? [ExtensionType.TransferFeeConfig] 
-        : [];
-    const mintLen = getMintLen(extensions);
+    // Focando apenas no padrão SPL
+    const programId = TOKEN_PROGRAM_ID;
+    const mintLen = getMintLen([]); // Sem extensões
     
     const rentLamports = await connection.getMinimumBalanceForRentExemption(mintLen);
 
@@ -75,14 +70,20 @@ export async function POST(request: Request) {
       programId
     );
 
+    // Instruções para a transação
     const instructions: TransactionInstruction[] = [
+        // Otimiza o custo e o processamento da transação
         ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
         ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
+        
+        // Taxa de serviço da plataforma
         SystemProgram.transfer({
             fromPubkey: userPublicKey,
             toPubkey: DEV_WALLET_ADDRESS,
             lamports: SERVICE_FEE_CREATE_TOKEN_LAMPORTS,
         }),
+
+        // Cria a conta para o mint do token
         SystemProgram.createAccount({
             fromPubkey: userPublicKey,
             newAccountPubkey: mintKeypair.publicKey,
@@ -90,59 +91,51 @@ export async function POST(request: Request) {
             lamports: rentLamports,
             programId: programId,
         }),
+
+        // Inicializa o mint com as propriedades definidas
+        createInitializeMintInstruction(
+            mintKeypair.publicKey,
+            decimals,
+            userPublicKey, // Mint Authority inicial é o usuário
+            freezeAuthority ? userPublicKey : null, // Freeze Authority opcional
+            programId
+        ),
+
+        // Cria a conta de token associada na carteira do usuário
+        createAssociatedTokenAccountInstruction(
+            userPublicKey,
+            associatedTokenAccount,
+            userPublicKey,
+            mintKeypair.publicKey,
+            programId
+        ),
+
+        // Envia (mints) o fornecimento inicial para a conta do usuário
+        createMintToInstruction(
+            mintKeypair.publicKey,
+            associatedTokenAccount,
+            userPublicKey,
+            BigInt(supply * Math.pow(10, decimals)),
+            [],
+            programId
+        )
     ];
-
-    if (tokenStandard === 'token-2022' && transferFee && transferFee.basisPoints > 0) {
-        instructions.push(
-            createInitializeTransferFeeConfigInstruction(
-                mintKeypair.publicKey,
-                userPublicKey,
-                userPublicKey,
-                transferFee.basisPoints,
-                BigInt(transferFee.maxFee),
-                programId
-            )
-        );
-    }
-
-    instructions.push(
-      createInitializeMintInstruction(
-        mintKeypair.publicKey,
-        decimals,
-        userPublicKey,
-        freezeAuthority ? userPublicKey : null,
-        programId
-      ),
-       createAssociatedTokenAccountInstruction(
-        userPublicKey,
-        associatedTokenAccount,
-        userPublicKey,
-        mintKeypair.publicKey,
-        programId
-      ),
-      createMintToInstruction(
-        mintKeypair.publicKey,
-        associatedTokenAccount,
-        userPublicKey,
-        BigInt(supply * Math.pow(10, decimals)),
-        [],
-        programId
-      )
-    );
       
+    // Cria a instrução para os metadados do token (padrão Metaplex)
     const createMetadataIx = createV1(umi, {
         mint: fromWeb3JsPublicKey(mintKeypair.publicKey),
         authority: userUmiSigner,
         name: name,
         symbol: symbol,
-        uri: imageUrl, // Alteração aqui: usar a URL da imagem diretamente
-        sellerFeeBasisPoints: percentAmount(0, 2),
+        uri: imageUrl,
+        sellerFeeBasisPoints: percentAmount(0, 2), // Taxa de royalties (0% neste caso)
         tokenStandard: TokenStandard.Fungible,
         isMutable: isMetadataMutable,
-        payer: userUmiSigner,
-        updateAuthority: userUmiSigner,
+        payer: userUmiSigner, // O usuário paga pela criação
+        updateAuthority: userUmiSigner, // O usuário é a autoridade de atualização
     }).getInstructions();
 
+    // Converte a instrução de Metadados do UMI para o formato do web3.js
     const web3Instructions = createMetadataIx.map(ix => ({
         keys: ix.keys.map(key => ({
             pubkey: new PublicKey(key.pubkey),
@@ -155,13 +148,14 @@ export async function POST(request: Request) {
       
     instructions.push(...web3Instructions);
 
+    // Se o usuário decidiu renunciar à autoridade de mint, adiciona a instrução
     if (!mintAuthority) {
         instructions.push(
             createSetAuthorityInstruction(
                 mintKeypair.publicKey,
                 userPublicKey,
                 AuthorityType.MintTokens,
-                null,
+                null, // A nova autoridade é nula, renunciando ao poder de criar mais tokens
                 [],
                 programId
             )
@@ -170,6 +164,7 @@ export async function POST(request: Request) {
       
     const { blockhash } = await connection.getLatestBlockhash('confirmed');
     
+    // Compila as instruções em uma transação versionada (padrão atual da Solana)
     const messageV0 = new TransactionMessage({
         payerKey: userPublicKey,
         recentBlockhash: blockhash,
@@ -177,8 +172,10 @@ export async function POST(request: Request) {
     }).compileToV0Message();
 
     const transaction = new VersionedTransaction(messageV0);
+    // Assina a transação com a chave do mint (criada no backend)
     transaction.sign([mintKeypair]);
 
+    // Serializa a transação para enviar ao frontend e ser assinada pela carteira do usuário
     const serializedTransaction = transaction.serialize();
     const base64Transaction = Buffer.from(serializedTransaction).toString('base64');
 

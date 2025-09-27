@@ -2,14 +2,16 @@
 
 import React, { useReducer, useState } from "react";
 import { useDropzone } from 'react-dropzone';
-import { useCreateToken } from "../hooks/useCreateToken";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import styles from "./TokenForm.module.css";
-import TokenPreview from "./TokenPreview";
+import { useCreateToken } from "@/hooks/useCreateToken";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import styles from "@/components/TokenForm.module.css";
+import TokenPreview from "@/components/TokenPreview";
 
 // --- COMPONENTES AUXILIARES ---
+
+// Tooltip para informações adicionais
 const Tooltip = ({ text, children }: { text: string; children: React.ReactNode }) => {
   const [show, setShow] = useState(false);
   return (
@@ -20,6 +22,7 @@ const Tooltip = ({ text, children }: { text: string; children: React.ReactNode }
   );
 };
 
+// Ícone de informação
 const InfoIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={styles.infoIcon}>
         <circle cx="12" cy="12" r="10"></circle>
@@ -29,16 +32,17 @@ const InfoIcon = () => (
 );
 
 // --- LÓGICA DO FORMULÁRIO ---
+
+// Tipagem para os erros do formulário
 interface FormErrors {
   name?: string;
   symbol?: string;
   decimals?: string;
   supply?: string;
   imageUrl?: string;
-  transferFeeBasisPoints?: string;
-  transferFeeMaxFee?: string;
 }
 
+// Tipagem para o estado do formulário
 interface State {
   name: string;
   symbol: string;
@@ -49,16 +53,15 @@ interface State {
   mintAuthority: boolean;
   freezeAuthority: boolean;
   isMetadataMutable: boolean;
-  tokenStandard: 'spl' | 'token-2022';
-  transferFeeBasisPoints: string;
-  transferFeeMaxFee: string;
   errors: FormErrors;
 }
 
+// Tipagem para as ações do reducer
 type Action =
   | { type: 'SET_FIELD'; field: keyof Omit<State, 'errors'>; value: any }
   | { type: 'SET_ERRORS'; errors: FormErrors };
 
+// Estado inicial do formulário
 const initialState: State = {
   name: "",
   symbol: "",
@@ -69,15 +72,14 @@ const initialState: State = {
   mintAuthority: false,
   freezeAuthority: true,
   isMetadataMutable: true,
-  tokenStandard: 'spl',
-  transferFeeBasisPoints: '',
-  transferFeeMaxFee: '',
   errors: {},
 };
 
+// Reducer para gerenciar o estado do formulário
 function formReducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_FIELD':
+      // Limpa o erro do campo ao ser modificado
       return { ...state, [action.field]: action.value, errors: { ...state.errors, [action.field]: undefined } };
     case 'SET_ERRORS':
       return { ...state, errors: action.errors };
@@ -86,6 +88,7 @@ function formReducer(state: State, action: Action): State {
   }
 }
 
+// Função de validação do formulário
 const validateForm = (state: Omit<State, 'errors' | 'showAdvanced'>): FormErrors => {
     const newErrors: FormErrors = {};
     if (!state.name) newErrors.name = "O nome do token é obrigatório.";
@@ -100,16 +103,6 @@ const validateForm = (state: Omit<State, 'errors' | 'showAdvanced'>): FormErrors
     if (!state.imageUrl) {
         newErrors.imageUrl = "A imagem é obrigatória.";
     }
-    if (state.tokenStandard === 'token-2022') {
-        const basisPoints = Number(state.transferFeeBasisPoints);
-        if (state.transferFeeBasisPoints && (isNaN(basisPoints) || basisPoints < 0 || basisPoints > 10000)) {
-            newErrors.transferFeeBasisPoints = "A taxa deve ser entre 0 e 10000 (100%).";
-        }
-        const maxFee = Number(state.transferFeeMaxFee);
-        if (state.transferFeeMaxFee && (isNaN(maxFee) || maxFee < 0)) {
-            newErrors.transferFeeMaxFee = "A taxa máxima deve ser um número positivo.";
-        }
-    }
     return newErrors;
 };
 
@@ -117,7 +110,7 @@ const validateForm = (state: Omit<State, 'errors' | 'showAdvanced'>): FormErrors
 export default function TokenForm() {
   const { createToken, isLoading: isCreatingToken } = useCreateToken();
   const [state, dispatch] = useReducer(formReducer, initialState);
-  const { name, symbol, decimals, supply, imageUrl, showAdvanced, mintAuthority, freezeAuthority, isMetadataMutable, tokenStandard, transferFeeBasisPoints, transferFeeMaxFee, errors } = state;
+  const { name, symbol, decimals, supply, imageUrl, showAdvanced, mintAuthority, freezeAuthority, isMetadataMutable, errors } = state;
   
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -185,12 +178,8 @@ export default function TokenForm() {
       imageUrl,
       mintAuthority,
       freezeAuthority,
-      tokenStandard,
       isMetadataMutable,
-      transferFee: {
-          basisPoints: Number(transferFeeBasisPoints) || 0,
-          maxFee: Number(transferFeeMaxFee) * Math.pow(10, decimals) || 0,
-      },
+      tokenStandard: 'spl', // Fixo para SPL Padrão
     };
     await createToken(tokenData);
   };
@@ -198,19 +187,7 @@ export default function TokenForm() {
   return (
     <div className={styles.formGrid}>
       <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.field}>
-          <Label>Padrão do Token</Label>
-          <div className={styles.radioGroup}>
-            <label className={styles.radioLabel}>
-              <input type="radio" value="spl" checked={tokenStandard === 'spl'} onChange={() => handleFieldChange('tokenStandard', 'spl')} />
-              <span>SPL Padrão</span>
-            </label>
-            <label className={styles.radioLabel}>
-              <input type="radio" value="token-2022" checked={tokenStandard === 'token-2022'} onChange={() => handleFieldChange('tokenStandard', 'token-2022')} />
-              <span>Token-2022 (Avançado)</span>
-            </label>
-          </div>
-        </div>
+        {/* Campo de Padrão do Token removido para simplificar */}
         
         <div className={styles.field}>
           <Label htmlFor="name">Nome do Token</Label>
@@ -240,9 +217,9 @@ export default function TokenForm() {
             <Label htmlFor="imageUrl">Imagem do Token</Label>
             <div {...getRootProps()} className={`${styles.dropzone} ${isDragActive ? styles.dropzoneActive : ''}`}>
               <input {...getInputProps()} />
-              {imageFile ? (
+              {imageUrl ? (
                 <div className={styles.preview}>
-                  <img src={URL.createObjectURL(imageFile)} alt="Preview" />
+                  <img src={imageUrl} alt="Preview" />
                   {isUploading && <div className={styles.spinner}></div>}
                   <button type="button" onClick={removeImage} className={styles.removeButton}>×</button>
                 </div>
@@ -254,19 +231,7 @@ export default function TokenForm() {
             {errors.imageUrl && <p className={styles.error}>{errors.imageUrl}</p>}
         </div>
 
-        {tokenStandard === 'token-2022' && (
-          <div className={styles.advancedContent}>
-            <div className={styles.field}>
-              <Label htmlFor="transferFee">Taxa de Transferência (opcional)</Label>
-              <div className={styles.feeInputs}>
-                <Input id="transferFee" type="number" placeholder="Taxa em % (Ex: 1 para 1%)" value={transferFeeBasisPoints} onChange={(e) => handleFieldChange('transferFeeBasisPoints', (Number(e.target.value) * 100).toString())} min="0" max="100" step="0.01" />
-                <Input type="number" placeholder="Taxa Máxima (em tokens)" value={transferFeeMaxFee} onChange={(e) => handleFieldChange('transferFeeMaxFee', e.target.value)} min="0" />
-              </div>
-              {errors.transferFeeBasisPoints && <p className={styles.error}>{errors.transferFeeBasisPoints}</p>}
-              {errors.transferFeeMaxFee && <p className={styles.error}>{errors.transferFeeMaxFee}</p>}
-            </div>
-          </div>
-        )}
+        {/* Seção de Opções Avançadas removida para focar no SPL Padrão */}
 
         <div className={styles.advancedSection}>
             <button type="button" onClick={() => handleFieldChange('showAdvanced', !showAdvanced)} className={styles.advancedButton}>
@@ -300,7 +265,7 @@ export default function TokenForm() {
         </div>
 
         <Button type="submit" disabled={isCreatingToken || isUploading}>
-          {isCreatingToken ? "Criando..." : isUploading ? "Fazendo upload..." : "Criar Token (~0.094 SOL)"}
+          {isCreatingToken ? "Criando..." : isUploading ? "Fazendo upload..." : "Criar Token"}
         </Button>
       </form>
 
@@ -315,3 +280,4 @@ export default function TokenForm() {
     </div>
   );
 }
+

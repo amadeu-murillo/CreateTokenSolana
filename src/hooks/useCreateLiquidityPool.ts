@@ -1,7 +1,7 @@
 // src/hooks/useCreateLiquidityPool.ts
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { VersionedTransaction } from "@solana/web3.js";
+import { VersionedTransaction, Transaction } from "@solana/web3.js";
 import { NATIVE_MINT } from "@solana/spl-token";
 
 function getFriendlyErrorMessage(error: any): string {
@@ -52,7 +52,7 @@ export const useCreateLiquidityPool = () => {
 
     try {
         // Etapa 1: Criar o mercado
-        setStatusMessage("Passo 1: Criando o OpenBook Market...");
+        setStatusMessage("Passo 1: Criando o OpenBook Market (pode levar alguns instantes)...");
         const marketResponse = await fetch('/api/create-market', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -67,9 +67,16 @@ export const useCreateLiquidityPool = () => {
         const marketResult = await marketResponse.json();
         if (!marketResponse.ok) throw new Error(marketResult.error || "Falha ao criar o mercado");
 
-        const marketTransaction = VersionedTransaction.deserialize(Buffer.from(marketResult.transaction, 'base64'));
-        const marketSignature = await sendTransaction(marketTransaction, connection);
-        await connection.confirmTransaction(marketSignature, 'confirmed');
+        // FIX: Lida com múltiplas transações para a criação do mercado
+        const marketTransactions = marketResult.transactions.map((tx: string) => Transaction.from(Buffer.from(tx, 'base64')));
+        
+        // Assina e envia as transações sequencialmente
+        for (let i = 0; i < marketTransactions.length; i++) {
+            setStatusMessage(`Passo 1: Assinando e enviando transação do mercado (${i + 1}/${marketTransactions.length})...`);
+            const signedTx = await sendTransaction(marketTransactions[i], connection);
+            await connection.confirmTransaction(signedTx, 'confirmed');
+        }
+
         const marketId = marketResult.marketId;
 
         // Etapa 2: Criar o pool de liquidez

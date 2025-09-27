@@ -1,9 +1,9 @@
 // src/app/api/create-market/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { Connection, PublicKey, Transaction, SystemProgram, VersionedTransaction } from '@solana/web3.js';
-import { MarketV2, Token, TOKEN_PROGRAM_ID } from '@raydium-io/raydium-sdk';
+import { Connection, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+import { MarketV2, Token, TOKEN_PROGRAM_ID, DEVNET_PROGRAM_ID } from '@raydium-io/raydium-sdk';
 import { NATIVE_MINT } from '@solana/spl-token';
-import { DEV_WALLET_ADDRESS, SERVICE_FEE_CREATE_LP_LAMPORTS } from '@/lib/constants';
+import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_LP_LAMPORTS } from '@/lib/constants';
 
 export async function POST(req: NextRequest) {
     try {
@@ -13,48 +13,50 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Parâmetros ausentes.' }, { status: 400 });
         }
 
-        const connection = new Connection('https://devnet.helius-rpc.com/?api-key=2e9c5f4b-aacf-4903-a787-0c431a50ffff');
+        const connection = new Connection(RPC_ENDPOINT, 'confirmed');
         const payer = new PublicKey(wallet);
 
         const baseToken = new Token(TOKEN_PROGRAM_ID, new PublicKey(baseMint), baseDecimals);
         const quoteToken = new Token(TOKEN_PROGRAM_ID, NATIVE_MINT, 9, 'WSOL', 'Wrapped SOL');
 
+        // A criação de mercado retorna múltiplas transações que precisam ser enviadas sequencialmente
         const { innerTransactions, address } = await MarketV2.makeCreateMarketInstructionSimple({
             connection,
             wallet: payer,
             baseInfo: baseToken,
             quoteInfo: quoteToken,
-            lotSize: 1,
+            lotSize: 1, 
             tickSize: 0.000001,
-            dexProgramId: new PublicKey('srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX'),
-            makeTxVersion: 0,
+            dexProgramId: DEVNET_PROGRAM_ID.OPENBOOK_MARKET, // FIX: Usa o ID correto do OpenBook para devnet
+            makeTxVersion: 0, // Usa transações legadas para simplificar a assinatura parcial
         });
 
-        const transaction = new Transaction();
-        innerTransactions[0].instructions.forEach(instruction => transaction.add(instruction));
-
-        transaction.add(
+        // Adiciona a taxa de serviço à primeira transação
+        innerTransactions[0].instructions.unshift(
             SystemProgram.transfer({
                 fromPubkey: payer,
                 toPubkey: DEV_WALLET_ADDRESS,
                 lamports: SERVICE_FEE_CREATE_LP_LAMPORTS,
             })
         );
+        
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
 
-        const { blockhash } = await connection.getLatestBlockhash();
-        transaction.recentBlockhash = blockhash;
-        transaction.feePayer = payer;
+        const transactions = innerTransactions.map(tx => {
+            const transaction = new Transaction();
+            transaction.add(...tx.instructions);
+            transaction.recentBlockhash = blockhash;
+            transaction.feePayer = payer;
 
-        innerTransactions[0].signers.forEach(signer => {
-            transaction.partialSign(signer);
-        });
+            tx.signers.forEach(signer => {
+                transaction.partialSign(signer);
+            });
 
-        const serializedTransaction = transaction.serialize({
-            requireAllSignatures: false,
+            return transaction.serialize({ requireAllSignatures: false }).toString('base64');
         });
 
         return NextResponse.json({
-            transaction: serializedTransaction.toString('base64'),
+            transactions: transactions, // Retorna um array de transações
             marketId: address.marketId.toBase58(),
         });
 
@@ -63,3 +65,4 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Erro no servidor: ${error.message}` }, { status: 500 });
     }
 }
+

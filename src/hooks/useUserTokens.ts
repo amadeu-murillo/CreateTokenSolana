@@ -26,6 +26,7 @@ interface UserToken {
     name?: string;
     symbol?: string;
     logoURI?: string;
+    programId: string; // Adicionado para identificar o tipo de token
 }
 
 // Função para introduzir um pequeno atraso
@@ -68,7 +69,11 @@ export const useUserTokens = () => {
                     connection.getParsedTokenAccountsByOwner(publicKey, { programId: TOKEN_2022_PROGRAM_ID })
                 ]);
 
-                const allAccounts = [...tokenAccounts.value, ...token2022Accounts.value]
+                // Adiciona o programId a cada conta para posterior filtragem
+                const allAccounts = [
+                    ...tokenAccounts.value.map(acc => ({ ...acc, programId: TOKEN_PROGRAM_ID.toBase58() })),
+                    ...token2022Accounts.value.map(acc => ({ ...acc, programId: TOKEN_2022_PROGRAM_ID.toBase58() }))
+                ]
                     .filter(acc => acc.account.data.parsed.info.tokenAmount.uiAmount > 0);
 
                 const resolvedTokens: UserToken[] = [];
@@ -89,6 +94,7 @@ export const useUserTokens = () => {
                                 name: tokenData.name,
                                 symbol: tokenData.symbol,
                                 logoURI: tokenData.logoURI,
+                                programId: accountInfo.programId,
                             };
                         } else {
                             try {
@@ -100,6 +106,7 @@ export const useUserTokens = () => {
                                     name: asset.metadata.name,
                                     symbol: asset.metadata.symbol,
                                     logoURI: asset.metadata.uri,
+                                    programId: accountInfo.programId,
                                 };
                             } catch (e) {
                                 console.error(`Falha ao buscar metadados para o mint ${mint}:`, e);
@@ -110,6 +117,7 @@ export const useUserTokens = () => {
                                     name: 'Token Desconhecido',
                                     symbol: mint.substring(0, 6),
                                     logoURI: '',
+                                    programId: accountInfo.programId,
                                 };
                             }
                         }
@@ -139,3 +147,4 @@ export const useUserTokens = () => {
 
     return { tokens, isLoading };
 };
+
