@@ -1,0 +1,144 @@
+/* src/app/add-liquidity/AddLiquidity.module.css */
+.grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.formContainer,
+.sidebar {
+    width: 100%;
+}
+
+.cardContent {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.inputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.amountHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.balance {
+    font-size: 0.875rem;
+    color: var(--secondary-foreground);
+    opacity: 0.8;
+}
+
+.amountInputContainer {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* Classe corrigida para o input com botão */
+.inputWithButton {
+    /* Adiciona espaço à direita para não ficar sob o botão */
+    padding-right: 4.5rem !important;
+}
+
+.amountInputContainer .maxButton {
+    position: absolute;
+    right: 0.5rem;
+    height: auto;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.message {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+.status {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+}
+
+.error {
+    background-color: var(--destructive);
+    color: var(--destructive-foreground);
+}
+
+.success {
+    background-color: #28a745;
+    color: white;
+}
+
+.link {
+    text-decoration: underline;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+/* Sidebar Styles */
+.sidebarTitle {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: var(--card-foreground);
+}
+
+.tutorialCard {
+    margin-bottom: 1rem;
+    background-color: var(--card);
+}
+
+.tutorialCardContent {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem !important; /* Shadcn override */
+}
+
+.tutorialIcon {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background-color: var(--primary-foreground);
+    color: var(--primary);
+}
+
+.tutorialIcon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.tutorialText {
+    display: flex;
+    flex-direction: column;
+}
+
+.tutorialTitle {
+    font-weight: 600;
+    color: var(--card-foreground);
+}
+
+.tutorialDescription {
+    font-size: 0.875rem;
+    color: var(--secondary-foreground);
+    opacity: 0.9;
+}

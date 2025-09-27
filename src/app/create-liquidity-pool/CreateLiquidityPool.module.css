@@ -1,9 +1,33 @@
 /* src/app/create-liquidity-pool/CreateLiquidityPool.module.css */
+.pageContainer {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+}
+
+.pageHeader {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.pageTitle {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.pageDescription {
+    font-size: 1.1rem;
+    color: hsl(var(--muted-foreground));
+    max-width: 600px;
+    margin: 0 auto;
+}
+
 .container {
     display: grid;
     grid-template-columns: 1fr;
     gap: 2rem;
-    padding: 2rem;
     align-items: start;
 }
 
@@ -22,7 +46,7 @@
 .infoCard {
     /* Opcional: Efeito 'sticky' para o card de info acompanhar o scroll */
     position: sticky;
-    top: 2rem;
+    top: 6rem; /* Adjust based on navbar height */
 }
 
 .cardContent {
@@ -30,6 +54,15 @@
   flex-direction: column;
   gap: 1.5rem;
 }
+
+.cardFooter {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    width: 100%;
+}
+
 
 .inputGroup {
     display: flex;
@@ -53,7 +86,7 @@
 }
 
 .featureList span {
-    background-color: var(--primary-color);
+    background-color: hsl(var(--primary));
     color: white;
     font-size: 0.75rem;
     font-weight: bold;
@@ -68,7 +101,7 @@
 
 .infoText {
     font-size: 0.875rem;
-    color: var(--text-secondary-color);
+    color: hsl(var(--muted-foreground));
     line-height: 1.5;
 }
 
@@ -76,7 +109,7 @@
 .message {
   width: 100%;
   padding: 1rem;
-  border-radius: var(--border-radius);
+  border-radius: var(--radius);
   text-align: center;
   font-size: 0.9rem;
   border: 1px solid transparent;
@@ -87,13 +120,10 @@
 .success { background-color: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.5); color: #84e1bc; }
 
 .link {
-    color: var(--primary-color);
+    color: hsl(var(--primary));
     text-decoration: underline;
     font-weight: 500;
 }
-/* src/app/create-liquidity-pool/CreateLiquidityPool.module.css */
-
-/* ... (adicionar ao final do arquivo) ... */
 
 .amountHeader {
     display: flex;
@@ -104,7 +134,7 @@
 
 .balance {
     font-size: 0.875rem; /* 14px */
-    color: var(--text-secondary-color);
+    color: hsl(var(--muted-foreground));
 }
 
 .amountInputContainer {
@@ -115,6 +145,13 @@
 
 .maxButton {
     height: 100%;
-    padding: 0.5rem 1rem; /* 8px 16px */
+    padding: 0.5rem 0.75rem; /* 8px 12px - padding ajustado */
     flex-shrink: 0;
 }
+
+.amountInput {
+    flex-grow: 1;
+    /* Previne que o input estoure o container em layouts flex */
+    min-width: 0;
+}
+

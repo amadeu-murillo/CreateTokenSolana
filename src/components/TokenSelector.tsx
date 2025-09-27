@@ -60,7 +60,7 @@ export const TokenSelector = ({ tokens, selectedTokenMint, onSelectToken, isLoad
                     <span>Carregando Tokens...</span>
                 ) : selectedToken ? (
                     <div className={styles.tokenDisplay}>
-                        <Image src={selectedToken.logoURI || '/file.svg'} alt={selectedToken.name || 'token'} width={24} height={24} className={styles.tokenIcon} />
+                        <Image src={selectedToken.logoURI || '/favicon.ico'} alt={selectedToken.name || 'token'} width={24} height={24} className={styles.tokenIcon} />
                         <span>{selectedToken.symbol || 'TOKEN'}</span>
                     </div>
                 ) : (
@@ -88,7 +88,7 @@ export const TokenSelector = ({ tokens, selectedTokenMint, onSelectToken, isLoad
                                 className={`${styles.tokenItem} ${token.mint === selectedTokenMint ? styles.tokenItemSelected : ''}`}
                                 onClick={() => handleSelect(token.mint)}
                             >
-                                <Image src={token.logoURI || '/file.svg'} alt={token.name || 'token'} width={32} height={32} className={styles.tokenIcon} />
+                                <Image src={token.logoURI || '/favicon.ico'} alt={token.name || 'token'} width={32} height={32} className={styles.tokenIcon} />
                                 <div className={styles.tokenItemInfo}>
                                     <span className={styles.tokenSymbol}>{token.symbol || 'Desconhecido'}</span>
                                     <span className={styles.tokenName}>{token.name || token.mint.slice(0, 15) + '...'}</span>
@@ -104,3 +104,4 @@ export const TokenSelector = ({ tokens, selectedTokenMint, onSelectToken, isLoad
         </div>
     );
 };
+

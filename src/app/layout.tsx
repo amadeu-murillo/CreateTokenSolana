@@ -84,7 +84,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                       <IconPlusCircle className={styles.navIcon} />
                       <span>Criar</span>
                     </Link>
-                    <Link href="/create-liquidity-pool" className={styles.navLink}>
+                    <Link href="/add-liquidity" className={styles.navLink}>
                         <IconLayers className={styles.navIcon} />
                         <span>Liquidez</span>
                     </Link>
@@ -124,7 +124,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <div className={styles.footerColumn}>
                     <h4 className={styles.footerColumnTitle}>Ferramentas</h4>
                     <Link href="/create" className={styles.footerLink}>Criar Token</Link>
-                    <Link href="/create-liquidity-pool" className={styles.footerLink}>Criar Liquidez</Link>
+                    <Link href="/add-liquidity" className={styles.footerLink}>Criar Liquidez</Link>
                     <Link href="/burn" className={styles.footerLink}>Queimar Tokens</Link>
                     <Link href="/airdrop" className={styles.footerLink}>Airdrop</Link>
                     <Link href="/dashboard" className={styles.footerLink}>Gerenciar</Link>
