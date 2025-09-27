@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useReducer, useState, useRef } from "react";
+import React, { useReducer, useState } from "react";
+import { useDropzone } from 'react-dropzone';
 import { useCreateToken } from "../hooks/useCreateToken";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -8,7 +9,7 @@ import { Label } from "./ui/label";
 import styles from "./TokenForm.module.css";
 import TokenPreview from "./TokenPreview";
 
-// --- COMPONENTE TOOLTIP ---
+// --- COMPONENTES AUXILIARES ---
 const Tooltip = ({ text, children }: { text: string; children: React.ReactNode }) => {
   const [show, setShow] = useState(false);
   return (
@@ -26,9 +27,8 @@ const InfoIcon = () => (
         <line x1="12" y1="8" x2="12.01" y2="8"></line>
     </svg>
 );
-// --- FIM DO COMPONENTE TOOLTIP ---
 
-
+// --- LÓGICA DO FORMULÁRIO ---
 interface FormErrors {
   name?: string;
   symbol?: string;
@@ -48,10 +48,10 @@ interface State {
   showAdvanced: boolean;
   mintAuthority: boolean;
   freezeAuthority: boolean;
-  isMetadataMutable: boolean; // MODIFICAÇÃO: Adicionado
-  tokenStandard: 'spl' | 'token-2022'; // MODIFICAÇÃO: Adicionado
-  transferFeeBasisPoints: string; // MODIFICAÇÃO: Adicionado
-  transferFeeMaxFee: string; // MODIFICAÇÃO: Adicionado
+  isMetadataMutable: boolean;
+  tokenStandard: 'spl' | 'token-2022';
+  transferFeeBasisPoints: string;
+  transferFeeMaxFee: string;
   errors: FormErrors;
 }
 
@@ -68,17 +68,17 @@ const initialState: State = {
   showAdvanced: false,
   mintAuthority: false,
   freezeAuthority: true,
-  isMetadataMutable: true, // MODIFICAÇÃO: Valor padrão
-  tokenStandard: 'spl', // MODIFICAÇÃO: Valor padrão
-  transferFeeBasisPoints: '', // MODIFICAÇÃO: Valor padrão
-  transferFeeMaxFee: '', // MODIFICAÇÃO: Valor padrão
+  isMetadataMutable: true,
+  tokenStandard: 'spl',
+  transferFeeBasisPoints: '',
+  transferFeeMaxFee: '',
   errors: {},
 };
 
 function formReducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_FIELD':
-      return { ...state, [action.field]: action.value };
+      return { ...state, [action.field]: action.value, errors: { ...state.errors, [action.field]: undefined } };
     case 'SET_ERRORS':
       return { ...state, errors: action.errors };
     default:
@@ -86,7 +86,6 @@ function formReducer(state: State, action: Action): State {
   }
 }
 
-// MODIFICAÇÃO: Validação atualizada para os novos campos
 const validateForm = (state: Omit<State, 'errors' | 'showAdvanced'>): FormErrors => {
     const newErrors: FormErrors = {};
     if (!state.name) newErrors.name = "O nome do token é obrigatório.";
@@ -99,13 +98,7 @@ const validateForm = (state: Omit<State, 'errors' | 'showAdvanced'>): FormErrors
       newErrors.supply = "O fornecimento deve ser um número positivo.";
     }
     if (!state.imageUrl) {
-        newErrors.imageUrl = "A URL da imagem é obrigatória.";
-    } else {
-        try {
-            new URL(state.imageUrl);
-        } catch (_) {
-            newErrors.imageUrl = "Por favor, insira uma URL válida.";
-        }
+        newErrors.imageUrl = "A imagem é obrigatória.";
     }
     if (state.tokenStandard === 'token-2022') {
         const basisPoints = Number(state.transferFeeBasisPoints);
@@ -122,16 +115,61 @@ const validateForm = (state: Omit<State, 'errors' | 'showAdvanced'>): FormErrors
 
 
 export default function TokenForm() {
-  const { createToken, isLoading } = useCreateToken();
+  const { createToken, isLoading: isCreatingToken } = useCreateToken();
   const [state, dispatch] = useReducer(formReducer, initialState);
   const { name, symbol, decimals, supply, imageUrl, showAdvanced, mintAuthority, freezeAuthority, isMetadataMutable, tokenStandard, transferFeeBasisPoints, transferFeeMaxFee, errors } = state;
   
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  
   const handleFieldChange = (field: keyof Omit<State, 'errors'>, value: any) => {
     dispatch({ type: 'SET_FIELD', field, value });
-    const newErrors = validateForm({ ...state, [field]: value });
-    dispatch({ type: 'SET_ERRORS', errors: { ...errors, [field]: newErrors[field as keyof FormErrors] } });
   };
-  
+
+  const onDrop = async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (file) {
+      setImageFile(file);
+      setUploadError(null);
+      setIsUploading(true);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      try {
+        const response = await fetch('/api/upload-image', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Falha no upload da imagem.');
+        }
+
+        const data = await response.json();
+        handleFieldChange('imageUrl', data.secure_url);
+      } catch (error) {
+        setUploadError("Erro no upload. Tente novamente.");
+        setImageFile(null);
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {'image/*': ['.jpeg', '.png', '.jpg', '.gif']},
+    maxSize: 5 * 1024 * 1024, // 5MB
+    multiple: false,
+  });
+
+  const removeImage = () => {
+    setImageFile(null);
+    handleFieldChange('imageUrl', '');
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const validationErrors = validateForm(state);
@@ -160,7 +198,6 @@ export default function TokenForm() {
   return (
     <div className={styles.formGrid}>
       <form onSubmit={handleSubmit} className={styles.form}>
-        {/* MODIFICAÇÃO: Seletor de Padrão de Token */}
         <div className={styles.field}>
           <Label>Padrão do Token</Label>
           <div className={styles.radioGroup}>
@@ -170,7 +207,7 @@ export default function TokenForm() {
             </label>
             <label className={styles.radioLabel}>
               <input type="radio" value="token-2022" checked={tokenStandard === 'token-2022'} onChange={() => handleFieldChange('tokenStandard', 'token-2022')} />
-              <span>Token-2022 (com Extensões)</span>
+              <span>Token-2022 (Avançado)</span>
             </label>
           </div>
         </div>
@@ -200,18 +237,29 @@ export default function TokenForm() {
         </div>
         
         <div className={styles.field}>
-            <Label htmlFor="imageUrl">URL da Imagem do Token</Label>
-            <Input id="imageUrl" type="url" placeholder="https://i.imgur.com/seu-logo.png" value={imageUrl} onChange={(e) => handleFieldChange('imageUrl', e.target.value)} onPaste={(e) => handleFieldChange('imageUrl', e.clipboardData.getData('text'))} required/>
+            <Label htmlFor="imageUrl">Imagem do Token</Label>
+            <div {...getRootProps()} className={`${styles.dropzone} ${isDragActive ? styles.dropzoneActive : ''}`}>
+              <input {...getInputProps()} />
+              {imageFile ? (
+                <div className={styles.preview}>
+                  <img src={URL.createObjectURL(imageFile)} alt="Preview" />
+                  {isUploading && <div className={styles.spinner}></div>}
+                  <button type="button" onClick={removeImage} className={styles.removeButton}>×</button>
+                </div>
+              ) : (
+                <p>Arraste e solte a imagem aqui, ou clique para selecionar</p>
+              )}
+            </div>
+            {uploadError && <p className={styles.error}>{uploadError}</p>}
             {errors.imageUrl && <p className={styles.error}>{errors.imageUrl}</p>}
         </div>
 
-        {/* MODIFICAÇÃO: Seção para extensões do Token-2022 */}
         {tokenStandard === 'token-2022' && (
           <div className={styles.advancedContent}>
             <div className={styles.field}>
               <Label htmlFor="transferFee">Taxa de Transferência (opcional)</Label>
               <div className={styles.feeInputs}>
-                <Input id="transferFee" type="number" placeholder="Taxa % (Ex: 1 para 1%)" value={transferFeeBasisPoints} onChange={(e) => handleFieldChange('transferFeeBasisPoints', e.target.value)} min="0" max="10000" />
+                <Input id="transferFee" type="number" placeholder="Taxa em % (Ex: 1 para 1%)" value={transferFeeBasisPoints} onChange={(e) => handleFieldChange('transferFeeBasisPoints', (Number(e.target.value) * 100).toString())} min="0" max="100" step="0.01" />
                 <Input type="number" placeholder="Taxa Máxima (em tokens)" value={transferFeeMaxFee} onChange={(e) => handleFieldChange('transferFeeMaxFee', e.target.value)} min="0" />
               </div>
               {errors.transferFeeBasisPoints && <p className={styles.error}>{errors.transferFeeBasisPoints}</p>}
@@ -251,8 +299,8 @@ export default function TokenForm() {
             )}
         </div>
 
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Criando..." : "Criar Token (~0.094 SOL)"}
+        <Button type="submit" disabled={isCreatingToken || isUploading}>
+          {isCreatingToken ? "Criando..." : isUploading ? "Fazendo upload..." : "Criar Token (~0.094 SOL)"}
         </Button>
       </form>
 

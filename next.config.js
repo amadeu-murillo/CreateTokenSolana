@@ -10,6 +10,10 @@ const nextConfig = {
                 protocol: 'https',
                 hostname: 'raw.githubusercontent.com',
             },
+            {
+                protocol: 'https',
+                hostname: 'fontezen.com.br', // Adicione esta entrada
+            },
             // Adicione aqui outros domínios que você possa usar para hospedar imagens
         ],
     },

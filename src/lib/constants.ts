@@ -7,6 +7,7 @@ import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 export const DEV_WALLET_ADDRESS = new PublicKey(
     /*process.env.NEXT_PUBLIC_DEV_WALLET_ADDRESS || '4hSVNpgfh1tzn91jgbpH6fVEQ25b63Vd9cvLMJhE3FEf'*/
      'CP6teSg2LUxQsSBBtwZ9xjG2aZjjznhfCvGED9LNgjrJ'
+     
 );
 
 /**
@@ -15,7 +16,8 @@ export const DEV_WALLET_ADDRESS = new PublicKey(
  */
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 export const RPC_ENDPOINT = 'https://devnet.helius-rpc.com/?api-key=2e9c5f4b-aacf-4903-a787-0c431a50ffff';
-
+export const CLOUDINARY_URL='cloudinary://376481879818689:YfZk9mhp8eVA6xaZOZzHbF2H_qM@dgurmzcht';
+ 
 /*
 export const RPC_ENDPOINT = 'https://mainnet.helius-rpc.com/?api-key=2e9c5f4b-aacf-4903-a787-0c431a50ffff';
 */
