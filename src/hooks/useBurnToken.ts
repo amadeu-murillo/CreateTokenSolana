@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
@@ -37,11 +37,11 @@ export const useBurnToken = () => {
   const burnToken = async (mint: string, amount: number) => {
     if (!publicKey || !sendTransaction) {
       setError("Carteira não conectada.");
-      return;
+      return null;
     }
     if (!connection) {
         setError("A conexão com a rede Solana não foi estabelecida.");
-        return;
+        return null;
     }
 
     setIsLoading(true);
@@ -76,5 +76,10 @@ export const useBurnToken = () => {
     }
   };
 
-  return { burnToken, isLoading, error, signature };
+  const reset = useCallback(() => {
+    setError(null);
+    setSignature(null);
+  }, []);
+
+  return { burnToken, isLoading, error, signature, reset };
 };

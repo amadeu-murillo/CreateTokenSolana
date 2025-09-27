@@ -96,7 +96,7 @@ export default function AirdropPage() {
                                 <p className={styles.fieldDescription}>Separe o endereço e a quantidade por vírgula, ponto e vírgula ou espaço.</p>
                             </div>
                             <Button type="submit" disabled={isLoading || !mint || !recipientsText}>
-                                {isLoading ? 'Enviando...' : `Fazer Airdrop (Custo: 0.05 SOL + taxas)`}
+                                {isLoading ? 'Enviando...' : `Fazer Airdrop (Custo: 0.05 SOL)`}
                             </Button>
                         </form>
                     </CardContent>

@@ -1,16 +1,14 @@
-// src/app/burn/page.tsx
-
 "use client";
 
-import { useState } from 'react';
-import { useBurnToken } from '@/hooks/useBurnToken';
-import { useUserTokens } from '@/hooks/useUserTokens';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { TokenSelector } from '@/components/TokenSelector'; // Importar o novo seletor
-import Notification from '@/components/ui/Notification';
+import { useState, useEffect } from 'react';
+import { useBurnToken } from '../../hooks/useBurnToken';
+import { useUserTokens } from '../../hooks/useUserTokens';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../../components/ui/card';
+import { TokenSelector } from '../../components/TokenSelector';
+import Notification from '../../components/ui/Notification';
 import styles from './Burn.module.css';
 
 // Ícones SVG
@@ -30,14 +28,33 @@ const tutorialSteps = [
     }
 ];
 
+type NotificationState = {
+    type: 'success' | 'error';
+    message: string;
+    txId?: string | null;
+} | null;
+
 export default function BurnPage() {
     const [selectedTokenMint, setSelectedTokenMint] = useState('');
     const [amount, setAmount] = useState('');
-    const { burnToken, isLoading, error, signature } = useBurnToken();
+    const [notification, setNotification] = useState<NotificationState>(null);
+    const { burnToken, isLoading, error, reset } = useBurnToken();
     const { tokens: userTokens, isLoading: isLoadingUserTokens } = useUserTokens();
 
-    // Deriva o token selecionado a partir do mint
     const selectedToken = userTokens.find(t => t.mint === selectedTokenMint) || null;
+    
+    useEffect(() => {
+        if (error) {
+            setNotification({ type: 'error', message: error });
+        }
+    }, [error]);
+
+    useEffect(() => {
+        // Limpa o estado do hook ao desmontar o componente
+        return () => {
+            reset();
+        }
+    }, [reset]);
 
     const handleSetMaxAmount = () => {
         if (selectedToken) {
@@ -47,10 +64,28 @@ export default function BurnPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setNotification(null);
+        reset();
+        
         if (selectedToken) {
-            await burnToken(selectedToken.mint, Number(amount));
+            const signature = await burnToken(selectedToken.mint, Number(amount));
+            if (signature) {
+                setNotification({
+                    type: 'success',
+                    message: `Sucesso! ${amount} ${selectedToken.symbol || 'tokens'} foram queimados.`,
+                    txId: signature
+                });
+                setSelectedTokenMint('');
+                setAmount('');
+            }
         }
     };
+
+    const handleCloseNotification = () => {
+        setNotification(null);
+        reset();
+    };
+
 
     return (
         <div className={styles.grid}>
@@ -64,8 +99,14 @@ export default function BurnPage() {
                     </CardHeader>
                     <form onSubmit={handleSubmit}>
                         <CardContent className={styles.cardContent}>
-                            {error && <Notification type="error" message={error} onClose={() => {}} />}
-                            {signature && <Notification type="success" message="Tokens queimados com sucesso!" txId={signature} onClose={() => {}} />}
+                            {notification && (
+                                <Notification
+                                    type={notification.type}
+                                    message={notification.message}
+                                    txId={notification.txId}
+                                    onClose={handleCloseNotification}
+                                />
+                            )}
                             
                             <div className={styles.field}>
                                 <Label htmlFor="token-select">Selecione o Token</Label>
@@ -108,7 +149,7 @@ export default function BurnPage() {
                         </CardContent>
                         <CardFooter>
                             <Button type="submit" disabled={isLoading || !selectedToken || !amount} className="w-full">
-                                {isLoading ? 'Queimando...' : `Queimar Tokens`}
+                                {isLoading ? 'Queimando...' : `Queimar Tokens (Custo: ~0.05 SOL + taxas)`}
                             </Button>
                         </CardFooter>
                     </form>
@@ -131,3 +172,4 @@ export default function BurnPage() {
         </div>
     );
 }
+

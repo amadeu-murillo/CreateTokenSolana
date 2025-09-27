@@ -203,7 +203,7 @@ export default function AddLiquidityPage() {
                     </CardContent>
                     <CardFooter>
                         <Button onClick={handleCreatePool} disabled={isLoading || !selectedTokenMint || !baseTokenAmount || !quoteTokenAmount} className="w-full">
-                            {isLoading ? "Processando..." : `Criar Pool e Adicionar Liquidez (~${TOTAL_FEE.toFixed(4)} SOL)`}
+                            {isLoading ? "Processando..." : `Criar Pool e Adicionar Liquidez (~${TOTAL_FEE.toFixed(2)} SOL)`}
                         </Button>
                     </CardFooter>
                 </Card>
