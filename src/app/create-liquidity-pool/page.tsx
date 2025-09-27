@@ -63,6 +63,11 @@ export default function CreateLiquidityPoolPage() {
             setStatusMessage("Token selecionado não encontrado na sua carteira.");
             return;
         }
+        // Validação da quantidade de tokens no momento do envio
+        if (parseFloat(baseTokenAmount) > parseFloat(selectedToken.amount)) {
+            setStatusMessage(`A quantidade do token excede seu saldo de ${parseFloat(selectedToken.amount).toLocaleString()} ${selectedToken.symbol}.`);
+            return;
+        }
         setStatusMessage("Passo 1: Criando o OpenBook Market...");
         const marketId = await createMarket(selectedTokenMint, NATIVE_MINT.toBase58(), selectedToken.decimals);
         if (marketId) {
@@ -111,10 +116,17 @@ export default function CreateLiquidityPoolPage() {
                         <div className={styles.inputGroup}>
                              <div className={styles.amountHeader}>
                                 <Label htmlFor="base-amount">Quantidade do Seu Token (Base)</Label>
-                                <span className={styles.balance}>Saldo: {selectedToken.amount} {selectedToken.symbol}</span>
+                                <span className={styles.balance}>Saldo: {parseFloat(selectedToken.amount).toLocaleString()} {selectedToken.symbol}</span>
                             </div>
                             <div className={styles.amountInputContainer}>
-                                <Input id="base-amount" type="number" value={baseTokenAmount} onChange={(e) => setBaseTokenAmount(e.target.value)} placeholder="Ex: 10000" disabled={isLoading} />
+                                <Input 
+                                    id="base-amount" 
+                                    type="number" 
+                                    value={baseTokenAmount} 
+                                    onChange={(e) => setBaseTokenAmount(e.target.value)} 
+                                    placeholder="Ex: 10000" 
+                                    disabled={isLoading} 
+                                />
                                 <Button type="button" onClick={handleSetMaxBaseAmount} className={styles.maxButton}>MAX</Button>
                             </div>
                         </div>

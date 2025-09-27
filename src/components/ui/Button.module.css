@@ -33,3 +33,27 @@
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
 }
+
+/* Novas variantes de botão */
+.secondary {
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
+  background-image: none; /* Remove o gradiente */
+  border: 1px solid hsl(var(--border));
+}
+
+.secondary:hover:not(:disabled) {
+  background-color: var(--muted);
+  background-image: none;
+}
+
+.destructive {
+    background-color: var(--destructive);
+    color: var(--destructive-foreground);
+    background-image: none;
+}
+
+.destructive:hover:not(:disabled) {
+    background-color: hsl(var(--destructive) / 0.9);
+    background-image: none;
+}

@@ -22,32 +22,7 @@
 }
 
 /* Unificação de Estilos de Botões */
-/* Sobrescreve os estilos do WalletMultiButton para alinhá-lo com o design system. */
+/* Os estilos do WalletMultiButton agora herdam do .button primário */
 .container :global(.wallet-adapter-button) {
-    background-image: var(--primary-gradient) !important;
-    background-size: 200% auto;
-    color: hsl(var(--primary-foreground)) !important;
-    transition: all 0.2s ease-in-out !important;
-    border-radius: var(--radius) !important;
-    height: 2.75rem !important; /* Altura ajustada */
-    padding: 0.75rem 1.5rem !important; /* Padding ajustado */
-    font-weight: 600 !important; /* Peso da fonte ajustado */
-    border: none !important;
-    box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.1);
-    text-transform: none !important;
-    letter-spacing: 0.02em;
+    /* Este seletor continua para garantir a especificidade, mas os estilos duplicados foram removidos */
 }
-
-.container :global(.wallet-adapter-button:hover:not(:disabled)) {
-    background-position: right center !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px 0 rgba(0, 0, 0, 0.15) !important;
-    opacity: 1 !important;
-}
-
-.container :global(.wallet-adapter-button:disabled) {
-    opacity: 0.5 !important;
-    cursor: not-allowed;
-}
-
-/* Removemos o :focus-visible daqui para usar o global */

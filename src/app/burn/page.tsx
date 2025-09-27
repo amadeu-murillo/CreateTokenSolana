@@ -2,17 +2,16 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useBurnToken } from '@/hooks/useBurnToken';
-import { useUserTokens } from '@/hooks/useUserTokens'; // Importar o hook para buscar os tokens do usuário
+import { useUserTokens } from '@/hooks/useUserTokens';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import Notification from '@/components/ui/Notification'; // Importar
 import styles from './Burn.module.css';
-import Link from 'next/link';
 
-// Definição da interface para o token do usuário
 interface UserToken {
     mint: string;
     amount: string;
@@ -22,7 +21,7 @@ interface UserToken {
     logoURI?: string;
 }
 
-// Ícones SVG para o guia
+// Ícones SVG (mantidos)
 const TokenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /></svg>;
 const FlameIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>;
 
@@ -49,7 +48,7 @@ export default function BurnPage() {
         const mint = e.target.value;
         const token = userTokens.find(t => t.mint === mint) || null;
         setSelectedToken(token);
-        setAmount(''); // Resetar a quantidade ao trocar de token
+        setAmount('');
     };
 
     const handleSetMaxAmount = () => {
@@ -76,25 +75,31 @@ export default function BurnPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
+                        {error && <Notification type="error" message={error} onClose={function (): void {
+                            throw new Error('Function not implemented.');
+                        } } />}
+                        {signature && <Notification type="success" message="Tokens queimados com sucesso!" txId={signature} onClose={function (): void {
+                            throw new Error('Function not implemented.');
+                        } } />}
                         <form onSubmit={handleSubmit} className={styles.form}>
                             <div className={styles.field}>
                                 <Label htmlFor="token-select">Selecione o Token</Label>
                                 <select 
-    id="token-select" 
-    value={selectedToken?.mint || ''} 
-    onChange={handleTokenChange}
-    className={styles.select}
-    required
->
-    <option value="" disabled>
-        {isLoadingUserTokens ? 'Carregando tokens...' : (userTokens.length > 0 ? 'Selecione um token' : 'Nenhum token encontrado')}
-    </option>
-    {userTokens.map(token => (
-        <option key={token.mint} value={token.mint}>
-            {token.name} ({token.symbol})
-        </option>
-    ))}
-</select>
+                                    id="token-select" 
+                                    value={selectedToken?.mint || ''} 
+                                    onChange={handleTokenChange}
+                                    className={styles.select}
+                                    required
+                                >
+                                    <option value="" disabled>
+                                        {isLoadingUserTokens ? 'Carregando tokens...' : (userTokens.length > 0 ? 'Selecione um token' : 'Nenhum token encontrado')}
+                                    </option>
+                                    {userTokens.map(token => (
+                                        <option key={token.mint} value={token.mint}>
+                                            {token.name} ({token.symbol})
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
                             {selectedToken && (
@@ -125,15 +130,6 @@ export default function BurnPage() {
                                 {isLoading ? 'Queimando...' : `Queimar Tokens (Custo: 0.05 SOL + taxas)`}
                             </Button>
                         </form>
-                        {error && <p className={styles.error}>{error}</p>}
-                        {signature && (
-                            <div className={styles.success}>
-                                <p>Tokens queimados com sucesso!</p>
-                                <Link href={`https://solscan.io/tx/${signature}`} target="_blank" rel="noopener noreferrer">
-                                    Ver transação no Solscan
-                                </Link>
-                            </div>
-                        )}
                     </CardContent>
                 </Card>
             </div>

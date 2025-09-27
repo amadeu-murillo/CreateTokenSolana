@@ -3,7 +3,6 @@ import { Connection, ParsedInstruction, PartiallyDecodedInstruction, PublicKey }
 import { RPC_ENDPOINT } from '@/lib/constants';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
-// Melhoria: Interfaces para tipagem estrita da instrução parseada
 interface InitializeMintInfo {
   mint: string;
   decimals: number;
@@ -16,20 +15,16 @@ interface ParsedInitializeMintData {
   info: InitializeMintInfo;
 }
 
-// Define o tipo exato da instrução que estamos procurando
 type InitializeMintInstruction = ParsedInstruction & {
   parsed: ParsedInitializeMintData;
 };
 
-// Type guard para verificar se a instrução é do tipo 'initializeMint' de forma segura
 function isInitializeMintInstruction(
   instruction: ParsedInstruction | PartiallyDecodedInstruction
 ): instruction is InitializeMintInstruction {
-  // Primeiro, verifica se é uma ParsedInstruction verificando a existência da propriedade 'parsed'
   if (!('parsed' in instruction)) {
     return false;
   }
-  // Agora que sabemos que é uma ParsedInstruction, podemos acessar 'parsed' com segurança
   const { parsed } = instruction;
   return (
     instruction.programId.equals(TOKEN_PROGRAM_ID) &&
@@ -49,6 +44,8 @@ function isInitializeMintInstruction(
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const wallet = searchParams.get('wallet');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = 10; // Itens por página
 
     if (!wallet) {
         return NextResponse.json({ error: 'Endereço da carteira é obrigatório.' }, { status: 400 });
@@ -58,6 +55,9 @@ export async function GET(request: Request) {
         const connection = new Connection(RPC_ENDPOINT, 'confirmed');
         const publicKey = new PublicKey(wallet);
 
+        // A lógica de paginação no backend com getSignaturesForAddress é complexa.
+        // A abordagem mais simples é carregar um número maior de assinaturas e paginar no frontend.
+        // Se a performance se tornar um problema, seria necessário implementar uma lógica mais robusta com `before` e `until`.
         const allSignatures = await connection.getSignaturesForAddress(publicKey, { limit: 100 });
 
         const tokenCreationTransactions = [];
@@ -66,7 +66,6 @@ export async function GET(request: Request) {
             const tx = await connection.getParsedTransaction(sigInfo.signature, { maxSupportedTransactionVersion: 0 });
             if (tx && tx.meta && tx.meta.err === null) {
                 for (const instruction of tx.transaction.message.instructions) {
-                    // Usar o type guard aprimorado garante a tipagem correta
                     if (isInitializeMintInstruction(instruction)) {
                          tokenCreationTransactions.push({
                             signature: sigInfo.signature,
@@ -84,10 +83,9 @@ export async function GET(request: Request) {
         console.error('Erro ao buscar histórico de tokens:', error);
         let errorMessage = 'Erro interno do servidor ao buscar o histórico.';
         if (error instanceof Error) {
-            // MODIFICAÇÃO: Tratamento de erro específico para o problema de RPC
             if (error.message.includes('Failed to query long-term storage')) {
                 errorMessage = 'Não foi possível carregar o histórico completo. O nó RPC da Solana está com dificuldades para aceder a dados antigos. Por favor, tente novamente mais tarde.';
-                return NextResponse.json({ error: errorMessage }, { status: 503 }); // Service Unavailable
+                return NextResponse.json({ error: errorMessage }, { status: 503 });
             }
             errorMessage = error.message;
         }

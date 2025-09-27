@@ -12,9 +12,16 @@ const nextConfig = {
             },
             {
                 protocol: 'https',
-                hostname: 'fontezen.com.br', // Adicione esta entrada
+                hostname: 'fontezen.com.br',
             },
-            // Adicione aqui outros domínios que você possa usar para hospedar imagens
+            {
+                protocol: 'https',
+                hostname: 'res.cloudinary.com',
+            },
+            {
+                protocol: 'http',
+                hostname: 'localhost',
+            },
         ],
     },
     webpack: (config, { isServer }) => {

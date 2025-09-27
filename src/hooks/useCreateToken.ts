@@ -8,7 +8,7 @@ interface TokenData {
   symbol: string;
   decimals: number;
   supply: number;
-  imageUrl: string; 
+  imageUrl: string;
   mintAuthority: boolean;
   freezeAuthority: boolean;
   tokenStandard: 'spl' | 'token-2022';
@@ -26,8 +26,16 @@ function getFriendlyErrorMessage(error: any): string {
     if (message.includes("User rejected the request")) {
         return "Transação rejeitada pelo utilizador na carteira.";
     }
+    // Erro de saldo insuficiente para rent
+    if (message.includes("insufficient lamports")) {
+        return "Você não possui SOL suficiente para cobrir as taxas da rede.";
+    }
     if (message.includes("not enough SOL")) {
         return "Falha na transação. Verifique se possui SOL suficiente para os custos.";
+    }
+    // Exemplo de erro de símbolo (simulado, a lógica real pode estar no backend)
+    if (message.includes("Token symbol already in use")) {
+        return "Este símbolo já foi utilizado. Por favor, escolha outro.";
     }
     if (message.includes("Transaction simulation failed")) {
         return "A simulação da transação falhou. Isto pode ser um problema temporário na rede ou dados inválidos.";

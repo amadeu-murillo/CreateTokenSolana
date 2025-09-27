@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import Notification from '@/components/ui/Notification'; // Importar
 import styles from './Airdrop.module.css';
-import Link from 'next/link';
 
 interface Recipient {
     address: string;
@@ -71,6 +71,12 @@ export default function AirdropPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
+                        {error && <Notification type="error" message={error} onClose={function (): void {
+                            throw new Error('Function not implemented.');
+                        } } />}
+                        {signature && <Notification type="success" message="Airdrop enviado com sucesso!" txId={signature} onClose={function (): void {
+                            throw new Error('Function not implemented.');
+                        } } />}
                         <form onSubmit={handleSubmit} className={styles.form}>
                             <div className={styles.field}>
                                 <Label htmlFor="mint">Endereço do Token (Mint)</Label>
@@ -93,15 +99,6 @@ export default function AirdropPage() {
                                 {isLoading ? 'Enviando...' : `Fazer Airdrop (Custo: 0.05 SOL + taxas)`}
                             </Button>
                         </form>
-                        {error && <p className={styles.error}>{error}</p>}
-                        {signature && (
-                            <div className={styles.success}>
-                                <p>Airdrop enviado com sucesso!</p>
-                                <Link href={`https://solscan.io/tx/${signature}`} target="_blank" rel="noopener noreferrer">
-                                    Ver transação no Solscan
-                                </Link>
-                            </div>
-                        )}
                     </CardContent>
                 </Card>
             </div>

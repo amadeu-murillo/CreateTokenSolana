@@ -24,12 +24,11 @@ export default function ConfirmationPage() {
               tokenAddress={tokenAddress} 
               txId={txId}
             />
-            {/* MODIFICAÇÃO: Adicionado botão de call-to-action para criar pool de liquidez */}
             <div className={styles.ctaContainer}>
                 <p>Parabéns! O seu token está na blockchain. O próximo passo é torná-lo negociável.</p>
                 <Link href={`/create-liquidity-pool?mint=${tokenAddress}`}>
-                    <Button className={styles.ctaButton}>
-                        Criar Pool de Liquidez (~0.3 SOL)
+                    <Button>
+                        Criar Pool de Liquidez
                     </Button>
                 </Link>
             </div>

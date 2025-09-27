@@ -78,19 +78,7 @@
     }
 }
 
-.actionButton {
-    background-color: hsl(var(--secondary)) !important;
-    background-image: none !important;
-    color: hsl(var(--secondary-foreground)) !important;
-    font-size: 0.8rem;
-    padding: 0.4rem 0.8rem;
-    height: auto;
-    border: 1px solid hsl(var(--border));
-}
-
-.actionButton:hover {
-    background-color: hsl(var(--muted)) !important;
-}
+/* Removido .actionButton e .actionButton:hover para usar classes globais */
 
 .solscanLink {
   background-image: var(--primary-gradient);

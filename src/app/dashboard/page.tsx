@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Link from 'next/link';
 import ManageAuthorityModal from "@/components/ManageAuthorityModal";
 import { useManageAuthority } from "@/hooks/useManageAuthority";
 import styles from './Dashboard.module.css';
-import Notification from "@/components/ui/Notification"; // Importar o novo componente
+import Notification from "@/components/ui/Notification";
 
 interface TokenHistoryItem {
     signature: string;
@@ -21,7 +22,6 @@ type AuthorityModalState = {
     type: 'mint' | 'freeze' | null;
 };
 
-// Modificação: O estado da notificação agora inclui um txId opcional
 type NotificationState = {
     type: 'success' | 'error';
     message: string;
@@ -40,8 +40,8 @@ const HistoryItem = ({ item, onManageAuthorityClick }: { item: TokenHistoryItem,
             )}
         </div>
         <div className={styles.actionsContainer}>
-             <Button className={styles.actionButton} onClick={() => onManageAuthorityClick(item.mint, 'mint')}>Remover Autoridade de Mint</Button>
-             <Button className={styles.actionButton} onClick={() => onManageAuthorityClick(item.mint, 'freeze')}>Remover Autoridade de Freeze</Button>
+             <Button className="secondary" onClick={() => onManageAuthorityClick(item.mint, 'mint')}>Remover Autoridade de Mint</Button>
+             <Button className="secondary" onClick={() => onManageAuthorityClick(item.mint, 'freeze')}>Remover Autoridade de Freeze</Button>
             <a 
                 href={`https://solscan.io/token/${item.mint}`} 
                 target="_blank" 
@@ -54,12 +54,28 @@ const HistoryItem = ({ item, onManageAuthorityClick }: { item: TokenHistoryItem,
     </div>
 );
 
+// Empty State Component
+const EmptyState = () => (
+    <div className={styles.emptyStateContainer}>
+        <div className={styles.emptyStateIcon}>
+            {/* Você pode adicionar um ícone SVG aqui */}
+        </div>
+        <h3>Nenhum token criado ainda</h3>
+        <p>Parece que você ainda não criou nenhum token. Comece agora!</p>
+        <Link href="/create">
+            <Button className={styles.emptyStateButton}>Criar Meu Primeiro Token</Button>
+        </Link>
+    </div>
+);
+
+
 export default function DashboardPage() {
     const { publicKey } = useWallet();
     const [history, setHistory] = useState<TokenHistoryItem[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [errorHistory, setErrorHistory] = useState<string | null>(null);
     const [notification, setNotification] = useState<NotificationState>(null);
+    const [visibleCount, setVisibleCount] = useState(10); // Para "Carregar Mais"
 
     const { manageAuthority, isLoading: isManagingAuthority, error: manageAuthorityError } = useManageAuthority();
 
@@ -100,19 +116,20 @@ export default function DashboardPage() {
         const signature = await manageAuthority(modalState.mint, modalState.type);
 
         if (signature) {
-             // Modificação: Atualiza o estado da notificação com txId para sucesso
              setNotification({type: 'success', message: `Autoridade removida com sucesso!`, txId: signature});
-             fetchHistory(); // Re-fetch history to reflect changes
+             fetchHistory();
         } else {
-             // Modificação: Atualiza o estado da notificação para erro
              setNotification({type: 'error', message: manageAuthorityError || "Falha ao remover autoridade."});
         }
         setModalState({ isOpen: false, mint: null, type: null });
     };
 
+    const handleLoadMore = () => {
+        setVisibleCount(prevCount => prevCount + 10);
+    };
+
     return (
         <div className={styles.container}>
-             {/* Modificação: Usa o novo componente de Notificação */}
              {notification && (
                 <Notification
                     type={notification.type}
@@ -136,13 +153,20 @@ export default function DashboardPage() {
                     ) : errorHistory ? (
                         <p className={`${styles.infoText} ${styles.errorText}`}>{errorHistory}</p>
                     ) : history.length > 0 ? (
-                        <div className={styles.historyList}>
-                            {history.map(item => (
-                                <HistoryItem key={item.signature} item={item} onManageAuthorityClick={handleManageAuthorityClick} />
-                            ))}
-                        </div>
+                        <>
+                            <div className={styles.historyList}>
+                                {history.slice(0, visibleCount).map(item => (
+                                    <HistoryItem key={item.signature} item={item} onManageAuthorityClick={handleManageAuthorityClick} />
+                                ))}
+                            </div>
+                            {visibleCount < history.length && (
+                                <Button onClick={handleLoadMore} className="secondary" style={{marginTop: '1.5rem'}}>
+                                    Carregar Mais
+                                </Button>
+                            )}
+                        </>
                     ) : (
-                        <p className={styles.infoText}>Nenhum token criado encontrado nas últimas transações.</p>
+                       <EmptyState />
                     )}
                 </CardContent>
             </Card>

@@ -10,6 +10,9 @@ function getFriendlyErrorMessage(error: any): string {
     if (message.includes("User rejected the request")) {
         return "Transação rejeitada pelo usuário na carteira.";
     }
+    if (message.includes("insufficient lamports")) {
+        return "Você não possui SOL suficiente para cobrir as taxas da rede.";
+    }
     if (message.includes("not enough SOL")) {
         return "Falha na transação. Verifique se você possui SOL suficiente para as taxas.";
     }
