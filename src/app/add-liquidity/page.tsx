@@ -1,14 +1,13 @@
 // src/app/add-liquidity/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useReducer, useEffect } from "react";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import styles from "./AddLiquidity.module.css";
 
 // Hooks
 import { useCreateLiquidityPool } from "@/hooks/useCreateLiquidityPool";
-import { useCreateMarket } from "@/hooks/useCreateMarket";
 import { useUserTokens } from "@/hooks/useUserTokens";
 import { SERVICE_FEE_CREATE_LP_SOL } from "@/lib/constants";
 
@@ -25,9 +24,9 @@ const MARKET_CREATION_RENT_SOL = 0.35;
 const TOTAL_FEE = MARKET_CREATION_RENT_SOL + SERVICE_FEE_CREATE_LP_SOL;
 
 // Ícones SVG para o tutorial
-const IconLayers = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
-const IconPlusCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>;
-const IconZap = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+const IconLayers = () => <svg xmlns="http://www.w.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
+const IconPlusCircle = () => <svg xmlns="http://www.w.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>;
+const IconZap = () => <svg xmlns="http://www.w.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
 
 const tutorialSteps = [
     {
@@ -47,72 +46,79 @@ const tutorialSteps = [
     }
 ];
 
+// --- INÍCIO DAS MUDANÇAS ---
+
+// 1. Definindo o tipo para o nosso estado
+interface State {
+    selectedTokenMint: string;
+    baseTokenAmount: string;
+    quoteTokenAmount: string;
+    solBalance: number | null;
+}
+
+// 2. Definindo os tipos para nossas ações
+type Action =
+    | { type: 'SET_FIELD'; field: keyof State; value: string | number | null }
+    | { type: 'SET_SOL_BALANCE'; payload: number };
+
+const initialState: State = {
+    selectedTokenMint: "",
+    baseTokenAmount: "",
+    quoteTokenAmount: "",
+    solBalance: null,
+};
+
+// 3. Aplicando os tipos na função reducer
+function reducer(state: State, action: Action): State {
+    switch (action.type) {
+        case 'SET_FIELD':
+            return { ...state, [action.field]: action.value };
+        case 'SET_SOL_BALANCE':
+            return { ...state, solBalance: action.payload };
+        default:
+            return state;
+    }
+}
+
+// --- FIM DAS MUDANÇAS ---
+
+
 export default function AddLiquidityPage() {
-    const [selectedTokenMint, setSelectedTokenMint] = useState("");
-    const [baseTokenAmount, setBaseTokenAmount] = useState("");
-    const [quoteTokenAmount, setQuoteTokenAmount] = useState("");
-    const [statusMessage, setStatusMessage] = useState("");
-    const [solBalance, setSolBalance] = useState<number | null>(null);
+    const [state, dispatch] = useReducer(reducer, initialState);
+    const { selectedTokenMint, baseTokenAmount, quoteTokenAmount, solBalance } = state;
 
     const { connection } = useConnection();
     const { publicKey } = useWallet();
     const { tokens, isLoading: isLoadingTokens } = useUserTokens();
-    const { createMarket, isLoading: isCreatingMarket, error: marketError } = useCreateMarket();
-    const { createLiquidityPool, isLoading: isCreatingPool, error: poolError, signature } = useCreateLiquidityPool();
+    const { createLiquidityPool, isLoading, error, signature, statusMessage } = useCreateLiquidityPool();
 
     useEffect(() => {
         if (publicKey) {
             connection.getBalance(publicKey).then(balance => {
-                setSolBalance(balance / 1_000_000_000);
+                dispatch({ type: 'SET_SOL_BALANCE', payload: balance / 1_000_000_000 });
             });
         }
     }, [publicKey, connection]);
 
     const selectedToken = tokens.find(t => t.mint === selectedTokenMint);
 
-    const handleSetMaxBaseAmount = () => {
-        if (selectedToken) {
-            setBaseTokenAmount(selectedToken.amount);
-        }
-    };
-
     const handleCreatePool = async () => {
-        if (!selectedTokenMint || !baseTokenAmount || !quoteTokenAmount) {
-            setStatusMessage("Por favor, preencha todos os campos.");
-            return;
-        }
         if (!selectedToken) {
-            setStatusMessage("Token selecionado não encontrado na sua carteira.");
-            return;
-        }
-        if (parseFloat(baseTokenAmount) > parseFloat(selectedToken.amount)) {
-            setStatusMessage(`A quantidade do token excede seu saldo de ${parseFloat(selectedToken.amount).toLocaleString()} ${selectedToken.symbol}.`);
+            alert("Por favor, selecione um token.");
             return;
         }
 
-        setStatusMessage("Passo 1: Criando o OpenBook Market...");
-        const marketId = await createMarket(selectedTokenMint, NATIVE_MINT.toBase58(), selectedToken.decimals);
-
-        if (marketId) {
-            setStatusMessage("Passo 2: Adicionando liquidez ao pool...");
-            await createLiquidityPool({
-                marketId,
-                baseAmount: parseFloat(baseTokenAmount),
-                quoteAmount: parseFloat(quoteTokenAmount),
-                baseMint: selectedTokenMint,
-                quoteMint: NATIVE_MINT.toBase58()
-            });
-            setStatusMessage("Processo iniciado. Verificando a transação...");
-        } else {
-            setStatusMessage("Falha ao criar o OpenBook Market. Verifique o console para mais detalhes.");
-        }
+        await createLiquidityPool({
+            baseAmount: parseFloat(baseTokenAmount),
+            quoteAmount: parseFloat(quoteTokenAmount),
+            baseMint: selectedTokenMint,
+            quoteMint: NATIVE_MINT.toBase58(),
+            baseDecimals: selectedToken.decimals,
+        });
     };
-
-    const isLoading = isCreatingMarket || isCreatingPool;
-    const error = marketError || poolError;
 
     const clearNotifications = () => {
-        // Esta função pode ser usada para limpar erros se necessário
+        // Lógica para limpar notificações, se necessário
     };
 
     return (
@@ -132,15 +138,15 @@ export default function AddLiquidityPage() {
 
                         <div className={styles.inputGroup}>
                             <Label>Selecione seu Token</Label>
-                            <TokenSelector 
-                                tokens={tokens} 
-                                selectedTokenMint={selectedTokenMint} 
+                            <TokenSelector
+                                tokens={tokens}
+                                selectedTokenMint={selectedTokenMint}
                                 onSelectToken={(mint) => {
-                                    setSelectedTokenMint(mint);
-                                    setBaseTokenAmount('');
-                                }} 
-                                isLoading={isLoadingTokens} 
-                                disabled={isLoading} 
+                                    dispatch({ type: 'SET_FIELD', field: 'selectedTokenMint', value: mint });
+                                    dispatch({ type: 'SET_FIELD', field: 'baseTokenAmount', value: '' });
+                                }}
+                                isLoading={isLoadingTokens}
+                                disabled={isLoading}
                             />
                         </div>
 
@@ -150,18 +156,24 @@ export default function AddLiquidityPage() {
                                     <Label htmlFor="base-amount">Quantidade de {selectedToken.symbol || 'Token'}</Label>
                                     <span className={styles.balance}>Saldo: {parseFloat(selectedToken.amount).toLocaleString()}</span>
                                 </div>
-                                <div className={styles.amountInputContainer}>
-                                    <Input 
-                                        id="base-amount" 
-                                        type="number" 
-                                        value={baseTokenAmount} 
-                                        onChange={(e) => setBaseTokenAmount(e.target.value)} 
-                                        placeholder="Ex: 10000" 
-                                        disabled={isLoading}
-                                        className={styles.inputWithButton}
-                                    />
-                                    <Button type="button" onClick={handleSetMaxBaseAmount} className={styles.maxButton}>MAX</Button>
-                                </div>
+                                <Input
+                                    id="base-amount"
+                                    type="number"
+                                    value={baseTokenAmount}
+                                    onChange={(e) => {
+                                        let value = e.target.value;
+                                        if (selectedToken && parseFloat(value) > parseFloat(selectedToken.amount)) {
+                                            value = selectedToken.amount;
+                                        }
+                                        if (value !== '' && parseFloat(value) < 0) {
+                                            value = '0';
+                                        }
+                                        dispatch({ type: 'SET_FIELD', field: 'baseTokenAmount', value: value });
+                                    }}
+                                    placeholder={`Ex: 10000`}
+                                    disabled={isLoading}
+                                    max={selectedToken.amount}
+                                />
                             </div>
                         )}
 
@@ -170,7 +182,7 @@ export default function AddLiquidityPage() {
                                 <Label htmlFor="quote-amount">Quantidade de SOL</Label>
                                 {solBalance !== null && <span className={styles.balance}>Saldo: {solBalance.toFixed(4)}</span>}
                             </div>
-                            <Input id="quote-amount" type="number" value={quoteTokenAmount} onChange={(e) => setQuoteTokenAmount(e.target.value)} placeholder="Ex: 10" disabled={isLoading} />
+                            <Input id="quote-amount" type="number" value={quoteTokenAmount} onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'quoteTokenAmount', value: e.target.value })} placeholder="Ex: 10" disabled={isLoading} />
                         </div>
                     </CardContent>
                     <CardFooter>

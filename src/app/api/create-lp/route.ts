@@ -31,10 +31,10 @@ export async function POST(request: Request) {
         // Obter as instruções para criar e inicializar o pool de liquidez do Raydium SDK
         const { innerTransactions } = await Liquidity.makeCreatePoolV4InstructionV2Simple({
             connection,
-            programId: MAINNET_PROGRAM_ID.AmmV4, // MODIFICAÇÃO: Corrigido de LIQUIDITY_V4 para AmmV4
+            programId: DEVNET_PROGRAM_ID.AmmV4, // MODIFICAÇÃO: Corrigido de LIQUIDITY_V4 para AmmV4
             marketInfo: {
                 marketId: new PublicKey(marketId),
-                programId: MAINNET_PROGRAM_ID.OPENBOOK_MARKET,
+                programId: DEVNET_PROGRAM_ID.OPENBOOK_MARKET,
             },
             baseMintInfo: { mint: baseMintInfo.address, decimals: baseMintInfo.decimals },
             quoteMintInfo: { mint: quoteMintInfo.address, decimals: quoteMintInfo.decimals },

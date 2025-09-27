@@ -1,15 +1,19 @@
 // src/app/api/create-market/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { Connection, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, SystemProgram, VersionedTransaction } from '@solana/web3.js';
 import { MarketV2, Token, TOKEN_PROGRAM_ID } from '@raydium-io/raydium-sdk';
 import { NATIVE_MINT } from '@solana/spl-token';
-// Importando suas constantes centralizadas
 import { DEV_WALLET_ADDRESS, SERVICE_FEE_CREATE_LP_LAMPORTS } from '@/lib/constants';
 
 export async function POST(req: NextRequest) {
     try {
         const { baseMint, quoteMint, wallet, baseDecimals } = await req.json();
-        const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_RPC_HOST!);
+
+        if (!baseMint || !quoteMint || !wallet || baseDecimals === undefined) {
+            return NextResponse.json({ error: 'Parâmetros ausentes.' }, { status: 400 });
+        }
+
+        const connection = new Connection('https://devnet.helius-rpc.com/?api-key=2e9c5f4b-aacf-4903-a787-0c431a50ffff');
         const payer = new PublicKey(wallet);
 
         const baseToken = new Token(TOKEN_PROGRAM_ID, new PublicKey(baseMint), baseDecimals);
@@ -20,34 +24,32 @@ export async function POST(req: NextRequest) {
             wallet: payer,
             baseInfo: baseToken,
             quoteInfo: quoteToken,
-            lotSize: 1, 
+            lotSize: 1,
             tickSize: 0.000001,
             dexProgramId: new PublicKey('srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX'),
-            makeTxVersion: 0, 
+            makeTxVersion: 0,
         });
 
-        const marketTransaction = new Transaction();
-        innerTransactions[0].instructions.forEach(instruction => marketTransaction.add(instruction));
-        
-        // Adiciona a instrução da taxa de serviço usando sua constante em Lamports
-        marketTransaction.add(
+        const transaction = new Transaction();
+        innerTransactions[0].instructions.forEach(instruction => transaction.add(instruction));
+
+        transaction.add(
             SystemProgram.transfer({
                 fromPubkey: payer,
                 toPubkey: DEV_WALLET_ADDRESS,
-                lamports: SERVICE_FEE_CREATE_LP_LAMPORTS, // Usando sua constante
+                lamports: SERVICE_FEE_CREATE_LP_LAMPORTS,
             })
         );
 
-        const finalTransaction = marketTransaction;
         const { blockhash } = await connection.getLatestBlockhash();
-        finalTransaction.recentBlockhash = blockhash;
-        finalTransaction.feePayer = payer;
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = payer;
 
         innerTransactions[0].signers.forEach(signer => {
-            finalTransaction.partialSign(signer);
+            transaction.partialSign(signer);
         });
 
-        const serializedTransaction = finalTransaction.serialize({
+        const serializedTransaction = transaction.serialize({
             requireAllSignatures: false,
         });
 

@@ -41,55 +41,6 @@
     opacity: 0.8;
 }
 
-.amountInputContainer {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-/* Classe corrigida para o input com botão */
-.inputWithButton {
-    /* Adiciona espaço à direita para não ficar sob o botão */
-    padding-right: 4.5rem !important;
-}
-
-.amountInputContainer .maxButton {
-    position: absolute;
-    right: 0.5rem;
-    height: auto;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-}
-
-.message {
-    margin-top: 1rem;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    text-align: center;
-}
-
-.status {
-    background-color: var(--accent);
-    color: var(--accent-foreground);
-}
-
-.error {
-    background-color: var(--destructive);
-    color: var(--destructive-foreground);
-}
-
-.success {
-    background-color: #28a745;
-    color: white;
-}
-
-.link {
-    text-decoration: underline;
-    font-weight: 500;
-    margin-left: 0.5rem;
-}
-
 /* Sidebar Styles */
 .sidebarTitle {
     font-size: 1.5rem;
@@ -107,7 +58,7 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1rem !important; /* Shadcn override */
+    padding: 1rem !important;
 }
 
 .tutorialIcon {

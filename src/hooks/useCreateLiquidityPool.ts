@@ -1,8 +1,9 @@
+// src/hooks/useCreateLiquidityPool.ts
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
+import { NATIVE_MINT } from "@solana/spl-token";
 
-// Função de tratamento de erro aprimorada e padronizada
 function getFriendlyErrorMessage(error: any): string {
     const message = error.message || String(error);
     console.error("Create LP error:", error);
@@ -22,13 +23,12 @@ function getFriendlyErrorMessage(error: any): string {
     return "Ocorreu um erro ao criar o pool de liquidez. Verifique o console para mais detalhes.";
 }
 
-
 interface CreateLpData {
     baseMint: string;
     quoteMint: string;
     baseAmount: number;
     quoteAmount: number;
-    marketId: string;
+    baseDecimals: number;
 }
 
 export const useCreateLiquidityPool = () => {
@@ -37,6 +37,7 @@ export const useCreateLiquidityPool = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const createLiquidityPool = async (data: CreateLpData) => {
     if (!publicKey || !sendTransaction) {
@@ -47,35 +48,57 @@ export const useCreateLiquidityPool = () => {
     setIsLoading(true);
     setError(null);
     setSignature(null);
+    setStatusMessage("Iniciando processo...");
 
     try {
-      const response = await fetch('/api/create-lp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, wallet: publicKey.toBase58() }),
-      });
+        // Etapa 1: Criar o mercado
+        setStatusMessage("Passo 1: Criando o OpenBook Market...");
+        const marketResponse = await fetch('/api/create-market', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                baseMint: data.baseMint,
+                quoteMint: NATIVE_MINT.toBase58(),
+                baseDecimals: data.baseDecimals,
+                wallet: publicKey.toBase58(),
+            }),
+        });
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error);
-      
-      const transactionBuffer = Buffer.from(result.transaction, 'base64');
-      const transaction = VersionedTransaction.deserialize(transactionBuffer);
-      
-      const sig = await sendTransaction(transaction, connection);
-      await connection.confirmTransaction(sig, 'confirmed');
+        const marketResult = await marketResponse.json();
+        if (!marketResponse.ok) throw new Error(marketResult.error || "Falha ao criar o mercado");
 
-      setSignature(sig);
-      return sig;
+        const marketTransaction = VersionedTransaction.deserialize(Buffer.from(marketResult.transaction, 'base64'));
+        const marketSignature = await sendTransaction(marketTransaction, connection);
+        await connection.confirmTransaction(marketSignature, 'confirmed');
+        const marketId = marketResult.marketId;
+
+        // Etapa 2: Criar o pool de liquidez
+        setStatusMessage("Passo 2: Adicionando liquidez ao pool...");
+        const lpResponse = await fetch('/api/create-lp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...data, marketId, wallet: publicKey.toBase58() }),
+        });
+
+        const lpResult = await lpResponse.json();
+        if (!lpResponse.ok) throw new Error(lpResult.error || "Falha ao criar o pool de liquidez");
+
+        const lpTransaction = VersionedTransaction.deserialize(Buffer.from(lpResult.transaction, 'base64'));
+        const lpSignature = await sendTransaction(lpTransaction, connection);
+        await connection.confirmTransaction(lpSignature, 'confirmed');
+
+        setSignature(lpSignature);
+        setStatusMessage("Pool de liquidez criado com sucesso!");
 
     } catch (err: any) {
-      const friendlyMessage = getFriendlyErrorMessage(err);
-      setError(friendlyMessage);
-      console.error(err);
-      return null;
+        const friendlyMessage = getFriendlyErrorMessage(err);
+        setError(friendlyMessage);
+        setStatusMessage(null);
+        console.error(err);
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 
-  return { createLiquidityPool, isLoading, error, signature };
+  return { createLiquidityPool, isLoading, error, signature, statusMessage };
 };
