@@ -3,25 +3,25 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius);
-  font-size: 1rem; /* Fonte maior */
-  font-weight: 600; /* Mais peso */
+  font-size: 1rem;
+  font-weight: 600;
   transition: all 0.2s ease-in-out;
-  padding: 0.875rem 2rem; /* Mais padding */
+  padding: 0.875rem 2rem;
   cursor: pointer;
   background-image: var(--primary-gradient);
   background-size: 200% auto;
   color: white;
   border: none;
   width: 100%;
-  text-transform: none; /* Remove o uppercase */
+  text-transform: none;
   letter-spacing: 0.02em;
   box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.1);
 }
 
 .button:hover:not(:disabled) {
   background-position: right center;
-  transform: translateY(-2px); /* Efeito de elevação */
-  box-shadow: 0 6px 20px 0 rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 hsla(var(--primary), 0.25); /* Sombra aprimorada */
 }
 
 .button:disabled {
@@ -38,7 +38,7 @@
 .secondary {
   background-color: var(--secondary);
   color: var(--secondary-foreground);
-  background-image: none; /* Remove o gradiente */
+  background-image: none;
   border: 1px solid hsl(var(--border));
 }
 

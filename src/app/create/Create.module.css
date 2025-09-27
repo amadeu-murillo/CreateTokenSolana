@@ -1,11 +1,10 @@
 .grid {
   display: grid;
-  gap: 2.5rem; /* Aumenta o espaçamento */
+  gap: 3rem; /* Aumentado para mais respiro */
   max-width: 72rem;
   margin-left: auto;
   margin-right: auto;
   align-items: start;
-  /* Melhoria de Responsividade: Garante uma única coluna em telas menores por padrão */
   grid-template-columns: 1fr;
 }
 
@@ -23,16 +22,16 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 2.5rem; /* Aumenta o espaçamento */
+  gap: 2.5rem;
   position: sticky;
   top: 6rem;
 }
 
 .sidebarTitle {
-  font-size: 1.25rem; /* Aumenta o título da sidebar */
+  font-size: 1.25rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  padding-bottom: 0.75rem; /* Aumenta o padding */
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid hsl(var(--border));
   color: hsl(var(--foreground));
 }
@@ -67,8 +66,8 @@
 }
 
 .tutorialIcon svg {
-  width: 22px; /* Ícones um pouco maiores */
-  height: 22px;
+  width: 24px; /* Ícones um pouco maiores */
+  height: 24px;
   flex-shrink: 0;
 }
 

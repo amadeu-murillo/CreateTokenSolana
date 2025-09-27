@@ -1,4 +1,3 @@
-// src/app/add-liquidity/page.tsx
 "use client";
 
 import { useReducer, useEffect } from "react";
@@ -108,8 +107,8 @@ export default function AddLiquidityPage() {
         }
 
         await createLiquidityPool({
-            baseAmount: parseFloat(baseTokenAmount),
-            quoteAmount: parseFloat(quoteTokenAmount),
+            baseAmount: baseTokenAmount, // Passa como string
+            quoteAmount: quoteTokenAmount, // Passa como string
             baseMint: selectedTokenMint,
             quoteMint: NATIVE_MINT.toBase58(),
             baseDecimals: selectedToken.decimals,
@@ -118,6 +117,25 @@ export default function AddLiquidityPage() {
 
     const clearNotifications = () => {
         // Lógica para limpar notificações, se necessário
+    };
+    
+    // Função para tratar a mudança nos inputs de quantidade
+    const handleAmountChange = (field: 'baseTokenAmount' | 'quoteTokenAmount', value: string, maxAmount?: string) => {
+        // Substitui a vírgula pelo ponto para o formato internacional
+        let formattedValue = value.replace(/,/g, '.');
+        
+        // Permite apenas números e um único ponto decimal
+        if (!/^\d*\.?\d*$/.test(formattedValue)) {
+            return;
+        }
+
+        if (maxAmount && parseFloat(formattedValue) > parseFloat(maxAmount)) {
+            formattedValue = maxAmount;
+        }
+        if (formattedValue !== '' && parseFloat(formattedValue) < 0) {
+            formattedValue = '0';
+        }
+        dispatch({ type: 'SET_FIELD', field, value: formattedValue });
     };
 
     return (
@@ -157,21 +175,12 @@ export default function AddLiquidityPage() {
                                 </div>
                                 <Input
                                     id="base-amount"
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={baseTokenAmount}
-                                    onChange={(e) => {
-                                        let value = e.target.value;
-                                        if (selectedToken && parseFloat(value) > parseFloat(selectedToken.amount)) {
-                                            value = selectedToken.amount;
-                                        }
-                                        if (value !== '' && parseFloat(value) < 0) {
-                                            value = '0';
-                                        }
-                                        dispatch({ type: 'SET_FIELD', field: 'baseTokenAmount', value: value });
-                                    }}
+                                    onChange={(e) => handleAmountChange('baseTokenAmount', e.target.value, selectedToken.amount)}
                                     placeholder={`Ex: 10000`}
                                     disabled={isLoading}
-                                    max={selectedToken.amount}
                                 />
                             </div>
                         )}
@@ -181,7 +190,15 @@ export default function AddLiquidityPage() {
                                 <Label htmlFor="quote-amount">Quantidade de SOL</Label>
                                 {solBalance !== null && <span className={styles.balance}>Saldo: {solBalance.toFixed(4)}</span>}
                             </div>
-                            <Input id="quote-amount" type="number" value={quoteTokenAmount} onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'quoteTokenAmount', value: e.target.value })} placeholder="Ex: 10" disabled={isLoading} />
+                            <Input 
+                                id="quote-amount" 
+                                type="text"
+                                inputMode="decimal"
+                                value={quoteTokenAmount} 
+                                onChange={(e) => handleAmountChange('quoteTokenAmount', e.target.value)} 
+                                placeholder="Ex: 10" 
+                                disabled={isLoading}
+                            />
                         </div>
                     </CardContent>
                     <CardFooter>

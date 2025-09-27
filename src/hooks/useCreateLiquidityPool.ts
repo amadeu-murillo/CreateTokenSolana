@@ -1,4 +1,3 @@
-// src/hooks/useCreateLiquidityPool.ts
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction, Transaction } from "@solana/web3.js";
@@ -26,8 +25,8 @@ function getFriendlyErrorMessage(error: any): string {
 interface CreateLpData {
     baseMint: string;
     quoteMint: string;
-    baseAmount: number;
-    quoteAmount: number;
+    baseAmount: string; // Alterado para string
+    quoteAmount: string; // Alterado para string
     baseDecimals: number;
 }
 
@@ -109,3 +108,4 @@ export const useCreateLiquidityPool = () => {
 
   return { createLiquidityPool, isLoading, error, signature, statusMessage };
 };
+

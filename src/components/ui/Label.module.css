@@ -1,7 +1,8 @@
 .label {
-    font-size: 0.875rem; /* 14px */
-    font-weight: 500;
+    font-size: 0.9rem; /* Levemente aumentado */
+    font-weight: 600; /* Mais destaque */
     line-height: 1;
+    color: hsl(var(--foreground)); /* Garante contraste */
 }
 
 .label[data-disabled] {

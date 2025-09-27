@@ -6,15 +6,19 @@
   border: 1px solid hsl(var(--input));
   background-color: hsl(var(--background));
   padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  color: hsl(var(--foreground)); /* Adicionado para garantir a visibilidade do texto */
+  font-size: 1rem; /* Aumentado para legibilidade */
+  color: hsl(var(--foreground));
   transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 
-.input:focus-visible {
+.input:focus-visible, .input:focus {
   outline: none;
   border-color: hsl(var(--ring));
   box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+}
+
+.input[aria-invalid="true"] {
+    border-color: hsl(var(--destructive));
 }
 
 .input::placeholder {

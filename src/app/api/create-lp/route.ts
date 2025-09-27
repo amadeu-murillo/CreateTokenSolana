@@ -5,12 +5,27 @@ import { Liquidity, DEVNET_PROGRAM_ID, MAINNET_PROGRAM_ID, Market, TxVersion, To
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import BN from "bn.js";
 
+// Função auxiliar para converter com segurança uma string decimal para sua menor unidade como uma string
+function toSmallestUnit(amount: string, decimals: number): string {
+    const safeAmount = String(amount).replace(/,/g, '.'); // Substitui vírgula por ponto
+    if (!safeAmount || isNaN(Number(safeAmount))) {
+        return '0';
+    }
+    const [integer, fraction = ''] = safeAmount.split('.');
+    
+    const formattedFraction = fraction.slice(0, decimals).padEnd(decimals, '0');
+    
+    const result = `${integer}${formattedFraction}`;
+
+    return result.replace(/^0+/, '') || '0';
+}
+
 interface CreateLpRequest {
     wallet: string;
     baseMint: string;
     quoteMint: string;
-    baseAmount: number;
-    quoteAmount: number;
+    baseAmount: string; // Manter como string para precisão
+    quoteAmount: string; // Manter como string para precisão
     marketId: string;
     baseDecimals: number;
 }
@@ -31,10 +46,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'O token de cotação deve ser SOL para este endpoint.' }, { status: 400 });
         }
         
-        // CORREÇÃO: Usar a classe Token do SDK do Raydium em vez de objetos simples ou TokenInfo.
         const baseToken = new Token(TOKEN_PROGRAM_ID, new PublicKey(baseMint), baseDecimals);
         const quoteToken = new Token(TOKEN_PROGRAM_ID, NATIVE_MINT, 9, 'SOL', 'SOL');
         
+        const baseAmountInSmallestUnit = toSmallestUnit(baseAmount, baseToken.decimals);
+        const quoteAmountInSmallestUnit = toSmallestUnit(quoteAmount, quoteToken.decimals);
+
         const { innerTransactions } = await Liquidity.makeCreatePoolV4InstructionV2Simple({
             connection,
             programId: DEVNET_PROGRAM_ID.AmmV4,
@@ -44,9 +61,9 @@ export async function POST(request: Request) {
             },
             baseMintInfo: baseToken,
             quoteMintInfo: quoteToken,
-            baseAmount: new BN(Math.floor(baseAmount * Math.pow(10, baseToken.decimals))),
-            quoteAmount: new BN(Math.floor(quoteAmount * Math.pow(10, quoteToken.decimals))),
-            startTime: new BN(0),
+            baseAmount: new BN(baseAmountInSmallestUnit),
+            quoteAmount: new BN(quoteAmountInSmallestUnit),
+            startTime: new BN(Math.floor(Date.now() / 1000)), // CORREÇÃO: Usar o timestamp atual
             ownerInfo: {
                 feePayer: userPublicKey,
                 wallet: userPublicKey,
@@ -96,7 +113,9 @@ export async function POST(request: Request) {
 
     } catch (error) {
         console.error('Erro ao criar pool de liquidez:', error);
-        return NextResponse.json({ error: 'Erro interno do servidor ao criar a transação.' }, { status: 500 });
+        // Retorna a mensagem de erro específica para melhor depuração no frontend
+        const errorMessage = error instanceof Error ? error.message : 'Erro interno do servidor ao criar a transação.';
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
 

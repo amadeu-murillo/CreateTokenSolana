@@ -1,5 +1,8 @@
 .previewCard {
-    border-style: dashed;
+    border-style: solid; /* Alterado de dashed */
+    border-width: 1px;
+    border-color: hsl(var(--border));
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Sombra adicionada */
 }
 
 .tokenDisplay {
