@@ -1,3 +1,23 @@
+.heroWrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Efeito de brilho no fundo da seção principal */
+.heroWrapper::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, hsla(var(--primary), 0.1) 0%, transparent 70%);
+  filter: blur(120px);
+  z-index: -1;
+  pointer-events: none;
+}
+
 .container {
   display: flex;
   align-items: center;
@@ -5,7 +25,7 @@
   flex-direction: column;
   text-align: center;
   min-height: 70vh;
-  padding: 1rem;
+  padding: 2rem 1rem;
 }
 
 .content {
@@ -35,51 +55,13 @@
   max-width: 42rem;
   margin-left: auto;
   margin-right: auto;
-  margin-bottom: 2.5rem; /* Ajuste de espaço */
+  margin-bottom: 2.5rem;
   line-height: 1.6;
 }
 
 .buttonContainer {
-  max-width: 20rem; /* Botão um pouco maior */
+  max-width: 20rem;
   margin: 0 auto;
-}
-
-/* SUGESTÃO: Estilos para o destaque da taxa */
-.feeHighlight {
-  margin-bottom: 2.5rem;
-  background: hsla(var(--card), 0.7);
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  padding: 1rem 1.5rem;
-  display: inline-block;
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-}
-
-.feeHighlight p {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  font-size: 1.1rem;
-}
-
-.feeHighlight span:first-child {
-  color: hsl(var(--muted-foreground));
-}
-
-.feeHighlight strong {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: hsl(var(--primary));
-}
-
-.feeHighlight span:last-child {
-  background-color: hsla(var(--primary), 0.1);
-  color: hsl(var(--primary));
-  padding: 0.25rem 0.5rem;
-  border-radius: 99px;
-  font-size: 0.75rem;
-  font-weight: 500;
 }
 
 /* --- SEÇÃO DE FUNCIONALIDADES --- */
@@ -88,10 +70,11 @@
   max-width: 1100px;
   margin: 6rem auto;
   text-align: center;
-  padding: 2rem 1.5rem;
+  padding: 4rem 1.5rem;
   background-color: hsla(var(--card), 0.5);
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
+  position: relative;
 }
 
 .featuresSection h2 {
@@ -104,6 +87,9 @@
   font-size: 1.1rem;
   color: hsl(var(--muted-foreground));
   margin-bottom: 3rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .featuresGrid {
@@ -114,16 +100,17 @@
 
 .featureCard {
   text-align: left;
-  padding: 1.5rem;
+  padding: 2rem;
   background-color: hsl(var(--background));
   border-radius: var(--radius);
   border: 1px solid hsl(var(--border));
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .featureCard:hover {
   transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+  box-shadow: 0 10px 30px hsla(var(--primary), 0.1);
+  border-color: hsla(var(--primary), 0.5);
 }
 
 .featureIcon {
@@ -151,7 +138,7 @@
 }
 
 
-/* SUGESTÃO: Estilos para a seção "Como Funciona" */
+/* --- SEÇÕES "Como Funciona" e "FAQ" --- */
 .howItWorksSection, .faqSection {
   width: 100%;
   max-width: 1100px;
@@ -173,16 +160,14 @@
   text-align: left;
 }
 
-/* Melhoria: Grid do FAQ ajustado para uma coluna para consistência */
 .faqGrid {
   display: grid;
   grid-template-columns: 1fr;
-  max-width: 768px; /* Centraliza e limita a largura */
+  max-width: 768px;
   margin: 0 auto;
   gap: 1rem;
   text-align: left;
 }
-
 
 .step {
   background-color: hsl(var(--card));
@@ -221,7 +206,6 @@
   line-height: 1.6;
 }
 
-/* Melhoria: Estilos para <details> e <summary> do FAQ */
 .faqItem {
   background-color: hsl(var(--card));
   border: 1px solid hsl(var(--border));
@@ -272,6 +256,11 @@
   font-size: 0.9rem;
   line-height: 1.6;
   padding-bottom: 1rem;
-  margin-top: -0.5rem; /* Ajuste para melhor espaçamento */
+  margin-top: -0.5rem;
 }
 
+.faqLink {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  font-weight: 500;
+}
