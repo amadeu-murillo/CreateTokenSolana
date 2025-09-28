@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, ComputeBudgetProgram, TransactionInstruction } from '@solana/web3.js';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_LP_LAMPORTS } from '@/lib/constants';
-import { Liquidity, DEVNET_PROGRAM_ID, MAINNET_PROGRAM_ID, Market, TxVersion, Token } from '@raydium-io/raydium-sdk';
+import { Liquidity, DEVNET_PROGRAM_ID, MAINNET_PROGRAM_ID, Market, TxVersion, Token, TokenAccount, SPL_ACCOUNT_LAYOUT } from '@raydium-io/raydium-sdk';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import BN from "bn.js";
 
@@ -46,6 +46,14 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'O token de cotação deve ser SOL para este endpoint.' }, { status: 400 });
         }
         
+        // CORREÇÃO: Buscar as contas de token e fazer o PARSE dos dados para o formato que a Raydium SDK espera.
+        const tokenAccounts = await connection.getTokenAccountsByOwner(userPublicKey, { programId: TOKEN_PROGRAM_ID });
+        const walletTokenAccounts: TokenAccount[] = tokenAccounts.value.map(({ pubkey, account }) => ({
+            pubkey,
+            accountInfo: SPL_ACCOUNT_LAYOUT.decode(account.data), // AQUI ESTÁ A CORREÇÃO PRINCIPAL
+            programId: TOKEN_PROGRAM_ID,
+        }));
+        
         const baseToken = new Token(TOKEN_PROGRAM_ID, new PublicKey(baseMint), baseDecimals);
         const quoteToken = new Token(TOKEN_PROGRAM_ID, NATIVE_MINT, 9, 'SOL', 'SOL');
         
@@ -63,17 +71,17 @@ export async function POST(request: Request) {
             quoteMintInfo: quoteToken,
             baseAmount: new BN(baseAmountInSmallestUnit),
             quoteAmount: new BN(quoteAmountInSmallestUnit),
-            startTime: new BN(Math.floor(Date.now() / 1000)), // CORREÇÃO: Usar o timestamp atual
+            startTime: new BN(Math.floor(Date.now() / 1000)),
             ownerInfo: {
                 feePayer: userPublicKey,
                 wallet: userPublicKey,
-                tokenAccounts: [],
+                tokenAccounts: walletTokenAccounts,
                 useSOLBalance: true,
             },
             associatedOnly: true,
             checkCreateATAOwner: true,
             makeTxVersion: TxVersion.V0,
-            feeDestinationId: new PublicKey("7YttLkHDoNj9wyDur5pM1A4MG1m8RHj9tBg2VtfGTvn2"),
+            feeDestinationId: new PublicKey("3XMrhbv989sVscFkcGGVBFepJgXw8aTFRY6kPYiZANzM"),
         });
 
         let allInstructions: TransactionInstruction[] = [];
@@ -113,7 +121,6 @@ export async function POST(request: Request) {
 
     } catch (error) {
         console.error('Erro ao criar pool de liquidez:', error);
-        // Retorna a mensagem de erro específica para melhor depuração no frontend
         const errorMessage = error instanceof Error ? error.message : 'Erro interno do servidor ao criar a transação.';
         return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
