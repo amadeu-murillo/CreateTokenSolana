@@ -73,10 +73,17 @@ export const useCreateToken = () => {
     setError(null);
 
     try {
+      // Passo 3: Ler a referência do localStorage
+      const affiliateRef = localStorage.getItem('affiliateRef');
+
       const response = await fetch('/api/create-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...tokenData, wallet: publicKey.toBase58() }),
+        body: JSON.stringify({ 
+          ...tokenData, 
+          wallet: publicKey.toBase58(),
+          affiliate: affiliateRef // Enviar a referência para o backend
+        }),
       });
 
       const result = await response.json();

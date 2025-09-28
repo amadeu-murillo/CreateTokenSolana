@@ -1,6 +1,8 @@
+// src/hooks/useCreateLiquidityPool.ts
+
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { VersionedTransaction, Transaction } from "@solana/web3.js";
+import { VersionedTransaction, Transaction } from "@solana/web3.js"; // Certifique-se que VersionedTransaction está importado
 import { NATIVE_MINT } from "@solana/spl-token";
 
 function getFriendlyErrorMessage(error: any): string {
@@ -25,8 +27,8 @@ function getFriendlyErrorMessage(error: any): string {
 interface CreateLpData {
     baseMint: string;
     quoteMint: string;
-    baseAmount: string; // Alterado para string
-    quoteAmount: string; // Alterado para string
+    baseAmount: string;
+    quoteAmount: string;
     baseDecimals: number;
 }
 
@@ -66,10 +68,8 @@ export const useCreateLiquidityPool = () => {
         const marketResult = await marketResponse.json();
         if (!marketResponse.ok) throw new Error(marketResult.error || "Falha ao criar o mercado");
 
-        // FIX: Lida com múltiplas transações para a criação do mercado
         const marketTransactions = marketResult.transactions.map((tx: string) => Transaction.from(Buffer.from(tx, 'base64')));
         
-        // Assina e envia as transações sequencialmente
         for (let i = 0; i < marketTransactions.length; i++) {
             setStatusMessage(`Passo 1: Assinando e enviando transação do mercado (${i + 1}/${marketTransactions.length})...`);
             const signedTx = await sendTransaction(marketTransactions[i], connection);
@@ -89,7 +89,10 @@ export const useCreateLiquidityPool = () => {
         const lpResult = await lpResponse.json();
         if (!lpResponse.ok) throw new Error(lpResult.error || "Falha ao criar o pool de liquidez");
 
+        // CORREÇÃO APLICADA AQUI
+        // Desserializa a transação usando a classe correta: VersionedTransaction.
         const lpTransaction = VersionedTransaction.deserialize(Buffer.from(lpResult.transaction, 'base64'));
+
         const lpSignature = await sendTransaction(lpTransaction, connection);
         await connection.confirmTransaction(lpSignature, 'confirmed');
 
