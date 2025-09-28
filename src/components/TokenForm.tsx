@@ -112,10 +112,11 @@ export default function TokenForm() {
           throw new Error('Falha ao buscar custos');
         }
         const data = await response.json();
-        setTotalCost(data.totalCost);
+        const formattedCost = parseFloat(data.totalCost).toFixed(2);
+        setTotalCost(formattedCost);
       } catch (error) {
         console.error(error);
-        setTotalCost('0.094'); // Fallback em caso de erro
+        setTotalCost('0.09'); // Fallback formatado
       }
     };
 
@@ -181,6 +182,10 @@ export default function TokenForm() {
       ...data,
       supply: Number(data.supply),
       tokenStandard: 'spl' as 'spl' | 'token-2022',
+      transferFee: { // Adicionando valores padrão, pois a interface espera
+          basisPoints: 0,
+          maxFee: 0,
+      }
     };
     await createToken(tokenData);
   };

@@ -25,7 +25,7 @@ export const RPC_ENDPOINT = 'https://mainnet.helius-rpc.com/?api-key=2e9c5f4b-aa
 /**
  * RF-03: Taxas de serviço em SOL.
  */
-export const SERVICE_FEE_CREATE_TOKEN_SOL = 0.092;
+export const SERVICE_FEE_CREATE_TOKEN_SOL = 0.099;
 export const SERVICE_FEE_BURN_TOKEN_SOL = 0.05;
 export const SERVICE_FEE_AIRDROP_SOL = 0.05;
 export const SERVICE_FEE_MANAGE_AUTHORITY_SOL = 0.05;

@@ -31,7 +31,7 @@ export default function CostSummary() {
         // Em caso de erro, podemos manter os valores estáticos como fallback
         setCosts({
           networkCost: '0.002',
-          serviceFee: '0.092',
+          serviceFee: '0.099',
           totalCost: '0.094',
         });
       } finally {
@@ -60,12 +60,12 @@ export default function CostSummary() {
         </div>
         <div className={styles.item}>
             <span><IconZap /> Taxa de Serviço</span>
-            <span>{costs?.serviceFee || '0.092'} SOL</span>
+            <span>{costs?.serviceFee || '0.099'} SOL</span>
         </div>
         <hr className={styles.divider} />
         <div className={`${styles.item} ${styles.total}`}>
             <p>Total:</p>
-            <p>~{costs?.totalCost || '0.094'} SOL</p>
+            <p>~{costs?.totalCost || '0.099'} SOL</p>
         </div>
     </div>
   );
