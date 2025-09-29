@@ -9,11 +9,16 @@ import ManageAuthorityModal from "@/components/ManageAuthorityModal";
 import { useManageAuthority } from "@/hooks/useManageAuthority";
 import styles from './Dashboard.module.css';
 import Notification from "@/components/ui/Notification";
+import Image from "next/image";
 
-interface TokenHistoryItem {
-    signature: string;
+// Tipagem para os dados do token que virão da API
+interface ManagedToken {
     mint: string;
-    blockTime?: number | null;
+    name: string;
+    symbol: string;
+    uri: string;
+    mintAuthority: string | null;
+    freezeAuthority: string | null;
 }
 
 type AuthorityModalState = {
@@ -28,81 +33,105 @@ type NotificationState = {
     txId?: string | null;
 } | null;
 
-const HistoryItem = ({ item, onManageAuthorityClick }: { item: TokenHistoryItem, onManageAuthorityClick: (mint: string, type: 'mint' | 'freeze') => void }) => (
-    <div className={styles.historyItem}>
-        <div>
-            <p className={styles.mintAddressLabel}>Endereço do Token (Mint)</p>
-            <p className={styles.mintAddress}>{item.mint}</p>
-            {item.blockTime && (
-                <p className={styles.creationDate}>
-                    Criado em: {new Date(item.blockTime * 1000).toLocaleString()}
-                </p>
-            )}
-        </div>
-        <div className={styles.actionsContainer}>
-             <Button className="secondary" onClick={() => onManageAuthorityClick(item.mint, 'mint')}>Remover Autoridade de Mint</Button>
-             <Button className="secondary" onClick={() => onManageAuthorityClick(item.mint, 'freeze')}>Remover Autoridade de Freeze</Button>
-            <a 
-                href={`https://solscan.io/token/${item.mint}`} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className={styles.solscanLink}
-            >
-                Ver no Solscan
-            </a>
-        </div>
+// Componente para exibir o estado de carregamento
+const LoadingState = () => (
+    <div className={styles.infoStateContainer}>
+        <div className={styles.spinner}></div>
+        <p>A carregar os seus tokens...</p>
     </div>
 );
 
-// Empty State Component
+// Componente para o estado vazio
 const EmptyState = () => (
-    <div className={styles.emptyStateContainer}>
-        <div className={styles.emptyStateIcon}>
-            {/* Você pode adicionar um ícone SVG aqui */}
-        </div>
-        <h3>Nenhum token criado ainda</h3>
-        <p>Parece que você ainda não criou nenhum token. Comece agora!</p>
+    <div className={styles.infoStateContainer}>
+        <h3 className={styles.emptyStateTitle}>Nenhum token encontrado</h3>
+        <p className={styles.emptyStateText}>Parece que ainda não criou nenhum token ou já removeu a sua autoridade de todos eles.</p>
         <Link href="/create">
-            <Button className={styles.emptyStateButton}>Criar Meu Primeiro Token</Button>
+            <Button>Criar o meu Primeiro Token</Button>
         </Link>
+    </div>
+);
+
+// Componente para o card de cada token
+const TokenManagementCard = ({ token, onManageClick }: { token: ManagedToken, onManageClick: (mint: string, type: 'mint' | 'freeze') => void }) => (
+    <div className={styles.tokenCard}>
+        <div className={styles.tokenInfo}>
+            <Image 
+                src={token.uri || '/favicon.ico'} 
+                alt={token.name} 
+                width={48} 
+                height={48} 
+                className={styles.tokenImage}
+                onError={(e) => { (e.target as HTMLImageElement).src = '/favicon.ico'; }}
+            />
+            <div>
+                <h4 className={styles.tokenName}>{token.name}</h4>
+                <p className={styles.tokenSymbol}>{token.symbol}</p>
+                <a 
+                    href={`https://solscan.io/token/${token.mint}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className={styles.solscanLink}
+                >
+                    {token.mint.slice(0, 6)}...{token.mint.slice(-6)}
+                </a>
+            </div>
+        </div>
+        <div className={styles.authorityInfo}>
+             <div className={styles.authorityStatus}>
+                <span>Autoridade de Mint</span>
+                {token.mintAuthority ? <span className={styles.statusActive}>Ativa</span> : <span className={styles.statusRevoked}>Removida</span>}
+            </div>
+             <div className={styles.authorityStatus}>
+                <span>Autoridade de Freeze</span>
+                {token.freezeAuthority ? <span className={styles.statusActive}>Ativa</span> : <span className={styles.statusRevoked}>Removida</span>}
+            </div>
+        </div>
+        <div className={styles.actions}>
+            {token.mintAuthority && <Button className="secondary" onClick={() => onManageClick(token.mint, 'mint')}>Remover Mint</Button>}
+            {token.freezeAuthority && <Button className="secondary" onClick={() => onManageClick(token.mint, 'freeze')}>Remover Freeze</Button>}
+            {!token.mintAuthority && !token.freezeAuthority && <p className={styles.noActionsText}>Nenhuma ação disponível.</p>}
+        </div>
     </div>
 );
 
 
 export default function DashboardPage() {
     const { publicKey } = useWallet();
-    const [history, setHistory] = useState<TokenHistoryItem[]>([]);
-    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-    const [errorHistory, setErrorHistory] = useState<string | null>(null);
+    const [managedTokens, setManagedTokens] = useState<ManagedToken[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [notification, setNotification] = useState<NotificationState>(null);
-    const [visibleCount, setVisibleCount] = useState(10); // Para "Carregar Mais"
 
     const { manageAuthority, isLoading: isManagingAuthority, error: manageAuthorityError } = useManageAuthority();
-
     const [modalState, setModalState] = useState<AuthorityModalState>({ isOpen: false, mint: null, type: null });
 
-    const fetchHistory = async () => {
-        if (!publicKey) return;
-        setIsLoadingHistory(true);
-        setErrorHistory(null);
+    const fetchManagedTokens = async () => {
+        if (!publicKey) {
+            setIsLoading(false);
+            setManagedTokens([]);
+            return;
+        }
+        setIsLoading(true);
+        setError(null);
         setNotification(null);
         try {
             const response = await fetch(`/api/token-history?wallet=${publicKey.toBase58()}`);
             if (!response.ok) {
                 const data = await response.json();
-                throw new Error(data.error || 'Falha ao buscar o histórico');
+                throw new Error(data.error || 'Falha ao buscar os tokens');
             }
             const data = await response.json();
-            setHistory(data.history);
+            setManagedTokens(data.tokens);
         } catch (err: any) {
-            setErrorHistory(err.message);
+            setError(err.message);
         } finally {
-            setIsLoadingHistory(false);
+            setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchHistory();
+        fetchManagedTokens();
     }, [publicKey]);
 
     const handleManageAuthorityClick = (mint: string, type: 'mint' | 'freeze') => {
@@ -117,16 +146,28 @@ export default function DashboardPage() {
 
         if (signature) {
              setNotification({type: 'success', message: `Autoridade removida com sucesso!`, txId: signature});
-             fetchHistory();
+             // Re-fetch tokens to update the UI
+             fetchManagedTokens();
         } else {
              setNotification({type: 'error', message: manageAuthorityError || "Falha ao remover autoridade."});
         }
         setModalState({ isOpen: false, mint: null, type: null });
     };
+    
+    const renderContent = () => {
+        if (!publicKey) return <p className={styles.infoStateContainer}>Conecte a sua carteira para gerir os seus tokens.</p>;
+        if (isLoading) return <LoadingState />;
+        if (error) return <p className={`${styles.infoStateContainer} ${styles.errorText}`}>{error}</p>;
+        if (managedTokens.length === 0) return <EmptyState />;
 
-    const handleLoadMore = () => {
-        setVisibleCount(prevCount => prevCount + 10);
-    };
+        return (
+             <div className={styles.tokenGrid}>
+                {managedTokens.map(token => (
+                    <TokenManagementCard key={token.mint} token={token} onManageClick={handleManageAuthorityClick} />
+                ))}
+            </div>
+        );
+    }
 
     return (
         <div className={styles.container}>
@@ -140,34 +181,13 @@ export default function DashboardPage() {
             )}
             <Card>
                 <CardHeader>
-                    <CardTitle>Gerenciamento de Tokens</CardTitle>
+                    <CardTitle>Gerir Tokens</CardTitle>
                     <CardDescription>
-                        Veja os tokens que você criou e gerencie suas autoridades.
+                        Veja e gira as autoridades dos tokens que criou.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {!publicKey ? (
-                        <p className={styles.infoText}>Conecte sua carteira para ver o histórico.</p>
-                    ) : isLoadingHistory ? (
-                        <p className={styles.infoText}>Carregando histórico...</p>
-                    ) : errorHistory ? (
-                        <p className={`${styles.infoText} ${styles.errorText}`}>{errorHistory}</p>
-                    ) : history.length > 0 ? (
-                        <>
-                            <div className={styles.historyList}>
-                                {history.slice(0, visibleCount).map(item => (
-                                    <HistoryItem key={item.signature} item={item} onManageAuthorityClick={handleManageAuthorityClick} />
-                                ))}
-                            </div>
-                            {visibleCount < history.length && (
-                                <Button onClick={handleLoadMore} className="secondary" style={{marginTop: '1.5rem'}}>
-                                    Carregar Mais
-                                </Button>
-                            )}
-                        </>
-                    ) : (
-                       <EmptyState />
-                    )}
+                    {renderContent()}
                 </CardContent>
             </Card>
 
@@ -176,7 +196,7 @@ export default function DashboardPage() {
                 onClose={() => setModalState({ isOpen: false, mint: null, type: null })}
                 onConfirm={handleConfirmManageAuthority}
                 title={`Confirmar Remoção de Autoridade de ${modalState.type === 'mint' ? 'Mint' : 'Freeze'}`}
-                description="Esta ação é irreversível. Após a remoção, você não poderá mais criar novos tokens (mint) ou congelar contas de token (freeze). Tem certeza de que deseja continuar?"
+                description="Esta ação é irreversível. Após a remoção, não poderá mais criar novos tokens (mint) ou congelar contas de token (freeze). Tem a certeza de que deseja continuar?"
                 isLoading={isManagingAuthority}
             />
         </div>

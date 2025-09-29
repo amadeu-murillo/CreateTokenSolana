@@ -1,22 +1,28 @@
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, TransactionInstruction, ComputeBudgetProgram } from '@solana/web3.js';
-import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction, getMint } from '@solana/spl-token';
+import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction, getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_AIRDROP_LAMPORTS } from '@/lib/constants';
 
 export async function POST(request: Request) {
     try {
-        const { mint, recipients, wallet } = await request.json();
+        const { mint, recipients, wallet, programId } = await request.json();
 
-        if (!mint || !recipients || !wallet) {
+        if (!mint || !recipients || !wallet || !programId) {
             return NextResponse.json({ error: 'Dados incompletos.' }, { status: 400 });
+        }
+        
+        // Valida se o programId é um dos conhecidos
+        if (programId !== TOKEN_PROGRAM_ID.toBase58() && programId !== TOKEN_2022_PROGRAM_ID.toBase58()) {
+            return NextResponse.json({ error: 'Program ID inválido.' }, { status: 400 });
         }
 
         const connection = new Connection(RPC_ENDPOINT, 'confirmed');
         const payerPublicKey = new PublicKey(wallet);
         const mintPublicKey = new PublicKey(mint);
+        const tokenProgramId = new PublicKey(programId);
 
-        // Buscar informações do mint para obter os decimais
-        const mintInfo = await getMint(connection, mintPublicKey);
+        // Buscar informações do mint para obter os decimais, usando o programId correto
+        const mintInfo = await getMint(connection, mintPublicKey, 'confirmed', tokenProgramId);
 
         const instructions: TransactionInstruction[] = [
             ComputeBudgetProgram.setComputeUnitLimit({ units: 50000 * recipients.length }),
@@ -28,13 +34,22 @@ export async function POST(request: Request) {
             })
         ];
         
-        const sourceTokenAccount = await getAssociatedTokenAddress(mintPublicKey, payerPublicKey);
+        const sourceTokenAccount = await getAssociatedTokenAddress(
+            mintPublicKey, 
+            payerPublicKey, 
+            false, 
+            tokenProgramId // Usa o programId correto
+        );
         
-        // MODIFICAÇÃO: Lógica robusta para criar ATAs se não existirem
         for (const recipient of recipients) {
             try {
                 const destinationPublicKey = new PublicKey(recipient.address);
-                const destinationAta = await getAssociatedTokenAddress(mintPublicKey, destinationPublicKey);
+                const destinationAta = await getAssociatedTokenAddress(
+                    mintPublicKey, 
+                    destinationPublicKey,
+                    false,
+                    tokenProgramId // Usa o programId correto
+                );
                 
                 const accountInfo = await connection.getAccountInfo(destinationAta);
                 if (accountInfo === null) {
@@ -44,7 +59,8 @@ export async function POST(request: Request) {
                             payerPublicKey,
                             destinationAta,
                             destinationPublicKey,
-                            mintPublicKey
+                            mintPublicKey,
+                            tokenProgramId // Usa o programId correto
                         )
                     );
                 }
@@ -54,7 +70,9 @@ export async function POST(request: Request) {
                         sourceTokenAccount,
                         destinationAta,
                         payerPublicKey,
-                        BigInt(recipient.amount * Math.pow(10, mintInfo.decimals))
+                        BigInt(recipient.amount * Math.pow(10, mintInfo.decimals)),
+                        [],
+                        tokenProgramId // Usa o programId correto
                     )
                 );
             } catch (e) {

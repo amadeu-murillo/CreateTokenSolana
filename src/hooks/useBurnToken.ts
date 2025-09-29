@@ -1,7 +1,6 @@
 import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
-import { useRouter } from "next/navigation";
 
 // Função de tratamento de erro aprimorada e padronizada
 function getFriendlyErrorMessage(error: any): string {
@@ -27,14 +26,13 @@ function getFriendlyErrorMessage(error: any): string {
 }
 
 export const useBurnToken = () => {
-  const router = useRouter();
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
 
-  const burnToken = async (mint: string, amount: number) => {
+  const burnToken = async (mint: string, amount: number, programId: string) => {
     if (!publicKey || !sendTransaction) {
       setError("Carteira não conectada.");
       return null;
@@ -52,7 +50,7 @@ export const useBurnToken = () => {
       const response = await fetch('/api/burn-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mint, amount, wallet: publicKey.toBase58() }),
+        body: JSON.stringify({ mint, amount, wallet: publicKey.toBase58(), programId }),
       });
 
       const result = await response.json();

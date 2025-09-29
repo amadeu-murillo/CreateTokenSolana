@@ -18,18 +18,15 @@ export async function GET(request: Request) {
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
     const affiliatePublicKey = new PublicKey(wallet);
 
-    // Busca as últimas 1000 assinaturas para o endereço do afiliado
+    // Busca as últimas 100 assinaturas para o endereço do afiliado
     const signatures = await connection.getSignaturesForAddress(affiliatePublicKey, { limit: 100 });
 
     let totalEarnings = 0;
     let referralCount = 0;
+    const transactions = [];
 
-    // Limita o número de transações a serem processadas para evitar sobrecarga/timeout
-    // Processa as 200 mais recentes, o que é suficiente para a maioria dos casos
-    const transactionsToParse = signatures.slice(0, 200); 
-
-    for (const sigInfo of transactionsToParse) {
-      // Pula transações com erro
+    // Processa as 100 transações mais recentes
+    for (const sigInfo of signatures) {
       if (sigInfo.err) continue;
 
       const tx = await connection.getParsedTransaction(sigInfo.signature, { maxSupportedTransactionVersion: 0 });
@@ -40,7 +37,6 @@ export async function GET(request: Request) {
       let isAffiliatePayment = false;
       let hasDevFeePayment = false;
 
-      // Itera sobre as instruções da transação para validar se é um pagamento de afiliado
       for (const instruction of instructions) {
         if (
           instruction.programId.equals(SystemProgram.programId) &&
@@ -49,31 +45,40 @@ export async function GET(request: Request) {
         ) {
           const { destination, lamports } = instruction.parsed.info;
           
-          // Verifica se é uma transferência de comissão para o afiliado
-          // Usamos uma tolerância para o valor, caso a taxa de serviço mude ligeiramente
+          // Verifica se é uma transferência de comissão para o afiliado (com uma pequena tolerância)
           if (
             destination === affiliatePublicKey.toBase58() &&
             Math.abs(lamports - AFFILIATE_COMMISSION_LAMPORTS) < 1000 
           ) {
             isAffiliatePayment = true;
           }
-          // Verifica se a taxa para o desenvolvedor também está na transação
+
           if (destination === DEV_WALLET_ADDRESS.toBase58()) {
             hasDevFeePayment = true;
           }
         }
       }
 
-      // Se ambas as condições forem verdadeiras, contabiliza como um referral válido
       if (isAffiliatePayment && hasDevFeePayment) {
         totalEarnings += AFFILIATE_COMMISSION_LAMPORTS;
         referralCount++;
+        if (tx.blockTime) {
+            transactions.push({
+                signature: sigInfo.signature,
+                blockTime: tx.blockTime,
+                amount: AFFILIATE_COMMISSION_SOL
+            });
+        }
       }
     }
+    
+    // Ordena as transações da mais recente para a mais antiga
+    transactions.sort((a, b) => b.blockTime - a.blockTime);
 
     return NextResponse.json({
       totalEarningsSol: totalEarnings / LAMPORTS_PER_SOL,
       referralCount,
+      transactions: transactions.slice(0, 10) // Retorna apenas as 10 últimas transações
     });
 
   } catch (error) {

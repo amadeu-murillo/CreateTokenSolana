@@ -13,6 +13,7 @@ import {
 } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
   createInitializeMintInstruction,
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddress,
@@ -20,6 +21,8 @@ import {
   createSetAuthorityInstruction,
   AuthorityType,
   getMintLen,
+  ExtensionType,
+  createInitializeTransferFeeConfigInstruction,
 } from '@solana/spl-token';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_TOKEN_LAMPORTS } from '@/lib/constants';
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
@@ -39,11 +42,22 @@ export async function POST(request: Request) {
         mintAuthority, 
         freezeAuthority,
         isMetadataMutable,
-        affiliate // Passo 4: Receber o campo de afiliado
+        tokenStandard,
+        transferFee,
+        affiliate
     } = await request.json();
 
     if (!name || !symbol || !imageUrl || decimals === undefined || !supply || !wallet) {
       return NextResponse.json({ error: 'Dados incompletos fornecidos.' }, { status: 400 });
+    }
+
+    // CORREÇÃO: Garante que 'supply' seja tratado como um número, independentemente do tipo recebido.
+    const numericSupply = typeof supply === 'string'
+        ? Number(supply.replace(/[^0-9]/g, ''))
+        : Number(supply);
+
+    if (isNaN(numericSupply) || numericSupply <= 0) {
+        return NextResponse.json({ error: 'Fornecimento inválido.' }, { status: 400 });
     }
 
     const userPublicKey = new PublicKey(wallet);
@@ -55,8 +69,13 @@ export async function POST(request: Request) {
     const userUmiSigner = createNoopSigner(fromWeb3JsPublicKey(userPublicKey));
     umi.use(signerIdentity(userUmiSigner));
     
-    const programId = TOKEN_PROGRAM_ID;
-    const mintLen = getMintLen([]);
+    const programId = tokenStandard === 'token-2022' ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+    
+    const extensions = (tokenStandard === 'token-2022' && transferFee && transferFee.basisPoints > 0)
+        ? [ExtensionType.TransferFeeConfig]
+        : [];
+        
+    const mintLen = getMintLen(extensions);
     
     const rentLamports = await connection.getMinimumBalanceForRentExemption(mintLen);
 
@@ -72,7 +91,6 @@ export async function POST(request: Request) {
         ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
     ];
 
-    // Passo 4: Lógica de divisão de taxa
     let affiliatePublicKey: PublicKey | null = null;
     try {
       if (affiliate && affiliate !== userPublicKey.toBase58()) {
@@ -84,22 +102,14 @@ export async function POST(request: Request) {
     }
 
     if (affiliatePublicKey) {
-      // AFILIADO VÁLIDO: Divida a taxa.
       const affiliateCommission = Math.round(SERVICE_FEE_CREATE_TOKEN_LAMPORTS * 0.10);
       const developerCut = SERVICE_FEE_CREATE_TOKEN_LAMPORTS - affiliateCommission;
-
-      // Adicione a instrução para pagar o afiliado.
       instructions.push(SystemProgram.transfer({ fromPubkey: userPublicKey, toPubkey: affiliatePublicKey, lamports: affiliateCommission }));
-
-      // Adicione a instrução para pagar o dev com o valor restante.
       instructions.push(SystemProgram.transfer({ fromPubkey: userPublicKey, toPubkey: DEV_WALLET_ADDRESS, lamports: developerCut }));
-
     } else {
-      // SEM AFILIADO ou AFILIADO INVÁLIDO: Taxa integral para o dev.
       instructions.push(SystemProgram.transfer({ fromPubkey: userPublicKey, toPubkey: DEV_WALLET_ADDRESS, lamports: SERVICE_FEE_CREATE_TOKEN_LAMPORTS }));
     }
 
-    // Adiciona o restante das instruções
     instructions.push(
         SystemProgram.createAccount({
             fromPubkey: userPublicKey,
@@ -107,7 +117,23 @@ export async function POST(request: Request) {
             space: mintLen,
             lamports: rentLamports,
             programId: programId,
-        }),
+        })
+    );
+
+    if (extensions.length > 0) {
+        instructions.push(
+            createInitializeTransferFeeConfigInstruction(
+                mintKeypair.publicKey,
+                userPublicKey,
+                userPublicKey,
+                transferFee.basisPoints,
+                BigInt(transferFee.maxFee * Math.pow(10, decimals)),
+                programId
+            )
+        );
+    }
+
+    instructions.push(
         createInitializeMintInstruction(
             mintKeypair.publicKey,
             decimals,
@@ -126,7 +152,7 @@ export async function POST(request: Request) {
             mintKeypair.publicKey,
             associatedTokenAccount,
             userPublicKey,
-            BigInt(supply * Math.pow(10, decimals)),
+            BigInt(numericSupply * Math.pow(10, decimals)), // Usa a variável corrigida
             [],
             programId
         )
@@ -139,7 +165,7 @@ export async function POST(request: Request) {
         symbol: symbol,
         uri: imageUrl,
         sellerFeeBasisPoints: percentAmount(0, 2),
-        tokenStandard: TokenStandard.Fungible,
+        tokenStandard: tokenStandard === 'token-2022' ? TokenStandard.Fungible : TokenStandard.FungibleAsset,
         isMutable: isMetadataMutable,
         payer: userUmiSigner,
         updateAuthority: userUmiSigner,
@@ -198,3 +224,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+

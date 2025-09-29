@@ -1,27 +1,44 @@
+/* --- LAYOUT DO FORMULÁRIO --- */
 .formGrid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 2.5rem; /* Aumentado */
+  gap: 2.5rem;
   align-items: start;
 }
 
-/* Layout de duas colunas apenas em telas maiores */
 @media (min-width: 900px) {
   .formGrid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr; /* Força uma única coluna para o formulário */
   }
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 2rem; /* Aumentado */
+  gap: 1.5rem; /* Espaçamento entre os campos */
+}
+
+.fieldGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 640px) {
+    .fieldGrid {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 .field {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.fieldDescription {
+    font-size: 0.8rem;
+    color: hsl(var(--muted-foreground));
 }
 
 .error {
@@ -36,50 +53,68 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-
 .previewContainer {
-  position: sticky;
-  top: 6rem; /* Garante que a pré-visualização acompanhe o scroll */
+  /* Estilos movidos para a página principal para controlar o posicionamento */
 }
 
-/* Opções Avançadas */
+/* --- SELETOR DE PADRÃO DE TOKEN --- */
+.segmentedControl {
+    display: flex;
+    width: 100%;
+    background-color: hsl(var(--muted));
+    border-radius: var(--radius);
+    padding: 4px;
+}
+
+.segmentedControl button {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border: none;
+    background-color: transparent;
+    color: hsl(var(--muted-foreground));
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: calc(var(--radius) - 4px);
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.segmentedControl button.active {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+
+/* --- OPÇÕES AVANÇADAS --- */
 .advancedSection {
   border-top: 1px solid hsl(var(--border));
   padding-top: 1.5rem;
-  margin-top: 0.5rem;
 }
 
 .advancedButton {
   background: none;
   border: none;
-  color: hsl(var(--foreground)); /* Corrigido */
+  color: hsl(var(--foreground));
   cursor: pointer;
-  font-weight: 600; /* Aumentado */
+  font-weight: 600;
   width: 100%;
   text-align: left;
   padding: 0.5rem 0;
-  margin-bottom: 0.25rem; /* Reduzido */
-  font-size: 1.1rem; /* Aumentado */
+  font-size: 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.advancedDescription {
-    font-size: 0.875rem;
-    color: hsl(var(--muted-foreground));
-    margin-bottom: 1rem;
-    line-height: 1.5;
-}
-
-
 .advancedContent {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 1rem;
+  padding: 1.25rem;
+  margin-top: 1rem;
   background-color: hsla(var(--muted), 0.3);
   border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
 }
 
 .checkboxWrapper {
@@ -99,7 +134,7 @@
   font-size: 0.9rem;
 }
 
-/* --- ESTILOS DO TOOLTIP --- */
+/* --- TOOLTIP --- */
 .infoIcon {
   color: hsl(var(--muted-foreground));
   cursor: help;
@@ -113,15 +148,14 @@
   position: relative;
   display: flex;
   align-items: center;
-  margin-left: auto; /* Alinha o ícone à direita */
+  margin-left: auto;
 }
 
 .tooltip {
   position: absolute;
-  left: 100%;
-  margin-left: 10px;
-  bottom: 50%;
-  transform: translateY(50%);
+  left: 50%;
+  bottom: 125%;
+  transform: translateX(-50%);
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   border: 1px solid hsl(var(--border));
@@ -129,19 +163,20 @@
   border-radius: var(--radius);
   font-size: 0.8rem;
   line-height: 1.4;
-  width: 280px;
+  width: 250px;
   z-index: 10;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   opacity: 0;
-  animation: fadeIn 0.2s ease-out forwards;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
   pointer-events: none;
 }
 
-@keyframes fadeIn {
-  to {
-    opacity: 1;
-  }
+.tooltipContainer:hover .tooltip {
+  opacity: 1;
+  visibility: visible;
 }
+
 
 /* --- UPLOAD DE IMAGEM --- */
 .dropzone {
@@ -156,6 +191,7 @@
   align-items: center;
   justify-content: center;
   min-height: 120px;
+  color: hsl(var(--muted-foreground));
 }
 
 .dropzone:hover, .dropzoneActive {
@@ -178,6 +214,7 @@
   height: 80px;
   border-radius: 50%;
   object-fit: cover;
+  border: 2px solid hsl(var(--border));
 }
 
 .spinner {

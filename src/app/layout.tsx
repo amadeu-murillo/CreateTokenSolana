@@ -1,4 +1,4 @@
-"use client"; // Convertido para Client Component
+"use client";
 
 import "./globals.css";
 import type { ReactNode } from "react";
@@ -97,6 +97,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </div>
                 <div className={styles.walletContainer}>
                   <ThemeSwitcher />
+                  {/* O botão da carteira foi movido para o container flutuante abaixo */}
                 </div>
               </div>
             </header>
@@ -151,3 +152,4 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     </html>
   );
 }
+

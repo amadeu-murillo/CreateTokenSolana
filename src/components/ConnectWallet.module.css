@@ -1,28 +1,133 @@
+/* --- CONTAINER PRINCIPAL --- */
 .container {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 1rem;
 }
 
-.address {
-  font-size: 0.875rem;
-  font-family: monospace; /* Usando a variável de fonte mono */
-  background-color: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--border));
-  display: none; /* Ocultar em dispositivos móveis por padrão */
+/* Placeholder para evitar erro de hidratação no SSR */
+.placeholderButton {
+    width: 150px;
+    height: 40px;
+    background-color: hsl(var(--muted));
+    border-radius: var(--radius);
 }
 
-@media(min-width: 768px) {
-    .address {
-        display: block; /* Mostrar em tablets e maiores */
+/* --- BOTÃO DE CONEXÃO (ESTILO PADRÃO DA LIB) --- */
+.connectButton {
+    background-image: var(--primary-gradient) !important;
+    transition: all 0.2s ease-in-out !important;
+    border-radius: var(--radius) !important;
+    font-weight: 500 !important;
+}
+.connectButton:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px hsla(var(--primary), 0.2) !important;
+}
+
+/* --- BOTÃO QUANDO A CARTEIRA ESTÁ CONECTADA --- */
+.connectedButton {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    font-family: monospace;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.connectedButton:hover {
+    border-color: hsl(var(--primary));
+    background-color: hsl(var(--muted));
+}
+
+.walletIcon {
+    border-radius: 50%;
+}
+
+/* --- MENU DROPDOWN --- */
+.dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 280px;
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    animation: fadeInScaleUp 0.2s ease-out forwards;
+}
+
+@keyframes fadeInScaleUp {
+    from {
+        opacity: 0;
+        transform: translateY(-5px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
     }
 }
 
-/* Unificação de Estilos de Botões */
-/* Os estilos do WalletMultiButton agora herdam do .button primário */
-.container :global(.wallet-adapter-button) {
-    /* Este seletor continua para garantir a especificidade, mas os estilos duplicados foram removidos */
+.dropdownHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 600;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.dropdownAddress {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    background-color: hsl(var(--muted));
+    padding: 0.5rem 0.75rem;
+    border-radius: calc(var(--radius) * 0.75);
+    font-family: monospace;
+    font-size: 0.8rem;
+    word-break: break-all;
+}
+
+.dropdownAddress button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: hsl(var(--muted-foreground));
+    transition: color 0.2s ease;
+}
+
+.dropdownAddress button:hover {
+    color: hsl(var(--primary));
+}
+
+.disconnectButton {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: hsl(var(--destructive));
+    font-weight: 500;
+    text-align: left;
+    border-radius: calc(var(--radius) * 0.75);
+    transition: background-color 0.2s ease;
+}
+
+.disconnectButton:hover {
+    background-color: hsla(var(--destructive), 0.1);
 }

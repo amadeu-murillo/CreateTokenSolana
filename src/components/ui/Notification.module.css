@@ -6,6 +6,12 @@
     border-radius: var(--radius);
     border: 1px solid;
     position: relative;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .success {
@@ -28,14 +34,27 @@
     color: #fca5a5;
 }
 
+/* Novo estilo para o tipo 'info' */
+.info {
+    background-color: hsla(210, 96%, 59%, 0.1);
+    border-color: hsla(210, 96%, 59%, 0.5);
+    color: hsl(210, 96%, 40%);
+}
+
+.dark .info {
+    color: hsl(210, 96%, 80%);
+}
+
+
 .iconWrapper {
     flex-shrink: 0;
     margin-right: 0.75rem;
+    margin-top: 2px;
 }
 
 .icon {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.25rem;
+    height: 1.25rem;
 }
 
 .content {
@@ -45,7 +64,8 @@
 .message {
     margin: 0;
     padding: 0;
-    line-height: 1.4;
+    line-height: 1.5;
+    font-weight: 500;
 }
 
 .link {
@@ -66,8 +86,11 @@
     color: inherit;
     opacity: 0.7;
     transition: opacity 0.2s ease;
+    padding: 0.25rem;
+    border-radius: 50%;
 }
 
 .closeButton:hover {
     opacity: 1;
+    background-color: hsla(var(--foreground), 0.1);
 }

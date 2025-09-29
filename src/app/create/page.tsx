@@ -6,69 +6,54 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import styles from '@/app/create/Create.module.css';
 
 // Ícones SVG como componentes para clareza
-const IconTextCursor = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h1a3 3 0 0 1 3 3v13"/><path d="M11 4h1a3 3 0 0 1 3 3v13"/><path d="M17 4h1a3 3 0 0 1 3 3v13"/><path d="M12 20h10"/></svg>;
-const IconCircleDot = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg>;
-const IconCoins = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="M16.71 13.88.71 4.12"/></svg>;
-const IconImage = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>;
+const IconInfo = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+const IconDollarSign = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>;
 
 // Conteúdo do guia lateral
-const tutorialSteps = [
+const infoItems = [
     {
-        icon: <IconTextCursor />,
-        title: "Nome e Símbolo",
-        description: "A identidade do seu token. O nome é como ele será conhecido (ex: Meu Token), e o símbolo é a sua abreviação (ex: MEU)."
+        title: "O que é um Token SPL?",
+        description: "É o padrão fundamental para criar tokens fungíveis (moedas) na rede Solana. Ideal para a maioria dos projetos que precisam de um token simples e eficiente."
     },
     {
-        icon: <IconCircleDot />,
-        title: "Decimais",
-        description: "Define a menor unidade fracionária do token. Para a maioria dos casos, 9 é o padrão recomendado pela Solana."
+        title: "O que é o Token-2022?",
+        description: "É uma extensão do padrão SPL que adiciona novas funcionalidades, como taxas de transferência, juros e muito mais, diretamente no nível do protocolo."
     },
     {
-        icon: <IconCoins />,
-        title: "Fornecimento Total",
-        description: "A quantidade total de tokens que serão criados. Este número pode ser fixo ou não, dependendo das 'Opções de Autoridade'."
-    },
-    {
-        icon: <IconImage />,
-        title: "Imagem do Token",
-        description: "O logotipo do seu token. Faça o upload de uma imagem (PNG, JPG) que será exibida em carteiras e exploradores."
+        title: "Autoridades de Mint e Freeze",
+        description: "Manter a autoridade de 'Mint' permite criar mais tokens no futuro. A de 'Freeze' permite congelar tokens em carteiras específicas. Renunciar a elas torna o token mais descentralizado e seu fornecimento imutável."
     }
 ];
 
 export default function CreatePage() {
   return (
-    <div className={styles.grid}>
-      <div className={styles.formContainer}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Crie seu Token na Solana</CardTitle>
-            <CardDescription>Preencha os detalhes abaixo para criar seu novo token SPL na rede Solana.</CardDescription>
-          </CardHeader>
-          <CardContent>
+    <div className={styles.pageContainer}>
+        <div className={styles.header}>
+            <h1 className={styles.title}>Crie seu Token na Solana</h1>
+            <p className={styles.description}>Preencha os detalhes abaixo para criar seu novo token SPL na rede Solana. Simples, rápido e seguro.</p>
+        </div>
+        <div className={styles.grid}>
+          <div className={styles.formContainer}>
             <TokenForm />
-          </CardContent>
-        </Card>
-      </div>
-      <aside className={styles.sidebar}>
-        <div className={styles.tutorialContainer}>
-            <h3 className={styles.sidebarTitle}>Guia de Preenchimento</h3>
-            <div className={styles.tutorialList}>
-              {tutorialSteps.map((step, index) => (
-                <div key={index} className={styles.tutorialItem}>
-                    <div className={styles.tutorialIcon}>{step.icon}</div>
-                    <div className={styles.tutorialText}>
-                        <p className={styles.tutorialTitle}>{step.title}</p>
-                        <p className={styles.tutorialDescription}>{step.description}</p>
-                    </div>
+          </div>
+          <aside className={styles.sidebar}>
+            <div className={styles.infoContainer}>
+                <div className={styles.sidebarSection}>
+                    <h3 className={styles.sidebarTitle}><IconInfo /> Guia Rápido</h3>
+                    {infoItems.map((item, index) => (
+                        <div key={index} className={styles.infoItem}>
+                            <p className={styles.infoTitle}>{item.title}</p>
+                            <p className={styles.infoDescription}>{item.description}</p>
+                        </div>
+                    ))}
                 </div>
-              ))}
+                <div className={styles.sidebarSection}>
+                     <h3 className={styles.sidebarTitle}><IconDollarSign /> Resumo de Custos</h3>
+                     <CostSummary />
+                </div>
             </div>
+          </aside>
         </div>
-        <div className={styles.costContainer}>
-            <h3 className={styles.sidebarTitle}>Resumo de Custos</h3>
-            <CostSummary />
-        </div>
-      </aside>
     </div>
   );
 }

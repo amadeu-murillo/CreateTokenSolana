@@ -1,127 +1,170 @@
 .container {
-  max-width: 64rem; /* 1024px */
+  max-width: 64rem;
   margin-left: auto;
   margin-right: auto;
 }
 
-.infoText {
-  text-align: center;
-  color: hsl(var(--muted-foreground));
-  padding: 2rem;
-}
-
-.errorText {
-  color: hsl(var(--destructive));
-}
-
-.historyList {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem; /* Aumenta o espaçamento */
-}
-
-.historyItem {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 1.5rem;
-  background-color: hsla(var(--muted), 0.5);
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  transition: background-color 0.2s ease;
-}
-
-@media(min-width: 768px) {
-    .historyItem {
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-    }
-}
-
-
-.historyItem:hover {
-  background-color: hsla(var(--muted), 1);
-}
-
-.mintAddressLabel {
-  font-size: 0.75rem;
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 0.25rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.mintAddress {
-  font-family: monospace;
-  font-weight: 500;
-  word-break: break-all;
-}
-
-.creationDate {
-    font-size: 0.8rem;
-    color: hsl(var(--muted-foreground));
-    margin-top: 0.25rem;
-}
-
-.actionsContainer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    align-items: center;
-    justify-content: flex-start;
-}
-
-@media(min-width: 768px) {
-    .actionsContainer {
-        justify-content: flex-end;
-    }
-}
-
-/* Removido .actionButton e .actionButton:hover para usar classes globais */
-
-.solscanLink {
-  background-image: var(--primary-gradient);
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius);
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: transform 0.2s ease;
-  white-space: nowrap;
-  border: none;
-}
-
-.solscanLink:hover {
-  transform: scale(1.05);
-}
-
-/* Estilos para o estado vazio */
-.emptyStateContainer {
+.infoStateContainer {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 3rem 1rem;
   text-align: center;
-}
-
-.emptyStateIcon {
+  gap: 1rem;
   color: hsl(var(--muted-foreground));
-  margin-bottom: 1.5rem;
 }
 
-.emptyStateContainer h3 {
+.spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 4px solid hsl(var(--border));
+  border-top-color: hsl(var(--primary));
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.errorText {
+  color: hsl(var(--destructive));
+}
+
+.tokenGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media(min-width: 1024px) {
+    .tokenGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.tokenCard {
+  background-color: hsla(var(--muted), 0.5);
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  display: grid;
+  grid-template-areas: 
+    "info"
+    "authority"
+    "actions";
+  gap: 1.25rem;
+  transition: all 0.2s ease;
+}
+
+@media(min-width: 768px) {
+    .tokenCard {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+            "info authority"
+            "actions actions";
+        align-items: center;
+    }
+}
+
+.tokenCard:hover {
+    border-color: hsl(var(--primary) / 0.5);
+    transform: translateY(-2px);
+}
+
+.tokenInfo {
+    grid-area: info;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.tokenImage {
+    border-radius: 50%;
+    border: 2px solid hsl(var(--border));
+}
+
+.tokenName {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+}
+
+.tokenSymbol {
+    font-size: 0.9rem;
+    color: hsl(var(--muted-foreground));
+    text-transform: uppercase;
+}
+
+.solscanLink {
+    font-size: 0.8rem;
+    color: hsl(var(--primary));
+    font-family: monospace;
+    text-decoration: none;
+}
+.solscanLink:hover {
+    text-decoration: underline;
+}
+
+.authorityInfo {
+    grid-area: authority;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.authorityStatus {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.statusActive, .statusRevoked {
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 99px;
+    font-size: 0.75rem;
+}
+
+.statusActive {
+    background-color: hsla(var(--primary), 0.1);
+    color: hsl(var(--primary));
+}
+
+.statusRevoked {
+    background-color: hsla(var(--destructive), 0.1);
+    color: hsl(var(--destructive));
+}
+
+.actions {
+    grid-area: actions;
+    display: flex;
+    gap: 0.75rem;
+    border-top: 1px solid hsl(var(--border));
+    padding-top: 1.25rem;
+}
+
+.actions > button {
+    flex-grow: 1;
+}
+
+.noActionsText {
+    width: 100%;
+    text-align: center;
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.emptyStateTitle {
   font-size: 1.25rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
+  color: hsl(var(--foreground));
 }
 
-.emptyStateContainer p {
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 1.5rem;
-}
-
-.emptyStateButton {
-  max-width: 250px;
+.emptyStateText {
+  max-width: 380px;
 }

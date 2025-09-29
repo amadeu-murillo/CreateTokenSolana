@@ -1,3 +1,29 @@
+/* --- LAYOUT GERAL --- */
+.pageContainer {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+}
+
+.pageHeader {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.pageTitle {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    margin-bottom: 0.75rem;
+}
+
+.pageDescription {
+    font-size: 1.1rem;
+    color: hsl(var(--muted-foreground));
+    max-width: 600px;
+    margin: 0 auto;
+}
+
 .grid {
     display: grid;
     gap: 2.5rem;
@@ -21,9 +47,10 @@
 .contentStack {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem; /* Espaçamento entre os cards */
+    gap: 1.5rem;
 }
 
+/* --- CARD DE LINK --- */
 .linkContainer {
     display: flex;
     flex-direction: column;
@@ -37,18 +64,149 @@
 }
 
 .inputWrapper input {
-    padding-right: 8rem; /* Espaço para o botão de copiar */
+    padding-right: 6.5rem; /* Espaço para o botão */
 }
 
 .copyButton {
     position: absolute;
     right: 0.5rem;
     height: 2.5rem;
-    padding: 0 1.5rem;
+    padding: 0 1.25rem;
     width: auto;
 }
 
-/* Sidebar Styles */
+.connectWalletPrompt {
+    text-align: center;
+    padding: 1rem 0;
+}
+.connectWalletPrompt p {
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 1rem;
+}
+
+/* --- PAINEL DE GANHOS --- */
+.earningsDashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.earningsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1.5rem;
+}
+
+.earningStat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1.25rem;
+    background-color: hsl(var(--muted) / 0.5);
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+}
+
+.statHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.statHeader svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+.statValue {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+    font-family: monospace;
+}
+
+.historyTitle {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.historyTable {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.historyRow {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-radius: calc(var(--radius) * 0.75);
+    background-color: hsl(var(--background));
+}
+
+.historyDate {
+    font-size: 0.8rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.historyAmount {
+    font-weight: 500;
+    font-family: monospace;
+    color: hsl(var(--primary));
+    text-align: right;
+}
+
+.historyLink {
+    font-size: 0.8rem;
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-align: right;
+    justify-self: end;
+}
+
+.noHistoryText {
+    font-size: 0.9rem;
+    color: hsl(var(--muted-foreground));
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.loadingContainer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2rem 0;
+    color: hsl(var(--muted-foreground));
+}
+
+.spinner {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    border: 2px solid hsl(var(--border));
+    border-top-color: hsl(var(--primary));
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.errorText {
+    color: hsl(var(--destructive));
+    text-align: center;
+    padding: 1rem 0;
+}
+
+/* --- SIDEBAR --- */
 .sidebar {
     display: flex;
     flex-direction: column;
@@ -103,45 +261,4 @@
     color: hsl(var(--muted-foreground));
     font-size: 0.875rem;
     line-height: 1.5;
-}
-
-/* Novos estilos para a exibição de ganhos */
-.earningsGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1.5rem;
-}
-
-.earningStat {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 1rem;
-    background-color: hsl(var(--muted) / 0.5);
-    border-radius: var(--radius);
-    border: 1px solid hsl(var(--border));
-}
-
-.statHeader {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
-    color: hsl(var(--muted-foreground));
-}
-
-.statHeader svg {
-    width: 1rem;
-    height: 1rem;
-}
-
-.statValue {
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: hsl(var(--foreground));
-    font-family: monospace;
-}
-
-.errorText {
-    color: hsl(var(--destructive));
 }

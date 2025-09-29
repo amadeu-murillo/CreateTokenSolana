@@ -1,24 +1,35 @@
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, ComputeBudgetProgram } from '@solana/web3.js';
-import { createBurnInstruction, getAssociatedTokenAddress, getMint } from '@solana/spl-token';
+import { createBurnInstruction, getAssociatedTokenAddress, getMint, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_BURN_TOKEN_LAMPORTS } from '@/lib/constants';
 
 export async function POST(request: Request) {
   try {
-    const { mint, amount, wallet } = await request.json();
+    const { mint, amount, wallet, programId } = await request.json();
 
-    if (!mint || !amount || !wallet) {
-      return NextResponse.json({ error: 'Dados incompletos: mint, amount e wallet são obrigatórios.' }, { status: 400 });
+    if (!mint || !amount || !wallet || !programId) {
+      return NextResponse.json({ error: 'Dados incompletos: mint, amount, wallet e programId são obrigatórios.' }, { status: 400 });
+    }
+
+    // Valida se o programId é um dos conhecidos
+    if (programId !== TOKEN_PROGRAM_ID.toBase58() && programId !== TOKEN_2022_PROGRAM_ID.toBase58()) {
+        return NextResponse.json({ error: 'Program ID inválido.' }, { status: 400 });
     }
 
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
     const userPublicKey = new PublicKey(wallet);
     const mintPublicKey = new PublicKey(mint);
+    const tokenProgramId = new PublicKey(programId);
 
     // Buscar as informações do mint para obter os decimais
-    const mintInfo = await getMint(connection, mintPublicKey);
+    const mintInfo = await getMint(connection, mintPublicKey, 'confirmed', tokenProgramId);
 
-    const associatedTokenAccount = await getAssociatedTokenAddress(mintPublicKey, userPublicKey);
+    const associatedTokenAccount = await getAssociatedTokenAddress(
+        mintPublicKey, 
+        userPublicKey,
+        false,
+        tokenProgramId // Usa o programId correto
+    );
 
     const instructions = [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
@@ -32,13 +43,14 @@ export async function POST(request: Request) {
             associatedTokenAccount,
             mintPublicKey,
             userPublicKey,
-            BigInt(amount * Math.pow(10, mintInfo.decimals))
+            BigInt(amount * Math.pow(10, mintInfo.decimals)),
+            [],
+            tokenProgramId // Usa o programId correto
         )
     ];
 
     const { blockhash } = await connection.getLatestBlockhash('confirmed');
 
-    // MODIFICAÇÃO: Construindo e serializando uma VersionedTransaction
     const messageV0 = new TransactionMessage({
         payerKey: userPublicKey,
         recentBlockhash: blockhash,

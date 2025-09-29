@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 
@@ -38,7 +38,7 @@ export const useAirdrop = () => {
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
 
-  const performAirdrop = async (mint: string, recipients: Recipient[]) => {
+  const performAirdrop = async (mint: string, recipients: Recipient[], programId: string) => {
     if (!publicKey || !sendTransaction) {
       setError("Carteira não conectada.");
       return;
@@ -56,7 +56,7 @@ export const useAirdrop = () => {
       const response = await fetch('/api/airdrop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mint, recipients, wallet: publicKey.toBase58() }),
+        body: JSON.stringify({ mint, recipients, wallet: publicKey.toBase58(), programId }),
       });
 
       const result = await response.json();
@@ -80,5 +80,10 @@ export const useAirdrop = () => {
     }
   };
 
-  return { performAirdrop, isLoading, error, signature };
+  const reset = useCallback(() => {
+    setError(null);
+    setSignature(null);
+  }, []);
+
+  return { performAirdrop, isLoading, error, signature, reset };
 };

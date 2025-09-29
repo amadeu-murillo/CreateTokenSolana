@@ -4,7 +4,6 @@ import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTran
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_LP_LAMPORTS } from '@/lib/constants';
 import { NATIVE_MINT } from '@solana/spl-token';
 import { OrcaU64, ORCA_WHIRLPOOL_PROGRAM_ID, WhirlpoolContext, buildWhirlpoolClient, PriceMath } from '@orca-so/sdk';
-// REMOVIDO: import { Wallet } from '@project-serum/anchor'; // Esta importação causa o erro
 import Decimal from 'decimal.js';
 
 // ADICIONADO: Interface mínima para a carteira para evitar a importação direta do Anchor

@@ -1,39 +1,68 @@
+/* === ESTILOS GERAIS PARA SEÇÕES === */
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 1.5rem;
+}
+
+.sectionTitle {
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: -0.05em;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.sectionDescription {
+    font-size: 1.1rem;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 4rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+    line-height: 1.6;
+}
+
+/* === SEÇÃO HERO === */
 .heroWrapper {
   position: relative;
   overflow: hidden;
+  padding: 6rem 0;
+  display: flex;
+  align-items: center;
+  min-height: 80vh;
 }
 
-/* Efeito de brilho no fundo da seção principal */
 .heroWrapper::before {
   content: '';
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, hsla(var(--primary), 0.1) 0%, transparent 70%);
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(circle, hsla(var(--primary), 0.15) 0%, transparent 70%);
   filter: blur(120px);
   z-index: -1;
   pointer-events: none;
+  animation: pulse 8s infinite alternate;
 }
 
-.container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
+@keyframes pulse {
+    from { transform: translate(-50%, -50%) scale(0.8); opacity: 0.7; }
+    to { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+}
+
+.heroContent {
   text-align: center;
-  min-height: 70vh;
-  padding: 2rem 1rem;
-}
-
-.content {
-  max-width: 52rem;
+  animation: fadeInUp 0.8s ease-out forwards;
 }
 
 .title {
-  font-size: 3.5rem;
+  font-size: 3rem;
   line-height: 1.1;
   font-weight: 800;
   letter-spacing: -0.05em;
@@ -53,145 +82,123 @@
   font-size: 1.25rem;
   color: hsl(var(--muted-foreground));
   max-width: 42rem;
-  margin-left: auto;
-  margin-right: auto;
-  margin-bottom: 2.5rem;
+  margin: 0 auto 2.5rem;
   line-height: 1.6;
 }
 
 .buttonContainer {
-  max-width: 20rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  max-width: 25rem;
   margin: 0 auto;
 }
 
-/* --- SEÇÃO DE FUNCIONALIDADES --- */
+@media(min-width: 640px) {
+    .buttonContainer {
+        flex-direction: row;
+        justify-content: center;
+    }
+}
+
+.secondaryButton {
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border));
+    background-image: none;
+}
+
+.secondaryButton:hover {
+    background: hsl(var(--muted));
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary));
+}
+
+
+/* === SEÇÃO DE FUNCIONALIDADES === */
 .featuresSection {
-  width: 100%;
-  max-width: 1100px;
-  margin: 6rem auto;
-  text-align: center;
-  padding: 4rem 1.5rem;
-  background-color: hsla(var(--card), 0.5);
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  position: relative;
-}
-
-.featuresSection h2 {
-  font-size: 2.25rem;
-  margin-bottom: 1rem;
-  font-weight: 700;
-}
-
-.featuresDescription {
-  font-size: 1.1rem;
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 3rem;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
+  padding: 6rem 0;
 }
 
 .featuresGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 2rem;
 }
 
 .featureCard {
   text-align: left;
   padding: 2rem;
-  background-color: hsl(var(--background));
+  background-color: hsl(var(--card));
   border-radius: var(--radius);
   border: 1px solid hsl(var(--border));
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .featureCard:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 30px hsla(var(--primary), 0.1);
+  transform: translateY(-8px);
+  box-shadow: 0 10px 30px hsla(var(--primary), 0.15);
   border-color: hsla(var(--primary), 0.5);
 }
 
 .featureIcon {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: var(--radius);
   background-image: var(--primary-gradient);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1.5rem;
+  transition: transform 0.3s ease;
+}
+.featureCard:hover .featureIcon {
+    transform: scale(1.1) rotate(-10deg);
 }
 
 .featureCard h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  font-weight: 700;
   margin-bottom: 0.5rem;
 }
 
 .featureCard p {
   color: hsl(var(--muted-foreground));
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   line-height: 1.6;
 }
 
-
-/* --- SEÇÕES "Como Funciona" e "FAQ" --- */
-.howItWorksSection, .faqSection {
-  width: 100%;
-  max-width: 1100px;
-  margin: 6rem auto;
-  text-align: center;
-  padding: 0 1.5rem;
-}
-
-.howItWorksSection h2, .faqSection h2 {
-  font-size: 2.25rem;
-  margin-bottom: 3rem;
-  font-weight: 700;
+/* === SEÇÃO COMO FUNCIONA === */
+.howItWorksSection {
+  padding: 6rem 0;
+  background-color: hsl(var(--card));
+  border-top: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 .stepsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 2rem;
-  text-align: left;
-}
-
-.faqGrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  max-width: 768px;
-  margin: 0 auto;
-  gap: 1rem;
-  text-align: left;
+  text-align: center;
 }
 
 .step {
-  background-color: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
   padding: 2rem;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.step:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
 }
 
 .stepIcon {
-  width: 3rem;
-  height: 3rem;
+  width: 4rem;
+  height: 4rem;
   border-radius: 50%;
   background-image: var(--primary-gradient);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1.5rem;
+  margin: 0 auto 1.5rem;
 }
 
 .step h3 {
@@ -204,6 +211,51 @@
   color: hsl(var(--muted-foreground));
   font-size: 0.9rem;
   line-height: 1.6;
+}
+
+/* === SEÇÃO PROVA SOCIAL === */
+.socialProofSection {
+    padding: 6rem 0;
+}
+
+.statsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+}
+
+.statCard {
+    text-align: center;
+    background-color: hsl(var(--card));
+    padding: 2.5rem;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+}
+
+.statValue {
+    font-size: 3rem;
+    font-weight: 800;
+    color: hsl(var(--primary));
+    line-height: 1;
+}
+
+.statLabel {
+    font-size: 1rem;
+    color: hsl(var(--muted-foreground));
+    margin-top: 0.5rem;
+}
+
+/* === SEÇÃO FAQ === */
+.faqSection {
+  padding: 6rem 0;
+}
+
+.faqGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  max-width: 768px;
+  margin: 0 auto;
+  gap: 1rem;
 }
 
 .faqItem {
@@ -224,7 +276,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 0;
+  padding: 1.5rem 0;
   font-size: 1.1rem;
   font-weight: 600;
 }
@@ -244,7 +296,7 @@
   font-size: 1.75rem;
   font-weight: 300;
   color: hsl(var(--primary));
-  transition: transform 0.2s ease;
+  transition: transform 0.3s ease;
 }
 
 .faqItem[open] summary::after {
@@ -253,10 +305,11 @@
 
 .faqItem p {
   color: hsl(var(--muted-foreground));
-  font-size: 0.9rem;
-  line-height: 1.6;
-  padding-bottom: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  padding-bottom: 1.5rem;
   margin-top: -0.5rem;
+  max-width: 95%;
 }
 
 .faqLink {
