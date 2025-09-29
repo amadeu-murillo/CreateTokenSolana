@@ -19,6 +19,10 @@ const nextConfig = {
                 hostname: 'res.cloudinary.com',
             },
             {
+                protocol: 'https',
+                hostname: 't3.ftcdn.net', // Domínio adicionado
+            },
+            {
                 protocol: 'http',
                 hostname: 'localhost',
             },
