@@ -12,7 +12,6 @@ const IconSettings = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" he
 const IconBookOpen = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
 const IconDollarSign = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>;
 
-
 const documentationSections = [
     {
         icon: <IconPlusCircle />,
@@ -31,15 +30,15 @@ const documentationSections = [
     },
     {
         icon: <IconLayers />,
-        title: "Como Adicionar Liquidez",
+        title: "Como Adicionar Liquidez (CPMM)",
         id: "add-liquidez",
         steps: [
             "Após criar seu token, vá para a página 'Liquidez'.",
-            "Selecione o token que você acabou de criar na lista de tokens da sua carteira.",
+            "Selecione o token SPL que você criou na lista de tokens da sua carteira.",
             "Insira a quantidade do seu token que você deseja adicionar ao pool de liquidez.",
             "Insira a quantidade de SOL que você deseja parear com seus tokens. A proporção entre os dois definirá o preço inicial.",
-            "A plataforma criará automaticamente um 'Market ID' no OpenBook, que é um pré-requisito para a Raydium.",
-            "Clique em 'Criar Pool e Adicionar Liquidez' e aprove a transação na sua carteira.",
+            "A plataforma utilizará o protocolo CPMM da Raydium para criar o pool de liquidez sem a necessidade de um Market ID prévio do OpenBook.",
+            "Clique em 'Criar Pool CPMM' e aprove a transação na sua carteira.",
             "Assim que a transação for confirmada, seu token estará disponível para negociação na Raydium!"
         ]
     },

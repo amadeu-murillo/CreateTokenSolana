@@ -8,7 +8,7 @@ import ConnectWallet from "../components/ConnectWallet";
 import styles from './Layout.module.css';
 import ThemeSwitcher from "../components/ThemeSwitcher";
 import { useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 
 // Ícones SVG
@@ -48,6 +48,30 @@ function AffiliateTracker() {
   return null; // Este componente não renderiza nada
 }
 
+function NavLinks() {
+  const pathname = usePathname();
+  const navLinks = [
+    { href: "/create", icon: <IconPlusCircle className={styles.navIcon} />, label: "Criar" },
+    { href: "/add-liquidity", icon: <IconLayers className={styles.navIcon} />, label: "Liquidez" },
+    { href: "/burn", icon: <IconFlame className={styles.navIcon} />, label: "Queimar" },
+    { href: "/airdrop", icon: <IconSend className={styles.navIcon} />, label: "Airdrop" },
+    { href: "/dashboard", icon: <IconSettings className={styles.navIcon} />, label: "Gerenciar" },
+    { href: "/afiliates", icon: <IconDollarSign className={styles.navIcon} />, label: "Afiliados" },
+    { href: "/documentacao", icon: <IconBookOpen className={styles.navIcon} />, label: "Documentação" },
+  ];
+
+  return (
+    <nav className={styles.nav}>
+      {navLinks.map(link => (
+        <Link key={link.href} href={link.href} className={`${styles.navLink} ${pathname === link.href ? styles.active : ''}`}>
+          {link.icon}
+          <span>{link.label}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
@@ -69,44 +93,20 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <Link href="/" className={styles.logoLink}>
                     <span className={styles.logoText}>🚀 CreateToken</span>
                   </Link>
-                  <nav className={styles.nav}>
-                    <Link href="/create" className={styles.navLink}>
-                      <IconPlusCircle className={styles.navIcon} />
-                      <span>Criar</span>
-                    </Link>
-                    <Link href="/add-liquidity" className={styles.navLink}>
-                        <IconLayers className={styles.navIcon} />
-                        <span>Liquidez</span>
-                    </Link>
-                    <Link href="/burn" className={styles.navLink}>
-                        <IconFlame className={styles.navIcon} />
-                        <span>Queimar</span>
-                    </Link>
-                    <Link href="/airdrop" className={styles.navLink}>
-                        <IconSend className={styles.navIcon} />
-                        <span>Airdrop</span>
-                    </Link>
-                    <Link href="/dashboard" className={styles.navLink}>
-                        <IconSettings className={styles.navIcon} />
-                        <span>Gerenciar</span>
-                    </Link>
-                    <Link href="/afiliates" className={styles.navLink}>
-                        <IconDollarSign className={styles.navIcon} />
-                        <span>Afiliados</span>
-                    </Link>
-                    <Link href="/documentacao" className={styles.navLink}>
-                        <IconBookOpen className={styles.navIcon} />
-                        <span>Documentação</span>
-                    </Link>
-                  </nav>
+                  <NavLinks />
                 </div>
                 <div className={styles.walletContainer}>
                   <ThemeSwitcher />
-                  <ConnectWallet />
                 </div>
               </div>
             </header>
+
+            <div className={styles.floatingWalletContainer}>
+              <ConnectWallet />
+            </div>
+            
             <main className={`${styles.container} ${styles.main}`}>{children}</main>
+            
             <footer className={styles.footer}>
               <div className={`${styles.container} ${styles.footerContainer}`}>
                 <div className={styles.footerGrid}>
@@ -151,4 +151,3 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     </html>
   );
 }
-

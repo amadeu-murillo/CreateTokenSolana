@@ -6,7 +6,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import styles from "./AddLiquidity.module.css";
 
 // Hooks
-import { useCreateLiquidityPool } from "@/hooks/useCreateLiquidityPool";
+import { useCreateOrcaPool } from "@/hooks/useCreateOrcaPool"; // CORRIGIDO
 import { useUserTokens } from "@/hooks/useUserTokens";
 import { SERVICE_FEE_CREATE_LP_SOL } from "@/lib/constants";
 
@@ -18,20 +18,18 @@ import { Label } from "@/components/ui/label";
 import { TokenSelector } from "@/components/TokenSelector";
 import Notification from "@/components/ui/Notification";
 
-// Custo estimado em SOL para a criação do Market ID (Rent)
-const MARKET_CREATION_RENT_SOL = 0.35;
-const TOTAL_FEE = MARKET_CREATION_RENT_SOL + SERVICE_FEE_CREATE_LP_SOL;
+const TOTAL_FEE = SERVICE_FEE_CREATE_LP_SOL; // Taxa de criação do pool na Orca pode variar, mas a nossa é fixa
 
 // Ícones SVG para o tutorial
 const IconLayers = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
 const IconPlusCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>;
-const IconZap = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+const IconZap = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>;
 
 const tutorialSteps = [
     {
         icon: <IconLayers />,
-        title: "Criação do Market ID",
-        description: "Um OpenBook Market ID é necessário para que a Raydium possa criar o pool. Faremos isso por você."
+        title: "Criação de Whirlpool",
+        description: "Um pool de liquidez concentrada (Whirlpool) será criado na Orca para o seu par de tokens."
     },
     {
         icon: <IconPlusCircle />,
@@ -41,7 +39,7 @@ const tutorialSteps = [
     {
         icon: <IconZap />,
         title: "Lançamento Imediato",
-        description: "Após a confirmação, o pool é criado e seu token fica instantaneamente disponível para negociação na Raydium."
+        description: "Após a confirmação, o pool é criado e seu token fica instantaneamente disponível para negociação na Orca."
     }
 ];
 
@@ -85,9 +83,8 @@ export default function AddLiquidityPage() {
     const { connection } = useConnection();
     const { publicKey } = useWallet();
     const { tokens, isLoading: isLoadingTokens } = useUserTokens();
-    const { createLiquidityPool, isLoading, error, signature, statusMessage } = useCreateLiquidityPool();
+    const { createOrcaPool, isLoading, error, signature, statusMessage } = useCreateOrcaPool(); // ATUALIZADO
 
-    // Filtra para incluir apenas tokens SPL padrão, que são compatíveis com a Raydium
     const splTokens = tokens.filter(token => token.programId === TOKEN_PROGRAM_ID.toBase58());
 
     useEffect(() => {
@@ -106,9 +103,9 @@ export default function AddLiquidityPage() {
             return;
         }
 
-        await createLiquidityPool({
-            baseAmount: baseTokenAmount, // Passa como string
-            quoteAmount: quoteTokenAmount, // Passa como string
+        await createOrcaPool({ // ATUALIZADO
+            baseAmount: baseTokenAmount,
+            quoteAmount: quoteTokenAmount,
             baseMint: selectedTokenMint,
             quoteMint: NATIVE_MINT.toBase58(),
             baseDecimals: selectedToken.decimals,
@@ -119,22 +116,11 @@ export default function AddLiquidityPage() {
         // Lógica para limpar notificações, se necessário
     };
     
-    // Função para tratar a mudança nos inputs de quantidade
     const handleAmountChange = (field: 'baseTokenAmount' | 'quoteTokenAmount', value: string, maxAmount?: string) => {
-        // Substitui a vírgula pelo ponto para o formato internacional
         let formattedValue = value.replace(/,/g, '.');
-        
-        // Permite apenas números e um único ponto decimal
-        if (!/^\d*\.?\d*$/.test(formattedValue)) {
-            return;
-        }
-
-        if (maxAmount && parseFloat(formattedValue) > parseFloat(maxAmount)) {
-            formattedValue = maxAmount;
-        }
-        if (formattedValue !== '' && parseFloat(formattedValue) < 0) {
-            formattedValue = '0';
-        }
+        if (!/^\d*\.?\d*$/.test(formattedValue)) return;
+        if (maxAmount && parseFloat(formattedValue) > parseFloat(maxAmount)) formattedValue = maxAmount;
+        if (formattedValue !== '' && parseFloat(formattedValue) < 0) formattedValue = '0';
         dispatch({ type: 'SET_FIELD', field, value: formattedValue });
     };
 
@@ -143,14 +129,14 @@ export default function AddLiquidityPage() {
             <div className={styles.formContainer}>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Adicionar Liquidez</CardTitle>
+                        <CardTitle>Adicionar Liquidez na Orca</CardTitle>
                         <CardDescription>
-                            Crie um novo pool de liquidez na Raydium para o seu token. O par será sempre com SOL.
+                            Crie um novo Whirlpool na Orca para o seu token. O par será sempre com SOL.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className={styles.cardContent}>
                         {error && <Notification type="error" message={error} onClose={clearNotifications} />}
-                        {signature && <Notification type="success" message="Pool de liquidez criado com sucesso!" txId={signature} onClose={clearNotifications} />}
+                        {signature && <Notification type="success" message="Pool de liquidez na Orca criado com sucesso!" txId={signature} onClose={clearNotifications} />}
                         {!signature && !error && statusMessage && <Notification type="info" message={statusMessage} onClose={clearNotifications} />}
 
                         <div className={styles.inputGroup}>
@@ -203,7 +189,7 @@ export default function AddLiquidityPage() {
                     </CardContent>
                     <CardFooter>
                         <Button onClick={handleCreatePool} disabled={isLoading || !selectedTokenMint || !baseTokenAmount || !quoteTokenAmount} className="w-full">
-                            {isLoading ? "Processando..." : `Criar Pool e Adicionar Liquidez (~${TOTAL_FEE.toFixed(2)} SOL)`}
+                            {isLoading ? "Processando..." : `Criar Pool na Orca (~${TOTAL_FEE.toFixed(2)} SOL de taxa)`}
                         </Button>
                     </CardFooter>
                 </Card>

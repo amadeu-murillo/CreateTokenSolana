@@ -114,6 +114,15 @@
   gap: 1rem;
 }
 
+/* Novo estilo para o container flutuante do botão da carteira */
+.floatingWalletContainer {
+  position: fixed; /* Mude para fixed para manter a posição durante o scroll */
+  top: 5rem; /* Posição ajustada para ficar abaixo do header */
+  right: 1.5rem;
+  z-index: 40; /* Reduzido para garantir que não sobreponha modais, mas ainda acima do conteúdo */
+}
+
+
 /* === MAIN === */
 .main {
   flex: 1 1 0%;
@@ -237,4 +246,5 @@
     transform: translateY(0);
   }
 }
+
 

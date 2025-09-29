@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import ConnectWallet from "../../components/ConnectWallet";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { Input } from "../../components/ui/input";
-import { Button } from "../../components/ui/button";
-import { Label } from "../../components/ui/label";
+import ConnectWallet from "@/components/ConnectWallet";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import styles from "./Affiliates.module.css"; 
 
 // Icons
@@ -34,7 +34,6 @@ const tutorialSteps = [
     }
 ];
 
-// Nova interface para os dados de ganhos
 interface AffiliateEarnings {
     totalEarningsSol: number;
     referralCount: number;
@@ -44,62 +43,56 @@ export default function AfiliatesPage() {
   const { connected, publicKey } = useWallet();
   const [copySuccess, setCopySuccess] = useState(false);
   const [affiliateLink, setAffiliateLink] = useState("");
-  // Novos estados para os ganhos
   const [earnings, setEarnings] = useState<AffiliateEarnings | null>(null);
   const [isLoadingEarnings, setIsLoadingEarnings] = useState(false);
   const [errorEarnings, setErrorEarnings] = useState<string | null>(null);
-
+  const [showEarnings, setShowEarnings] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && connected && publicKey) {
       const baseUrl = window.location.origin;
-      // Aponta para a página inicial para capturar o 'ref' em qualquer ponto da navegação
       setAffiliateLink(`${baseUrl}/?ref=${publicKey.toBase58()}`);
     } else {
       setAffiliateLink("");
     }
   }, [connected, publicKey]);
-  
-  // Novo useEffect para buscar os ganhos
-  useEffect(() => {
-    const fetchEarnings = async () => {
-        if (connected && publicKey) {
-            setIsLoadingEarnings(true);
-            setErrorEarnings(null);
-            try {
-                const response = await fetch(`/api/affiliate-earnings?wallet=${publicKey.toBase58()}`);
-                if (!response.ok) {
-                    const data = await response.json();
-                    throw new Error(data.error || 'Falha ao buscar ganhos.');
-                }
-                const data = await response.json();
-                setEarnings(data);
-            } catch (error: any) {
-                console.error(error);
-                setErrorEarnings(error.message);
-                setEarnings(null);
-            } finally {
-                setIsLoadingEarnings(false);
-            }
-        }
-    };
 
-    fetchEarnings();
-  }, [connected, publicKey]);
+  const handleFetchEarnings = async () => {
+    if (connected && publicKey) {
+        setShowEarnings(true);
+        setIsLoadingEarnings(true);
+        setErrorEarnings(null);
+        try {
+            const response = await fetch(`/api/affiliate-earnings?wallet=${publicKey.toBase58()}`);
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Falha ao buscar ganhos.');
+            }
+            const data = await response.json();
+            setEarnings(data);
+        } catch (error: any) {
+            console.error(error);
+            setErrorEarnings(error.message);
+            setEarnings(null);
+        } finally {
+            setIsLoadingEarnings(false);
+        }
+    }
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(affiliateLink).then(() => {
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2500);
     }, () => {
-      // Lida com erro na cópia se necessário
+      // Handle copy error if needed
     });
   };
 
   return (
     <div className={styles.grid}>
         <div className={styles.mainContent}>
-            <div className={styles.contentStack}> {/* Wrapper para empilhar os cards */}
+            <div className={styles.contentStack}>
                 <Card>
                     <CardHeader>
                         <CardTitle>Programa de Afiliados</CardTitle>
@@ -134,17 +127,20 @@ export default function AfiliatesPage() {
                     </CardContent>
                 </Card>
 
-                {/* Novo Card para Ganhos */}
                 {connected && publicKey && (
                     <Card>
                         <CardHeader>
                             <CardTitle>Seus Ganhos</CardTitle>
                             <CardDescription>
-                                Total de comissões recebidas através do seu link.
+                                Consulte o total de comissões recebidas através do seu link.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            {isLoadingEarnings ? (
+                            {!showEarnings ? (
+                                <Button onClick={handleFetchEarnings} disabled={isLoadingEarnings} className="w-full">
+                                    {isLoadingEarnings ? 'Carregando...' : 'Ver Meus Ganhos'}
+                                </Button>
+                            ) : isLoadingEarnings ? (
                                 <p>Carregando seus ganhos...</p>
                             ) : errorEarnings ? (
                                 <p className={styles.errorText}>Erro ao carregar ganhos: {errorEarnings}</p>
