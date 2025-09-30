@@ -1,10 +1,12 @@
 // src/app/add-liquidity/page.tsx
 "use client";
 
-import { useReducer, useEffect, useCallback } from "react";
+import { useReducer, useEffect, useCallback, useMemo } from "react";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import styles from "./AddLiquidity.module.css";
+import { useSearchParams } from 'next/navigation';
+
 
 // Hooks
 import { useCreateRaydiumPool } from "@/hooks/useCreateRaydiumPool";
@@ -22,9 +24,11 @@ import Notification from "@/components/ui/Notification";
 const TOTAL_FEE = SERVICE_FEE_CREATE_LP_SOL;
 
 // Ícones SVG
-const IconLayers = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
-const IconPlusCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>;
+const IconLayers = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
+const IconPlusCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"  fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>;
 const IconZap = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>;
+const IconInfo = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>);
+
 
 const tutorialSteps = [
     {
@@ -52,8 +56,10 @@ interface State {
 }
 
 type Action =
-    | { type: 'SET_FIELD'; field: keyof State; value: string | number | null }
+    | { type: 'SET_FIELD'; field: keyof State; value: any }
+    | { type: 'RESET_AMOUNTS' }
     | { type: 'SET_SOL_BALANCE'; payload: number };
+
 
 const initialState: State = {
     selectedTokenMint: "",
@@ -66,6 +72,8 @@ function reducer(state: State, action: Action): State {
     switch (action.type) {
         case 'SET_FIELD':
             return { ...state, [action.field]: action.value };
+        case 'RESET_AMOUNTS':
+            return { ...state, baseTokenAmount: '', quoteTokenAmount: '' };
         case 'SET_SOL_BALANCE':
             return { ...state, solBalance: action.payload };
         default:
@@ -81,16 +89,28 @@ export default function AddLiquidityPage() {
     const { publicKey } = useWallet();
     const { tokens, isLoading: isLoadingTokens } = useUserTokens();
     const { createRaydiumPool, isLoading, error, signature, statusMessage, reset } = useCreateRaydiumPool();
+    const searchParams = useSearchParams();
+
+    // Sincroniza o mint da URL com o estado
+    useEffect(() => {
+        const mintFromUrl = searchParams.get('mint');
+        if (mintFromUrl && mintFromUrl !== selectedTokenMint) {
+            dispatch({ type: 'SET_FIELD', field: 'selectedTokenMint', value: mintFromUrl });
+        }
+    }, [searchParams, selectedTokenMint]);
+
 
     useEffect(() => {
         if (publicKey) {
-            connection.getBalance(publicKey).then(balance => {
+            const getBalance = async () => {
+                const balance = await connection.getBalance(publicKey);
                 dispatch({ type: 'SET_SOL_BALANCE', payload: balance / 1_000_000_000 });
-            });
+            }
+            getBalance();
         }
     }, [publicKey, connection]);
 
-    const selectedToken = tokens.find(t => t.mint === selectedTokenMint);
+    const selectedToken = useMemo(() => tokens.find(t => t.mint === selectedTokenMint), [tokens, selectedTokenMint]);
 
     const handleCreatePool = async () => {
         if (!selectedToken) {
@@ -133,6 +153,11 @@ export default function AddLiquidityPage() {
                         {error && <Notification type="error" message={error} onClose={clearNotifications} />}
                         {signature && <Notification type="success" message="Pool de liquidez criado com sucesso!" txId={signature} onClose={clearNotifications} />}
                         {!signature && !error && statusMessage && <Notification type="info" message={statusMessage} onClose={clearNotifications} />}
+                        
+                        <div className={styles.infoBox}>
+                           <IconInfo />
+                           <span>A criação de um Pool de Liquidez CPMM na Raydium envolve múltiplas transações (geralmente 2) que devem ser aprovadas sequencialmente na sua carteira.</span>
+                        </div>
 
                         <div className={styles.inputGroup}>
                             <Label>Selecione seu Token (SPL & Token-2022)</Label>
@@ -141,7 +166,7 @@ export default function AddLiquidityPage() {
                                 selectedTokenMint={selectedTokenMint}
                                 onSelectToken={(mint) => {
                                     dispatch({ type: 'SET_FIELD', field: 'selectedTokenMint', value: mint });
-                                    dispatch({ type: 'SET_FIELD', field: 'baseTokenAmount', value: '' });
+                                    dispatch({ type: 'RESET_AMOUNTS' });
                                 }}
                                 isLoading={isLoadingTokens}
                                 disabled={isLoading}

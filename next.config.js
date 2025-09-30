@@ -34,7 +34,7 @@ const nextConfig = {
         }
         // Adiciona @orca-so/sdk aos pacotes externos no servidor
         if (isServer) {
-            config.externals.push('@orca-so/sdk');
+            config.externals.push('@raydium-io/raydium-sdk');
         }
         config.externals.push('pino-pretty', 'lokijs', 'encoding');
         return config;
