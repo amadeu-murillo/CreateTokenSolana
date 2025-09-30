@@ -32,6 +32,10 @@ const nextConfig = {
         if (!isServer) {
             config.resolve.fallback.fs = false;
         }
+        // Adiciona @orca-so/sdk aos pacotes externos no servidor
+        if (isServer) {
+            config.externals.push('@orca-so/sdk');
+        }
         config.externals.push('pino-pretty', 'lokijs', 'encoding');
         return config;
     },

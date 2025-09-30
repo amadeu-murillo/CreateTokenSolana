@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import styles from "./Home.module.css";
+import { JSX } from "react";
 
 // --- Ícones como Componentes ---
 const IconWallet = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4h-4z"/></svg>;
@@ -16,8 +17,6 @@ const IconSend = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height
 const IconSettings = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15.08a2 2 0 0 0 .73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>;
 const IconLayers = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
 const IconDollarSign = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>;
-const IconSparkles = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L14.39 8.36L21 9.27L16 14.14L17.21 21L12 17.77L6.79 21L8 14.14L3 9.27L9.61 8.36L12 2z"/></svg>;
-
 
 // --- Componente: HeroSection ---
 const HeroSection = () => (
@@ -64,7 +63,7 @@ const FeaturesSection = () => (
     <p className={styles.sectionDescription}>Tudo o que precisa para gerir o seu token SPL num só lugar.</p>
     <div className={styles.featuresGrid}>
         <FeatureCard icon={<IconPlusCircle />} title="Criação de Tokens" description="Lance o seu próprio token SPL na rede Solana com metadados completos, incluindo nome, símbolo e imagem." />
-        <FeatureCard icon={<IconLayers />} title="Criação de Liquidez" description="Crie um Whirlpool moderno e eficiente na Orca para o seu par de tokens com SOL, de forma rápida e mais barata." />
+        <FeatureCard icon={<IconLayers />} title="Criação de Liquidez" description="Crie um pool de liquidez (CPMM) na Raydium com o seu par de tokens com SOL, de forma rápida e sem a necessidade de um Market ID." />
         <FeatureCard icon={<IconFlame />} title="Queima de Tokens (Burn)" description="Remova tokens de circulação de forma permanente para controlar a oferta e aumentar a escassez." />
         <FeatureCard icon={<IconSend />} title="Distribuição (Airdrop)" description="Distribua os seus tokens para múltiplos endereços de uma só vez, ideal para campanhas de marketing e recompensas." />
         <FeatureCard icon={<IconSettings />} title="Gestão de Autoridade" description="Tenha controlo total sobre o seu token, com a opção de renunciar às autoridades de 'mint' e 'freeze'." />
@@ -72,7 +71,6 @@ const FeaturesSection = () => (
     </div>
   </section>
 );
-
 
 // --- Componente: HowItWorksSection ---
 const HowItWorksSection = () => (
@@ -125,7 +123,6 @@ const SocialProofSection = () => (
     </section>
 );
 
-
 // --- Componente: FaqSection ---
 const FaqSection = () => (
   <section className={styles.faqSection} id="faq">
@@ -150,7 +147,6 @@ const FaqSection = () => (
     </div>
   </section>
 );
-
 
 // --- Componente Principal da Página ---
 export default function Home() {

@@ -1,28 +1,28 @@
-// src/hooks/useCreateOrcaPool.ts
-import { useState } from "react";
+// src/hooks/useCreateRaydiumPool.ts
+import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 
 function getFriendlyErrorMessage(error: any): string {
     const message = error.message || String(error);
-    console.error("Create Orca Pool error:", error);
+    console.error("Create Raydium Pool error:", error);
 
     if (message.includes("User rejected the request")) {
         return "Transação rejeitada pelo usuário na carteira.";
     }
     if (message.includes("not enough SOL")) {
-        return "Falha na transação. Verifique se você possui SOL suficiente para as taxas e para a liquidez.";
+        return "Falha na transação. Verifique se possui SOL suficiente para as taxas e para a liquidez.";
     }
     if (message.includes("Transaction simulation failed")) {
-        return "A simulação da transação falhou. Verifique os dados e tente novamente.";
+        return "A simulação da transação falhou. Verifique os dados e o saldo dos tokens e tente novamente.";
     }
     if (message.includes("blockhash")) {
         return "O blockhash da transação expirou. Por favor, tente novamente.";
     }
-    return "Ocorreu um erro ao criar o pool de liquidez na Orca. Verifique o console para mais detalhes.";
+    return "Ocorreu um erro ao criar o pool de liquidez. Verifique o console para mais detalhes.";
 }
 
-interface CreateOrcaData {
+interface CreateRaydiumData {
     baseMint: string;
     quoteMint: string;
     baseAmount: string;
@@ -30,7 +30,7 @@ interface CreateOrcaData {
     baseDecimals: number;
 }
 
-export const useCreateOrcaPool = () => {
+export const useCreateRaydiumPool = () => {
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +38,7 @@ export const useCreateOrcaPool = () => {
   const [signature, setSignature] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const createOrcaPool = async (data: CreateOrcaData) => {
+  const createRaydiumPool = async (data: CreateRaydiumData) => {
     if (!publicKey || !sendTransaction) {
       setError("Carteira não conectada.");
       return;
@@ -47,25 +47,28 @@ export const useCreateOrcaPool = () => {
     setIsLoading(true);
     setError(null);
     setSignature(null);
-    setStatusMessage("Criando pool na Orca...");
+    setStatusMessage("Preparando a transação para o pool da Raydium...");
 
     try {
-        const response = await fetch('/api/create-orca-pool', {
+        const response = await fetch('/api/create-raydium-pool', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...data, wallet: publicKey.toBase58() }),
         });
 
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "Falha ao criar o pool de liquidez na Orca");
+        if (!response.ok) throw new Error(result.error || "Falha ao criar o pool de liquidez na Raydium");
 
         const transaction = VersionedTransaction.deserialize(Buffer.from(result.transaction, 'base64'));
 
+        setStatusMessage("Aguardando aprovação da transação na sua carteira...");
         const txSignature = await sendTransaction(transaction, connection);
+        
+        setStatusMessage("Confirmando a transação na blockchain...");
         await connection.confirmTransaction(txSignature, 'confirmed');
 
         setSignature(txSignature);
-        setStatusMessage("Pool de liquidez na Orca criado com sucesso!");
+        setStatusMessage("Pool de liquidez criado com sucesso!");
 
     } catch (err: any) {
         const friendlyMessage = getFriendlyErrorMessage(err);
@@ -76,6 +79,13 @@ export const useCreateOrcaPool = () => {
         setIsLoading(false);
     }
   };
+  
+  const reset = useCallback(() => {
+    setIsLoading(false);
+    setError(null);
+    setSignature(null);
+    setStatusMessage(null);
+  }, []);
 
-  return { createOrcaPool, isLoading, error, signature, statusMessage };
+  return { createRaydiumPool, isLoading, error, signature, statusMessage, reset };
 };

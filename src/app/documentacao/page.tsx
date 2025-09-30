@@ -30,15 +30,15 @@ const documentationSections = [
     },
     {
         icon: <IconLayers />,
-        title: "Como Adicionar Liquidez (CPMM)",
+        title: "Como Adicionar Liquidez (Raydium)",
         id: "add-liquidez",
         steps: [
             "Após criar seu token, vá para a página 'Liquidez'.",
-            "Selecione o token SPL que você criou na lista de tokens da sua carteira.",
+            "Selecione o token que você criou na lista de tokens da sua carteira.",
             "Insira a quantidade do seu token que você deseja adicionar ao pool de liquidez.",
             "Insira a quantidade de SOL que você deseja parear com seus tokens. A proporção entre os dois definirá o preço inicial.",
-            "A plataforma utilizará o protocolo CPMM da Raydium para criar o pool de liquidez sem a necessidade de um Market ID prévio do OpenBook.",
-            "Clique em 'Criar Pool CPMM' e aprove a transação na sua carteira.",
+            "A plataforma utilizará o protocolo CPMM da Raydium para criar o pool de liquidez sem a necessidade de um Market ID prévio do OpenBook, tornando o processo mais barato e rápido.",
+            "Clique em 'Criar Pool na Raydium' e aprove a transação na sua carteira.",
             "Assim que a transação for confirmada, seu token estará disponível para negociação na Raydium!"
         ]
     },
