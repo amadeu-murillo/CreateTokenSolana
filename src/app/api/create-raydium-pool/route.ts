@@ -10,7 +10,6 @@ import {
 } from '@solana/web3.js';
 import { 
   NATIVE_MINT, 
-  TOKEN_PROGRAM_ID, 
   getAssociatedTokenAddress, 
   createAssociatedTokenAccountInstruction,
   createSyncNativeInstruction,
@@ -24,14 +23,14 @@ import {
   Clmm,
   TokenAmount,
   Price,
+  LiquidityMath,
+  SqrtPriceMath,
+  TickMath
 } from '@raydium-io/raydium-sdk';
 import BN from 'bn.js';
 import Decimal from 'decimal.js';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_LP_LAMPORTS } from '@/lib/constants';
 
-// Configuração CLMM (defina manualmente)
-const TICK_SPACING = 64;
-const FEE_RATE = 500; // 0.05%
 const isMainnet = RPC_ENDPOINT.includes('mainnet');
 const RAYDIUM_PROGRAM_ID = isMainnet ? MAINNET_PROGRAM_ID.CLMM : DEVNET_PROGRAM_ID.CLMM;
 
@@ -44,45 +43,34 @@ interface CreateRaydiumPoolRequest {
   baseProgramId: string;
 }
 
-function priceToTick(price: number, tickSpacing: number) {
-  // Fórmula baseada em Raydium CLMM V1
-  // tick = floor(log_1.0001(price))
-  const logBase = Math.log(1.0001);
-  let tick = Math.floor(Math.log(price) / logBase);
-  // Ajusta para múltiplo do tickSpacing
-  tick = Math.floor(tick / tickSpacing) * tickSpacing;
-  return tick;
-}
-
 export async function POST(request: Request) {
   try {
-    const {
-      wallet,
-      baseMint,
-      baseAmount,
-      quoteAmount,
-      baseDecimals,
-      baseProgramId,
-    }: CreateRaydiumPoolRequest = await request.json();
+    const body: CreateRaydiumPoolRequest = await request.json();
+    const { wallet, baseMint, baseAmount, quoteAmount, baseDecimals, baseProgramId } = body;
 
     if (!wallet || !baseMint || !baseAmount || !quoteAmount || baseDecimals === undefined || !baseProgramId) {
       return NextResponse.json({ error: 'Dados da requisição incompletos.' }, { status: 400 });
     }
 
+    // validação extra
+    if (typeof baseMint !== "string" || typeof baseProgramId !== "string") {
+      return NextResponse.json({ error: "baseMint e baseProgramId devem ser strings base58." }, { status: 400 });
+    }
+
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
     const userPublicKey = new PublicKey(wallet);
 
-    const baseToken = new Token(new PublicKey(baseProgramId), new PublicKey(baseMint), baseDecimals);
+    const baseToken = new Token(new PublicKey(baseProgramId.trim()), new PublicKey(baseMint.trim()), baseDecimals);
     const quoteToken = Token.WSOL;
 
     const instructions: TransactionInstruction[] = [
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 800000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50000 }),
       SystemProgram.transfer({
         fromPubkey: userPublicKey,
         toPubkey: DEV_WALLET_ADDRESS,
         lamports: SERVICE_FEE_CREATE_LP_LAMPORTS,
       }),
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 800000 }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50000 })
     ];
     const signers = [];
 
@@ -106,58 +94,68 @@ export async function POST(request: Request) {
     );
 
     // ==== PRICE and TICKS ====
-    // Converta quantidades para BN
     const baseAmountBn = new BN(new Decimal(baseAmount).times(new Decimal(10).pow(baseDecimals)).toFixed(0));
-    // price = baseAmount / quoteAmount (ajustado para decimais)
-    const priceNum = Number(baseAmountBn.toString()) / Number(quoteLamports.toString());
-    // Calcula o tick central
-    const currentTick = priceToTick(priceNum, TICK_SPACING);
-    const tickLower = currentTick - 100 * TICK_SPACING;
-    const tickUpper = currentTick + 100 * TICK_SPACING;
+    
+    const initialPrice = new Price(baseToken, baseAmountBn, quoteToken, quoteLamports);
+    
+    const currentSqrtPriceX64 = SqrtPriceMath.priceToSqrtPriceX64(initialPrice);
+    const currentTick = TickMath.sqrtPriceX64ToTick(currentSqrtPriceX64);
+    
+    const tickSpacing = 60; 
+    const tickLower = TickMath.getInitializableTickIndex(currentTick, tickSpacing) - 200 * tickSpacing;
+    const tickUpper = TickMath.getInitializableTickIndex(currentTick, tickSpacing) + 200 * tickSpacing;
 
-    // Price para CLMM v1
-    const initialPrice = new Price(
-      baseToken, baseAmountBn,
-      quoteToken, quoteLamports
-    );
+    const { amountA, amountB } = LiquidityMath.getAmountsFromLiquidity({
+        currentSqrtPrice: currentSqrtPriceX64,
+        tickLower,
+        tickUpper,
+        liquidity: LiquidityMath.getLiquidityFromTokenAmount({
+          amount: new TokenAmount(baseToken, baseAmountBn, true),
+          currentSqrtPrice: currentSqrtPriceX64,
+          tickLower,
+          tickUpper,
+        }),
+        slippage: 0.005,
+    });
 
-    // --- Pool creation (adaptado para v1) ---
     const { poolId, innerTransactions: createPoolTx } = await Clmm.makeCreatePoolInstructions({
       connection,
       programId: RAYDIUM_PROGRAM_ID,
-      // clmmConfig: não existe nesta versão, então não inclua
       mintA: baseToken,
       mintB: quoteToken,
       initialPrice,
       owner: userPublicKey,
       makeTxVersion: TxVersion.V0,
-      tickSpacing: TICK_SPACING,
-      feeRate: FEE_RATE,
+      tickSpacing,
     });
-    instructions.push(...createPoolTx.flatMap(tx => tx.instructions));
-    signers.push(...createPoolTx.flatMap(tx => tx.signers));
 
-    // --- Abrir posição (adicionar liquidez) ---
-    const { innerTransactions: openPositionTx } = await Clmm.makeOpenPositionFromBaseInstruction({
+    instructions.push(...createPoolTx.innerTransactions.flatMap(tx => tx.instructions));
+    signers.push(...createPoolTx.innerTransactions.flatMap(tx => tx.signers));
+
+    const { innerTransactions: openPositionTx } = await Clmm.makeOpenPositionFromLiquidityInstruction({
       connection,
       poolId,
       tickLower,
       tickUpper,
-      base: new TokenAmount(baseToken, baseAmountBn, true),
+      liquidity: LiquidityMath.getLiquidityFromTokenAmount({
+        amount: new TokenAmount(baseToken, amountA, true),
+        currentSqrtPrice: currentSqrtPriceX64,
+        tickLower,
+        tickUpper,
+      }),
       owner: userPublicKey,
+      makeTxVersion: TxVersion.V0,
       associatedOnly: true,
       checkCreateATAOwner: true,
-      makeTxVersion: TxVersion.V0,
     });
-    instructions.push(...openPositionTx.flatMap(tx => tx.instructions));
-    signers.push(...openPositionTx.flatMap(tx => tx.signers));
 
-    // --- Fechar conta WSOL ---
+    instructions.push(...openPositionTx.innerTransactions.flatMap(tx => tx.instructions));
+    signers.push(...openPositionTx.innerTransactions.flatMap(tx => tx.signers));
+
     instructions.push(
       createCloseAccountInstruction(wsolAta, userPublicKey, userPublicKey)
     );
 
-    // --- Serialização da transação ---
     const { blockhash } = await connection.getLatestBlockhash('confirmed');
 
     const messageV0 = new TransactionMessage({

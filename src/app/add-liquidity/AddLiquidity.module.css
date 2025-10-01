@@ -37,8 +37,7 @@
 
 .balance {
     font-size: 0.875rem;
-    color: var(--secondary-foreground);
-    opacity: 0.8;
+    color: hsl(var(--muted-foreground));
 }
 
 /* Sidebar Styles */
@@ -46,12 +45,12 @@
     font-size: 1.5rem;
     font-weight: 700;
     margin-bottom: 1.5rem;
-    color: var(--card-foreground);
+    color: hsl(var(--foreground));
 }
 
 .tutorialCard {
     margin-bottom: 1rem;
-    background-color: var(--card);
+    background-color: hsl(var(--card));
 }
 
 .tutorialCardContent {
@@ -69,8 +68,8 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background-color: var(--primary-foreground);
-    color: var(--primary);
+    background-image: var(--primary-gradient);
+    color: white;
 }
 
 .tutorialIcon svg {
@@ -85,13 +84,12 @@
 
 .tutorialTitle {
     font-weight: 600;
-    color: var(--card-foreground);
+    color: hsl(var(--card-foreground));
 }
 
 .tutorialDescription {
     font-size: 0.875rem;
-    color: var(--secondary-foreground);
-    opacity: 0.9;
+    color: hsl(var(--muted-foreground));
 }
 
 /* --- Caixa de Informação --- */

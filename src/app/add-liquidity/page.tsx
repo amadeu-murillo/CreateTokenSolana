@@ -9,23 +9,23 @@ import { useSearchParams } from 'next/navigation';
 
 
 // Hooks
-import { useCreateRaydiumPool } from "@/hooks/useCreateRaydiumPool";
-import { useUserTokens } from "@/hooks/useUserTokens";
-import { SERVICE_FEE_CREATE_LP_SOL } from "@/lib/constants";
+import { useCreateRaydiumPool } from "../../hooks/useCreateRaydiumPool";
+import { useUserTokens } from "../../hooks/useUserTokens";
+import { SERVICE_FEE_CREATE_LP_SOL } from "../../lib/constants";
 
 // Componentes
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { TokenSelector } from "@/components/TokenSelector";
-import Notification from "@/components/ui/Notification";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { TokenSelector } from "../../components/TokenSelector";
+import Notification from "../../components/ui/Notification";
 
 const TOTAL_FEE = SERVICE_FEE_CREATE_LP_SOL;
 
 // Ícones SVG
-const IconLayers = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
-const IconPlusCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"  fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>;
+const IconLayers = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
+const IconPlusCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>;
 const IconZap = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>;
 const IconInfo = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>);
 
@@ -33,8 +33,8 @@ const IconInfo = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" heigh
 const tutorialSteps = [
     {
         icon: <IconLayers />,
-        title: "Criação de Pool CPMM",
-        description: "Um pool de liquidez (Constant Product Market Maker) será criado na Raydium para o seu par de tokens."
+        title: "Criação de Pool CLMM",
+        description: "Um pool de liquidez (Concentrated Liquidity Market Maker) será criado na Raydium para o seu par de tokens."
     },
     {
         icon: <IconPlusCircle />,
@@ -113,24 +113,26 @@ export default function AddLiquidityPage() {
     const selectedToken = useMemo(() => tokens.find(t => t.mint === selectedTokenMint), [tokens, selectedTokenMint]);
 
     const handleCreatePool = async () => {
-        if (!selectedToken) {
-            alert("Por favor, selecione um token.");
+        if (!selectedToken || !publicKey) {
+            alert("Por favor, selecione um token e conecte a carteira.");
             return;
         }
 
+        // dentro do handleCreatePool
         await createRaydiumPool({
             baseAmount: baseTokenAmount,
             quoteAmount: quoteTokenAmount,
             baseMint: selectedTokenMint,
-            quoteMint: NATIVE_MINT.toBase58(),
             baseDecimals: selectedToken.decimals,
+            baseProgramId: typeof selectedToken.programId === "string" ? selectedToken.programId : selectedToken.programId.toBase58(),
         });
+
     };
 
     const clearNotifications = useCallback(() => {
         reset();
     }, [reset]);
-    
+
     const handleAmountChange = (field: 'baseTokenAmount' | 'quoteTokenAmount', value: string, maxAmount?: string) => {
         let formattedValue = value.replace(/,/g, '.');
         if (!/^\d*\.?\d*$/.test(formattedValue)) return;
@@ -146,17 +148,17 @@ export default function AddLiquidityPage() {
                     <CardHeader>
                         <CardTitle>Criar Pool de Liquidez na Raydium</CardTitle>
                         <CardDescription>
-                            Crie um novo pool CPMM na Raydium para o seu token. O par será sempre com SOL e não necessita de um Market ID.
+                            Crie um novo pool CLMM na Raydium para o seu token. O par será sempre com SOL.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className={styles.cardContent}>
                         {error && <Notification type="error" message={error} onClose={clearNotifications} />}
                         {signature && <Notification type="success" message="Pool de liquidez criado com sucesso!" txId={signature} onClose={clearNotifications} />}
                         {!signature && !error && statusMessage && <Notification type="info" message={statusMessage} onClose={clearNotifications} />}
-                        
+
                         <div className={styles.infoBox}>
-                           <IconInfo />
-                           <span>A criação de um Pool de Liquidez CPMM na Raydium envolve múltiplas transações (geralmente 2) que devem ser aprovadas sequencialmente na sua carteira.</span>
+                            <IconInfo />
+                            <span>A criação de um Pool de Liquidez na Raydium envolve múltiplas transações que devem ser aprovadas sequencialmente na sua carteira.</span>
                         </div>
 
                         <div className={styles.inputGroup}>
@@ -175,7 +177,7 @@ export default function AddLiquidityPage() {
 
                         {selectedToken && (
                             <div className={styles.inputGroup}>
-                                 <div className={styles.amountHeader}>
+                                <div className={styles.amountHeader}>
                                     <Label htmlFor="base-amount">Quantidade de {selectedToken.symbol || 'Token'}</Label>
                                     <span className={styles.balance}>Saldo: {parseFloat(selectedToken.amount).toLocaleString()}</span>
                                 </div>
@@ -196,27 +198,27 @@ export default function AddLiquidityPage() {
                                 <Label htmlFor="quote-amount">Quantidade de SOL</Label>
                                 {solBalance !== null && <span className={styles.balance}>Saldo: {solBalance.toFixed(4)}</span>}
                             </div>
-                            <Input 
-                                id="quote-amount" 
+                            <Input
+                                id="quote-amount"
                                 type="text"
                                 inputMode="decimal"
-                                value={quoteTokenAmount} 
-                                onChange={(e) => handleAmountChange('quoteTokenAmount', e.target.value)} 
-                                placeholder="Ex: 10" 
+                                value={quoteTokenAmount}
+                                onChange={(e) => handleAmountChange('quoteTokenAmount', e.target.value)}
+                                placeholder="Ex: 10"
                                 disabled={isLoading}
                             />
                         </div>
                     </CardContent>
                     <CardFooter>
                         <Button onClick={handleCreatePool} disabled={isLoading || !selectedTokenMint || !baseTokenAmount || !quoteTokenAmount} className="w-full">
-                            {isLoading ? "Processando..." : `Criar Pool na Raydium (~${TOTAL_FEE.toFixed(2)} SOL de taxa)`}
+                            {isLoading ? statusMessage || "Processando..." : `Criar Pool na Raydium (~${TOTAL_FEE.toFixed(2)} SOL de taxa)`}
                         </Button>
                     </CardFooter>
                 </Card>
             </div>
             <div className={styles.sidebar}>
                 <h3 className={styles.sidebarTitle}>Como Funciona?</h3>
-                 {tutorialSteps.map((step, index) => (
+                {tutorialSteps.map((step, index) => (
                     <Card key={index} className={styles.tutorialCard}>
                         <CardContent className={styles.tutorialCardContent}>
                             <div className={styles.tutorialIcon}>{step.icon}</div>
