@@ -1,19 +1,24 @@
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, ComputeBudgetProgram } from '@solana/web3.js';
-import { createSetAuthorityInstruction, AuthorityType } from '@solana/spl-token';
+import { createSetAuthorityInstruction, AuthorityType, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_MANAGE_AUTHORITY_LAMPORTS } from '@/lib/constants';
 
 export async function POST(request: Request) {
   try {
-    const { mint, authorityType, wallet } = await request.json();
+    const { mint, authorityType, wallet, programId } = await request.json();
 
-    if (!mint || !authorityType || !wallet) {
+    if (!mint || !authorityType || !wallet || !programId) {
       return NextResponse.json({ error: 'Dados incompletos.' }, { status: 400 });
+    }
+    
+    if (programId !== TOKEN_PROGRAM_ID.toBase58() && programId !== TOKEN_2022_PROGRAM_ID.toBase58()) {
+        return NextResponse.json({ error: 'Program ID inválido.' }, { status: 400 });
     }
 
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
     const userPublicKey = new PublicKey(wallet);
     const mintPublicKey = new PublicKey(mint);
+    const tokenProgramId = new PublicKey(programId);
 
     let type: AuthorityType;
     if (authorityType === 'mint') {
@@ -36,7 +41,9 @@ export async function POST(request: Request) {
             mintPublicKey,
             userPublicKey,
             type,
-            null // Definir a nova autoridade como nula para removê-la
+            null, // Definir a nova autoridade como nula para removê-la
+            [],
+            tokenProgramId
         )
     ];
 

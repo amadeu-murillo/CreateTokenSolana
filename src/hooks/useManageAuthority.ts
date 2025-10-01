@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 
@@ -28,7 +28,7 @@ export const useManageAuthority = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const manageAuthority = async (mint: string, authorityType: 'mint' | 'freeze') => {
+  const manageAuthority = async (mint: string, authorityType: 'mint' | 'freeze', programId: string) => {
     if (!publicKey || !sendTransaction) {
       setError("Carteira não conectada.");
       return null;
@@ -45,7 +45,7 @@ export const useManageAuthority = () => {
       const response = await fetch('/api/manage-authority', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mint, authorityType, wallet: publicKey.toBase58() }),
+        body: JSON.stringify({ mint, authorityType, wallet: publicKey.toBase58(), programId }),
       });
 
       const result = await response.json();
@@ -67,5 +67,9 @@ export const useManageAuthority = () => {
     }
   };
 
-  return { manageAuthority, isLoading, error };
+  const reset = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return { manageAuthority, isLoading, error, reset };
 };

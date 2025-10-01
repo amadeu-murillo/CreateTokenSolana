@@ -16,6 +16,7 @@ const IconFlame = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" heigh
 const IconSend = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>;
 const IconSettings = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15.08a2 2 0 0 0 .73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>;
 const IconDollarSign = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>;
+const IconLayers = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
 
 // --- Componente: HeroSection ---
 const HeroSection = () => (
@@ -61,10 +62,11 @@ const FeaturesSection = () => (
     <h2 className={styles.sectionTitle}>Funcionalidades Abrangentes</h2>
     <p className={styles.sectionDescription}>Tudo o que precisa para gerir o seu token SPL num só lugar.</p>
     <div className={styles.featuresGrid}>
-        <FeatureCard icon={<IconPlusCircle />} title="Criação de Tokens" description="Lance o seu próprio token SPL na rede Solana com metadados completos, incluindo nome, símbolo e imagem." />
-        <FeatureCard icon={<IconFlame />} title="Queima de Tokens (Burn)" description="Remova tokens de circulação de forma permanente para controlar a oferta e aumentar a escassez." />
-        <FeatureCard icon={<IconSend />} title="Distribuição (Airdrop)" description="Distribua os seus tokens para múltiplos endereços de uma só vez, ideal para campanhas de marketing e recompensas." />
-        <FeatureCard icon={<IconSettings />} title="Gestão de Autoridade" description="Tenha controlo total sobre o seu token, com a opção de renunciar às autoridades de 'mint' e 'freeze'." />
+        <FeatureCard icon={<IconPlusCircle />} title="Criação de Tokens" description="Lance o seu próprio token SPL na rede Solana com metadados completos, incluindo nome, símbolo e imagem." href="/create"/>
+        <FeatureCard icon={<IconLayers />} title="Criar Pool de Liquidez" href="/add-liquidity" description="Crie um pool de liquidez na Raydium para que o seu token possa ser negociado por outros utilizadores." />
+        <FeatureCard icon={<IconFlame />} title="Queima de Tokens (Burn)" description="Remova tokens de circulação de forma permanente para controlar a oferta e aumentar a escassez." href="/burn" />
+        <FeatureCard icon={<IconSend />} title="Distribuição (Airdrop)" description="Distribua os seus tokens para múltiplos endereços de uma só vez, ideal para campanhas de marketing e recompensas." href="/airdrop" />
+        <FeatureCard icon={<IconSettings />} title="Gestão de Autoridade" description="Tenha controlo total sobre o seu token, com a opção de renunciar às autoridades de 'mint' e 'freeze'." href="/dashboard"/>
         <FeatureCard icon={<IconDollarSign />} title="Programa de Afiliados" href="/afiliates" description="Ganhe SOL indicando novos usuários. Gere seu link de afiliado e receba comissões por cada token criado." />
     </div>
   </section>
@@ -106,15 +108,15 @@ const SocialProofSection = () => (
         <p className={styles.sectionDescription}>A nossa plataforma já foi usada para lançar projetos incríveis. Seja o próximo!</p>
         <div className={styles.statsGrid}>
             <div className={styles.statCard}>
-                <p className={styles.statValue}>+5,000</p>
+                <p className={styles.statValue}>+250</p>
                 <p className={styles.statLabel}>Tokens Criados</p>
             </div>
             <div className={styles.statCard}>
-                <p className={styles.statValue}>+1,200</p>
+                <p className={styles.statValue}>+150</p>
                 <p className={styles.statLabel}>Projetos Lançados</p>
             </div>
             <div className={styles.statCard}>
-                <p className={styles.statValue}>+10,000</p>
+                <p className={styles.statValue}>+600</p>
                 <p className={styles.statLabel}>Transações Realizadas</p>
             </div>
         </div>

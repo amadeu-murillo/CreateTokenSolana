@@ -56,7 +56,7 @@ function NavLinks() {
     { href: "/burn", icon: <IconFlame className={styles.navIcon} />, label: "Queimar" },
     { href: "/airdrop", icon: <IconSend className={styles.navIcon} />, label: "Airdrop" },
     { href: "/dashboard", icon: <IconSettings className={styles.navIcon} />, label: "Gerenciar" },
-    { href: "/afiliates", icon: <IconDollarSign className={styles.navIcon} />, label: "Afiliados" },
+    { href: "/afiliates", icon: <IconDollarSign className={styles.navIcon} />, label: "Receber" },
     { href: "/documentacao", icon: <IconBookOpen className={styles.navIcon} />, label: "Documentação" },
   ];
 
@@ -135,6 +135,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     <Link href="/afiliates" className={styles.footerLink}>Programa de Afiliados</Link>
                     <Link href="/documentacao" className={styles.footerLink}>Documentação</Link>
                   </div>
+                  <div className={styles.footerColumn}>
+                    <h4 className={styles.footerColumnTitle}>Entrar em contato</h4>
+                    <a href="mailto:contato@createtokensolana.com" className={styles.footerLink}>contato@createtokensolana.com</a>
+                  </div>
                 </div>
                 <div className={styles.footerBottom}>
                   <p className={styles.footerText}>
@@ -152,5 +156,3 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     </html>
   );
 }
-
-
