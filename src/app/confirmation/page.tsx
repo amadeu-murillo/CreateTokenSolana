@@ -25,7 +25,12 @@ export default function ConfirmationPage() {
               txId={txId}
             />
             <div className={styles.ctaContainer}>
-                <p>Parabéns! O seu token está na blockchain.</p>
+                <p>Parabéns! Seu token está na blockchain. O próximo passo é criar um pool de liquidez para que ele possa ser negociado.</p>
+                <Link href={`/add-liquidity?mint=${tokenAddress}`}>
+                    <Button className={styles.ctaButton}>
+                        Criar Pool de Liquidez Agora
+                    </Button>
+                </Link>
             </div>
           </>
         ) : (

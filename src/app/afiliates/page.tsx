@@ -5,7 +5,6 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import styles from "./Affiliates.module.css"; 
 
 // --- Ícones ---
@@ -40,6 +39,7 @@ export default function AfiliatesPage() {
   const [earnings, setEarnings] = useState<AffiliateEarnings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showEarnings, setShowEarnings] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && connected && publicKey) {
@@ -70,19 +70,19 @@ export default function AfiliatesPage() {
     }
   }, [connected, publicKey]);
 
-  useEffect(() => {
-    // Busca os ganhos automaticamente quando a carteira é conectada
-    if(connected && publicKey) {
-        handleFetchEarnings();
-    }
-  }, [connected, publicKey, handleFetchEarnings]);
-
   const handleCopy = () => {
     navigator.clipboard.writeText(affiliateLink).then(() => {
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2500);
     });
   };
+  
+  const handleToggleEarnings = () => {
+      if (!showEarnings && !earnings) {
+          handleFetchEarnings();
+      }
+      setShowEarnings(!showEarnings);
+  }
 
   return (
     <div className={styles.pageContainer}>
@@ -117,56 +117,63 @@ export default function AfiliatesPage() {
                   </Card>
                   
                   {connected && publicKey && (
-                      <Card>
-                          <CardHeader>
-                              <CardTitle>Painel de Ganhos</CardTitle>
-                              <CardDescription>Acompanhe o seu desempenho e comissões.</CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                              {isLoading ? (
-                                  <div className={styles.loadingContainer}>
-                                      <div className={styles.spinner}></div>
-                                      <p>A carregar os seus ganhos...</p>
-                                  </div>
-                              ) : error ? (
-                                  <p className={styles.errorText}>Erro ao carregar ganhos: {error}</p>
-                              ) : earnings ? (
-                                  <div className={styles.earningsDashboard}>
-                                      <div className={styles.earningsGrid}>
-                                          <div className={styles.earningStat}>
-                                              <div className={styles.statHeader}><IconTrendingUp /><span>Ganhos Totais</span></div>
-                                              <p className={styles.statValue}>{earnings.totalEarningsSol.toFixed(4)} SOL</p>
-                                          </div>
-                                          <div className={styles.earningStat}>
-                                              <div className={styles.statHeader}><IconUsers /><span>Referências</span></div>
-                                              <p className={styles.statValue}>{earnings.referralCount}</p>
-                                          </div>
+                    <>
+                        <Button onClick={handleToggleEarnings} className="w-full">
+                            {showEarnings ? 'Ocultar Ganhos e Últimas Comissões' : 'Mostrar Ganhos e Últimas Comissões'}
+                        </Button>
+                      {showEarnings && (
+                          <Card>
+                              <CardHeader>
+                                  <CardTitle>Painel de Ganhos</CardTitle>
+                                  <CardDescription>Acompanhe o seu desempenho e comissões.</CardDescription>
+                              </CardHeader>
+                              <CardContent>
+                                  {isLoading ? (
+                                      <div className={styles.loadingContainer}>
+                                          <div className={styles.spinner}></div>
+                                          <p>A carregar os seus ganhos...</p>
                                       </div>
-                                      
-                                      <h4 className={styles.historyTitle}>Últimas Comissões</h4>
-                                      {earnings.transactions.length > 0 ? (
-                                          <div className={styles.historyTable}>
-                                              {earnings.transactions.map(tx => (
-                                                  <div key={tx.signature} className={styles.historyRow}>
-                                                      <div className={styles.historyDate}>
-                                                          {new Date(tx.blockTime * 1000).toLocaleString()}
-                                                      </div>
-                                                      <div className={styles.historyAmount}>
-                                                          +{tx.amount.toFixed(4)} SOL
-                                                      </div>
-                                                      <a href={`https://solscan.io/tx/${tx.signature}`} target="_blank" rel="noopener noreferrer" className={styles.historyLink}>
-                                                          Ver Tx
-                                                      </a>
-                                                  </div>
-                                              ))}
+                                  ) : error ? (
+                                      <p className={styles.errorText}>Erro ao carregar ganhos: {error}</p>
+                                  ) : earnings ? (
+                                      <div className={styles.earningsDashboard}>
+                                          <div className={styles.earningsGrid}>
+                                              <div className={styles.earningStat}>
+                                                  <div className={styles.statHeader}><IconTrendingUp /><span>Ganhos Totais</span></div>
+                                                  <p className={styles.statValue}>{earnings.totalEarningsSol.toFixed(4)} SOL</p>
+                                              </div>
+                                              <div className={styles.earningStat}>
+                                                  <div className={styles.statHeader}><IconUsers /><span>Referências</span></div>
+                                                  <p className={styles.statValue}>{earnings.referralCount}</p>
+                                              </div>
                                           </div>
-                                      ) : (
-                                          <p className={styles.noHistoryText}>Ainda não há transações de comissão.</p>
-                                      )}
-                                  </div>
-                              ) : null}
-                          </CardContent>
-                      </Card>
+                                          
+                                          <h4 className={styles.historyTitle}>Últimas Comissões</h4>
+                                          {earnings.transactions.length > 0 ? (
+                                              <div className={styles.historyTable}>
+                                                  {earnings.transactions.map(tx => (
+                                                      <div key={tx.signature} className={styles.historyRow}>
+                                                          <div className={styles.historyDate}>
+                                                              {new Date(tx.blockTime * 1000).toLocaleString()}
+                                                          </div>
+                                                          <div className={styles.historyAmount}>
+                                                              +{tx.amount.toFixed(4)} SOL
+                                                          </div>
+                                                          <a href={`https://solscan.io/tx/${tx.signature}`} target="_blank" rel="noopener noreferrer" className={styles.historyLink}>
+                                                              Ver Tx
+                                                          </a>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          ) : (
+                                              <p className={styles.noHistoryText}>Ainda não há transações de comissão.</p>
+                                          )}
+                                      </div>
+                                  ) : null}
+                              </CardContent>
+                          </Card>
+                      )}
+                      </>
                   )}
               </div>
           </div>
