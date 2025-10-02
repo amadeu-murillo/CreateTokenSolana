@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import styles from "./AddLiquidity.module.css";
-// CORREÇÃO: Importa o componente 'Notification' como default
 import Notification from '@/components/ui/Notification';
+import {type Amm } from '@/lib/idl/amm';
 
 export default function AddLiquidityPage() {
     const { connection } = useConnection();
@@ -23,12 +23,12 @@ export default function AddLiquidityPage() {
     const [solAmount, setSolAmount] = useState('');
     
     const [isLoading, setIsLoading] = useState(false);
-    const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
     const [signature, setSignature] = useState('');
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
-        if (!publicKey) {
+        if (!publicKey || !sendTransaction) {
             setFeedback({ type: 'error', message: 'Por favor, conecte sua carteira primeiro.' });
             return;
         }
@@ -58,7 +58,9 @@ export default function AddLiquidityPage() {
 
             const transaction = VersionedTransaction.deserialize(bs58.decode(data.transaction));
             
+            // A transação já vem parcialmente assinada do backend
             const txSignature = await sendTransaction(transaction, connection);
+            await connection.confirmTransaction(txSignature, 'confirmed');
             setSignature(txSignature);
             
             setFeedback({
@@ -80,9 +82,9 @@ export default function AddLiquidityPage() {
                 <div className={styles.formContainer}>
                     <Card>
                         <CardHeader>
-                            <CardTitle>Criar Pool de Liquidez na Raydium</CardTitle>
+                            <CardTitle>Criar Pool de Liquidez</CardTitle>
                             <CardDescription>
-                                Crie um novo pool AMM (Token/SOL) na Raydium.
+                                Crie um novo pool AMM (Token/SOL) com o nosso programa.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -111,17 +113,10 @@ export default function AddLiquidityPage() {
                             {feedback && (
                                 <Notification
                                     message={feedback.message}
-                                    type={feedback.type as 'success' | 'error' | 'info'}
+                                    type={feedback.type}
                                     onClose={() => setFeedback(null)}
+                                    txId={signature}
                                 />
-                            )}
-                            {signature && (
-                                <div className={styles.signature}>
-                                    <p>Transação enviada!</p>
-                                    <a href={`https://solscan.io/tx/${signature}`} target="_blank" rel="noopener noreferrer">
-                                        Ver na Solscan
-                                    </a>
-                                </div>
                             )}
                         </CardContent>
                     </Card>
@@ -144,3 +139,7 @@ export default function AddLiquidityPage() {
         </div>
     );
 }
+
+// Type for the IDL
+export type AmmType = Amm;
+
