@@ -5,29 +5,64 @@
     padding: 0 1.5rem;
 }
 
-.grid {
+.pageHeader {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.pageTitle {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.pageDescription {
+    font-size: 1.1rem;
+    color: hsl(var(--muted-foreground));
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.container {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: 1fr;
     gap: 2rem;
     align-items: start;
 }
 
-@media (max-width: 900px) {
-    .grid {
-        grid-template-columns: 1fr;
+/* Em telas maiores, layout de duas colunas */
+@media (min-width: 1024px) {
+    .container {
+        grid-template-columns: 1.5fr 1fr;
     }
 }
 
-.formContainer,
-.sidebar {
+.actionCard {
     width: 100%;
 }
 
+.infoCard {
+    position: sticky;
+    top: 6rem; /* Ajuste conforme a altura do seu header */
+}
+
 .cardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.cardFooter {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    align-items: flex-start;
+    gap: 1rem;
+    width: 100%;
+    padding-top: 1.5rem !important; /* Adicionado para garantir o espaçamento */
+    border-top: 1px solid hsl(var(--border));
 }
+
 
 .inputGroup {
     display: flex;
@@ -35,121 +70,112 @@
     gap: 0.5rem;
 }
 
+.featureList {
+    list-style: none;
+    padding-left: 0;
+    margin: 0 0 1.5rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.featureList li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.featureList span {
+    background-color: hsl(var(--primary));
+    color: white;
+    font-size: 0.75rem;
+    font-weight: bold;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.infoText {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    line-height: 1.5;
+}
+
+/* --- Mensagens de Feedback --- */
+.message {
+  width: 100%;
+  padding: 1rem;
+  border-radius: var(--radius);
+  text-align: center;
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+}
+
+.status { background-color: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.5); color: #a3c5ff; }
+.error { background-color: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.5); color: #f89a9a; }
+.success { background-color: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.5); color: #84e1bc; }
+
+.link {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    font-weight: 500;
+}
+
 .amountHeader {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: 0.25rem; /* 4px */
 }
 
 .balance {
-    font-size: 0.875rem;
+    font-size: 0.875rem; /* 14px */
     color: hsl(var(--muted-foreground));
 }
 
-/* Sidebar Styles */
-.sidebarTitle {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin-bottom: 1.5rem;
-    color: hsl(var(--foreground));
-}
-
-.tutorialCard {
-    margin-bottom: 1rem;
-    background-color: hsl(var(--card));
-}
-
-.tutorialCardContent {
+.amountInputContainer {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 1.25rem !important;
+    gap: 0.5rem; /* 8px */
 }
 
-.tutorialIcon {
+.maxButton {
+    height: 40px; /* Mesma altura do input */
+    padding: 0.5rem 0.75rem; /* 8px 12px - padding ajustado */
     flex-shrink: 0;
-    width: 2.5rem;
-    height: 2.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background-image: var(--primary-gradient);
-    color: white;
 }
 
-.tutorialIcon svg {
-    width: 1.25rem;
-    height: 1.25rem;
+.amountInput {
+    flex-grow: 1;
+    min-width: 0;
 }
 
-.tutorialText {
-    display: flex;
-    flex-direction: column;
-}
-
-.tutorialTitle {
+.sidebarTitle {
+    font-size: 1.25rem;
     font-weight: 600;
-    color: hsl(var(--card-foreground));
 }
 
-.tutorialDescription {
-    font-size: 0.875rem;
-    color: hsl(var(--muted-foreground));
-}
-
-/* --- Caixa de Informação --- */
 .infoBox {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
-    background-color: hsla(48, 96%, 59%, 0.1);
-    border: 1px solid hsla(48, 96%, 59%, 0.5);
-    color: hsl(48, 96%, 70%);
+    background-color: hsla(210, 96%, 59%, 0.1);
+    border: 1px solid hsla(210, 96%, 59%, 0.5);
+    color: hsl(210, 96%, 40%);
     padding: 1rem;
     border-radius: var(--radius);
     font-size: 0.9rem;
 }
-
 .dark .infoBox {
-    color: hsl(48, 96%, 80%);
+    color: hsl(210, 96%, 80%);
 }
-
 .infoBox svg {
     flex-shrink: 0;
     width: 1.25rem;
     height: 1.25rem;
     margin-top: 2px;
-}
-
-/* Estilos para "Em Desenvolvimento" */
-.wipContainer {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 3rem 1rem;
-    gap: 1rem;
-    min-height: 250px;
-    border: 2px dashed hsl(var(--border));
-    border-radius: var(--radius);
-    background-color: hsl(var(--muted) / 0.3);
-}
-
-.wipContainer svg {
-    width: 2.5rem;
-    height: 2.5rem;
-    color: hsl(var(--primary));
-}
-
-.wipTitle {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: hsl(var(--foreground));
-}
-
-.wipText {
-    max-width: 400px;
-    color: hsl(var(--muted-foreground));
 }
