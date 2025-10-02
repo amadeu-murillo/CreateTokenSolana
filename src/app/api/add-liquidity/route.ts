@@ -41,15 +41,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Dados da requisição inválidos.', details: validation.error.flatten() }, { status: 400 });
     }
 
-    // O serviço precisa de uma Wallet, mas como a assinatura final é no cliente,
-    // podemos usar uma dummy wallet aqui.
-    const dummyWallet = new Wallet(Keypair.generate());
-
     // 2. Chama o serviço do AMM customizado para construir a transação
-    const result = await customAmmService.createPoolAndAddLiquidity({
-      ...validation.data,
-      wallet: dummyWallet
-    });
+    const result = await customAmmService.createPoolAndAddLiquidity(validation.data);
 
     // 3. Retorna a transação serializada com sucesso
     return NextResponse.json(result);

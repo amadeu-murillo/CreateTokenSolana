@@ -7,6 +7,7 @@ import {
   VersionedTransaction,
   LAMPORTS_PER_SOL,
   SYSVAR_RENT_PUBKEY,
+  Transaction,
 } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
@@ -15,16 +16,31 @@ import {
   createAssociatedTokenAccountInstruction,
   createSyncNativeInstruction,
   createCloseAccountInstruction,
-  getMinimumBalanceForRentExemptAccount,
   ACCOUNT_SIZE,
   createInitializeAccountInstruction,
 } from '@solana/spl-token';
 import { Program, AnchorProvider, Wallet, BN } from '@coral-xyz/anchor';
-import AmmIDL from "@/lib/idl/amm.json";
+import { IDL, type Amm } from '@/lib/idl/amm';
 import { CreatePoolWithSolParams } from '@/types/api';
 import { RPC_ENDPOINT } from '@/lib/constants';
 
-const PROGRAM_ID = new PublicKey(AmmIDL.metadata.address);
+const PROGRAM_ID = new PublicKey(IDL.metadata.address);
+
+// Helper para criar uma carteira "dummy" que satisfaz a interface do AnchorProvider
+const createDummyWallet = (): Wallet => {
+  const payer = Keypair.generate();
+  return {
+    payer,
+    publicKey: payer.publicKey,
+    signTransaction: <T extends Transaction | VersionedTransaction>(tx: T): Promise<T> => {
+      throw new Error("DummyWallet não pode assinar transações. A transação deve ser assinada no lado do cliente.");
+    },
+    signAllTransactions: <T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]> => {
+      throw new Error("DummyWallet não pode assinar transações. As transações devem ser assinadas no lado do cliente.");
+    },
+  };
+};
+
 
 class CustomAmmService {
   private connection: Connection;
@@ -33,131 +49,160 @@ class CustomAmmService {
 
   constructor() {
     this.connection = new Connection(RPC_ENDPOINT, 'confirmed');
-    // Use a dummy wallet for the provider since we are only building transactions
-    const dummyWallet = new Wallet(Keypair.generate());
+    // CORREÇÃO: Use a função helper para criar uma carteira compatível.
+    const dummyWallet = createDummyWallet();
     this.provider = new AnchorProvider(this.connection, dummyWallet, { commitment: 'confirmed' });
-    this.program = new Program<Amm>(AmmIDL, PROGRAM_ID, this.provider);
+    this.program = new Program<Amm>(IDL, PROGRAM_ID, this.provider);
   }
 
   async createPoolAndAddLiquidity(params: CreatePoolWithSolParams) {
-    const {
-      baseTokenMint,
-      initialBaseTokenAmount,
-      initialSolAmount,
-      userWalletAddress,
-      baseTokenDecimals,
-    } = params;
+    console.log("Iniciando createPoolAndAddLiquidity com os parâmetros:", params);
+    try {
+        const {
+        baseTokenMint,
+        initialBaseTokenAmount,
+        initialSolAmount,
+        userWalletAddress,
+        baseTokenDecimals,
+        } = params;
 
-    const userPublicKey = new PublicKey(userWalletAddress);
-    const baseMint = new PublicKey(baseTokenMint);
-    const quoteMint = NATIVE_MINT; // WSOL
+        const userPublicKey = new PublicKey(userWalletAddress);
+        const baseMint = new PublicKey(baseTokenMint);
+        const quoteMint = NATIVE_MINT; // WSOL
 
-    const poolKeypair = Keypair.generate();
-    const lpMintKeypair = Keypair.generate();
-    const vaultAKeypair = Keypair.generate();
-    const vaultBKeypair = Keypair.generate();
-    const wrappedSolAccount = Keypair.generate();
+        const poolKeypair = Keypair.generate();
+        const lpMintKeypair = Keypair.generate();
+        const vaultAKeypair = Keypair.generate();
+        const vaultBKeypair = Keypair.generate();
+        const wrappedSolAccount = Keypair.generate();
 
-    const [poolAuthority] = PublicKey.findProgramAddressSync(
-      [poolKeypair.publicKey.toBuffer()],
-      this.program.programId
-    );
+        console.log("Chaves geradas:", {
+            pool: poolKeypair.publicKey.toBase58(),
+            lpMint: lpMintKeypair.publicKey.toBase58(),
+            vaultA: vaultAKeypair.publicKey.toBase58(),
+            vaultB: vaultBKeypair.publicKey.toBase58(),
+        });
 
-    const userTokenA = getAssociatedTokenAddressSync(baseMint, userPublicKey);
-    const userLpToken = getAssociatedTokenAddressSync(lpMintKeypair.publicKey, userPublicKey);
+        const [poolAuthority] = PublicKey.findProgramAddressSync(
+        [poolKeypair.publicKey.toBuffer()],
+        this.program.programId
+        );
+        console.log("PDA da pool authority derivado:", poolAuthority.toBase58());
 
-    const instructions = [];
+        const userTokenA = getAssociatedTokenAddressSync(baseMint, userPublicKey);
+        const userLpToken = getAssociatedTokenAddressSync(lpMintKeypair.publicKey, userPublicKey);
 
-    // 1. Create temporary account for WSOL
-    const rentForWrappedSol = await this.connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE);
-    instructions.push(
-      SystemProgram.createAccount({
-        fromPubkey: userPublicKey,
-        newAccountPubkey: wrappedSolAccount.publicKey,
-        lamports: rentForWrappedSol,
-        space: ACCOUNT_SIZE,
-        programId: TOKEN_PROGRAM_ID,
-      }),
-      createInitializeAccountInstruction(wrappedSolAccount.publicKey, quoteMint, userPublicKey),
-      SystemProgram.transfer({
-          fromPubkey: userPublicKey,
-          toPubkey: wrappedSolAccount.publicKey,
-          lamports: Math.ceil(initialSolAmount * LAMPORTS_PER_SOL),
-      }),
-      createSyncNativeInstruction(wrappedSolAccount.publicKey)
-    );
+        const instructions = [];
 
-    // 2. Create user's ATA for the LP token if it doesn't exist
-    const userLpTokenAccountInfo = await this.connection.getAccountInfo(userLpToken);
-    if (userLpTokenAccountInfo === null) {
-      instructions.push(
-        createAssociatedTokenAccountInstruction(userPublicKey, userLpToken, userPublicKey, lpMintKeypair.publicKey)
-      );
+        // 1. Create temporary account for WSOL
+        console.log("A preparar instruções para a conta WSOL temporária...");
+        const rentForWrappedSol = await this.connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE);
+        instructions.push(
+        SystemProgram.createAccount({
+            fromPubkey: userPublicKey,
+            newAccountPubkey: wrappedSolAccount.publicKey,
+            lamports: rentForWrappedSol,
+            space: ACCOUNT_SIZE,
+            programId: TOKEN_PROGRAM_ID,
+        }),
+        createInitializeAccountInstruction(wrappedSolAccount.publicKey, quoteMint, userPublicKey),
+        SystemProgram.transfer({
+            fromPubkey: userPublicKey,
+            toPubkey: wrappedSolAccount.publicKey,
+            lamports: Math.ceil(initialSolAmount * LAMPORTS_PER_SOL),
+        }),
+        createSyncNativeInstruction(wrappedSolAccount.publicKey)
+        );
+        console.log("Instruções WSOL adicionadas.");
+
+        // 2. Create user's ATA for the LP token if it doesn't exist
+        console.log("A verificar a conta de token LP do utilizador...");
+        const userLpTokenAccountInfo = await this.connection.getAccountInfo(userLpToken);
+        if (userLpTokenAccountInfo === null) {
+        console.log("Conta de token LP não encontrada. A adicionar instrução para criar.");
+        instructions.push(
+            createAssociatedTokenAccountInstruction(userPublicKey, userLpToken, userPublicKey, lpMintKeypair.publicKey)
+        );
+        } else {
+            console.log("Conta de token LP do utilizador já existe.");
+        }
+        
+        // 3. Instruction to initialize the pool (from our program Anchor)
+        console.log("A construir a instrução initializePool...");
+        const initPoolIx = await this.program.methods
+            .initializePool(100) // Taxa de 1% (100 basis points)
+            .accounts({
+                pool: poolKeypair.publicKey,
+                poolAuthority: poolAuthority,
+                mintA: baseMint,
+                mintB: quoteMint,
+                vaultA: vaultAKeypair.publicKey,
+                vaultB: vaultBKeypair.publicKey,
+                lpMint: lpMintKeypair.publicKey,
+                payer: userPublicKey,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                systemProgram: SystemProgram.programId,
+                rent: SYSVAR_RENT_PUBKEY,
+            })
+            .instruction();
+        
+        instructions.push(initPoolIx);
+        console.log("Instrução initializePool construída com sucesso.");
+
+        // 4. Instruction to add initial liquidity
+        console.log("A construir a instrução addLiquidity...");
+        const addLiquidityIx = await this.program.methods
+            .addLiquidity(new BN(initialBaseTokenAmount * Math.pow(10, baseTokenDecimals)), new BN(initialSolAmount * LAMPORTS_PER_SOL))
+            .accounts({
+                pool: poolKeypair.publicKey,
+                lpMint: lpMintKeypair.publicKey,
+                vaultA: vaultAKeypair.publicKey,
+                vaultB: vaultBKeypair.publicKey,
+                userTokenA: userTokenA,
+                userTokenB: wrappedSolAccount.publicKey,
+                userLpToken: userLpToken,
+                poolAuthority: poolAuthority,
+                user: userPublicKey,
+                tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .instruction();
+        instructions.push(addLiquidityIx);
+        console.log("Instrução addLiquidity construída com sucesso.");
+
+        // 5. Close the temporary WSOL account
+        instructions.push(
+        createCloseAccountInstruction(wrappedSolAccount.publicKey, userPublicKey, userPublicKey)
+        );
+        console.log("Instrução para fechar a conta WSOL adicionada.");
+
+        const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
+        console.log("Blockhash recente obtido:", blockhash);
+
+        const messageV0 = new TransactionMessage({
+        payerKey: userPublicKey,
+        recentBlockhash: blockhash,
+        instructions,
+        }).compileToV0Message();
+
+        const transaction = new VersionedTransaction(messageV0);
+
+        // Sign with the newly generated accounts
+        console.log("A assinar a transação com as contas geradas...");
+        transaction.sign([poolKeypair, vaultAKeypair, vaultBKeypair, lpMintKeypair, wrappedSolAccount]);
+
+        const serializedTransaction = Buffer.from(transaction.serialize()).toString('base64');
+        console.log("Transação serializada com sucesso.");
+
+        return {
+        transaction: serializedTransaction,
+        ammId: poolKeypair.publicKey.toBase58(),
+        lpTokenAddress: lpMintKeypair.publicKey.toBase58(),
+        };
+    } catch (error) {
+        console.error("ERRO DETALHADO em createPoolAndAddLiquidity:", error);
+        // Lança o erro para que a rota da API possa capturá-lo e retornar uma resposta 500
+        throw error;
     }
-    
-    // 3. Instruction to initialize the pool (from our program Anchor)
-    const initPoolIx = await this.program.methods
-        .initializePool(100) // Taxa de 1% (100 basis points)
-        .accounts({
-          pool: poolKeypair.publicKey,
-          poolAuthority,
-          mintA: baseMint,
-          mintB: quoteMint,
-          vaultA: vaultAKeypair.publicKey,
-          vaultB: vaultBKeypair.publicKey,
-          lpMint: lpMintKeypair.publicKey,
-          payer: userPublicKey,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          systemProgram: SystemProgram.programId,
-          rent: SYSVAR_RENT_PUBKEY,
-        })
-        .instruction();
-    
-    instructions.push(initPoolIx);
-
-    // 4. Instruction to add initial liquidity
-    const addLiquidityIx = await this.program.methods
-        .addLiquidity(new BN(initialBaseTokenAmount * Math.pow(10, baseTokenDecimals)), new BN(initialSolAmount * LAMPORTS_PER_SOL))
-        .accounts({
-          pool: poolKeypair.publicKey,
-          lpMint: lpMintKeypair.publicKey,
-          vaultA: vaultAKeypair.publicKey,
-          vaultB: vaultBKeypair.publicKey,
-          userTokenA: userTokenA,
-          userTokenB: wrappedSolAccount.publicKey,
-          userLpToken: userLpToken,
-          poolAuthority: poolAuthority,
-          user: userPublicKey,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        })
-        .instruction();
-    instructions.push(addLiquidityIx);
-
-    // 5. Close the temporary WSOL account
-    instructions.push(
-      createCloseAccountInstruction(wrappedSolAccount.publicKey, userPublicKey, userPublicKey)
-    );
-
-    const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
-
-    const messageV0 = new TransactionMessage({
-      payerKey: userPublicKey,
-      recentBlockhash: blockhash,
-      instructions,
-    }).compileToV0Message();
-
-    const transaction = new VersionedTransaction(messageV0);
-
-    // Sign with the newly generated accounts
-    transaction.sign([poolKeypair, vaultAKeypair, vaultBKeypair, lpMintKeypair, wrappedSolAccount]);
-
-    const serializedTransaction = Buffer.from(transaction.serialize()).toString('base64');
-
-    return {
-      transaction: serializedTransaction,
-      ammId: poolKeypair.publicKey.toBase58(),
-      lpTokenAddress: lpMintKeypair.publicKey.toBase58(),
-    };
   }
 }
 

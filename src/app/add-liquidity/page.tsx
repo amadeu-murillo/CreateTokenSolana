@@ -140,6 +140,5 @@ export default function AddLiquidityPage() {
     );
 }
 
-// Type for the IDL
-export type AmmType = Amm;
+
 
