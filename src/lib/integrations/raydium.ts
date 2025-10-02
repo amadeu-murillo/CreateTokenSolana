@@ -9,27 +9,27 @@ import {
   Keypair,
   SystemProgram,
   LAMPORTS_PER_SOL,
+  TransactionInstruction,
 } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
   NATIVE_MINT,
   getAssociatedTokenAddressSync,
-  createAssociatedTokenAccountInstruction,
   createSyncNativeInstruction,
   createCloseAccountInstruction,
+  createAssociatedTokenAccountInstruction,
 } from '@solana/spl-token';
 import {
   Liquidity,
-  Token,
-  TokenAmount,
-  Percent,
-  LiquidityPoolKeys,
   MAINNET_PROGRAM_ID,
   LiquidityPoolInfo,
+  LiquidityPoolKeysV4,
+  Market,
 } from '@raydium-io/raydium-sdk';
 import { RPC_ENDPOINT } from '@/lib/constants';
 import { CreatePoolWithSolParams } from '@/types/api';
 import bs58 from 'bs58';
+import BN from 'bn.js';
 
 class RaydiumIntegration {
   private connection: Connection;
@@ -38,61 +38,63 @@ class RaydiumIntegration {
     this.connection = new Connection(RPC_ENDPOINT, 'confirmed');
   }
 
-  /**
-   * Constrói a transação para criar um novo pool de liquidez na Raydium
-   * usando o programa AMM v4 (Constant Product).
-   */
   async buildCreatePoolWithSolTransaction(params: CreatePoolWithSolParams) {
     const {
+      marketId: marketIdString,
       baseTokenMint,
       baseTokenDecimals,
       initialBaseTokenAmount,
       initialSolAmount,
       userWalletAddress,
     } = params;
-
+    
+    const marketId = new PublicKey(marketIdString);
     const userPublicKey = new PublicKey(userWalletAddress);
     const baseMint = new PublicKey(baseTokenMint);
-    const quoteMint = NATIVE_MINT; // WSOL
 
-    const baseToken = new Token(TOKEN_PROGRAM_ID, baseMint, baseTokenDecimals);
-    const quoteToken = new Token(TOKEN_PROGRAM_ID, quoteMint, 9, 'WSOL', 'Wrapped SOL');
+    // ETAPA 1: Carregar todas as chaves necessárias do mercado
+    const marketInfo = await this.connection.getAccountInfo(marketId);
+    if (!marketInfo) throw new Error('Market not found.');
+    const marketState = Market.getLayouts(3).state.decode(marketInfo.data);
 
-    // ---- 1. Gerar chaves e endereços para o novo pool ----
-    // O SDK da Raydium calcula deterministicamente os endereços das contas do pool
-    const { authority, marketId, lpMint, ...poolKeys } = Liquidity.getAssociatedPoolKeys({
-        version: 4,
-        marketVersion: 3, // OpenBook market version
-        baseMint,
-        quoteMint,
-        baseDecimals: baseTokenDecimals,
-        quoteDecimals: 9,
-        programId: MAINNET_PROGRAM_ID.AmmV4,
-        marketProgramId: MAINNET_PROGRAM_ID.OPENBOOK_MARKET, // OpenBook program id
+    // ETAPA 2: Gerar as chaves associadas ao pool
+    const associatedPoolKeys = Liquidity.getAssociatedPoolKeys({
+      version: 4,
+      marketVersion: 3,
+      marketId,
+      baseMint,
+      quoteMint: NATIVE_MINT,
+      baseDecimals: baseTokenDecimals,
+      quoteDecimals: 9,
+      programId: MAINNET_PROGRAM_ID.AmmV4,
+      marketProgramId: MAINNET_PROGRAM_ID.OPENBOOK_MARKET,
     });
+    
+    // ETAPA 3: Construir o objeto 'poolKeys' completo
+    const poolKeys: LiquidityPoolKeysV4 = {
+      ...associatedPoolKeys,
+      marketBaseVault: marketState.baseVault,
+      marketQuoteVault: marketState.quoteVault,
+      marketBids: marketState.bids,
+      marketAsks: marketState.asks,
+      marketEventQueue: marketState.eventQueue,
+    };
 
     const poolInfo: LiquidityPoolInfo = {
-        baseDecimals: baseTokenDecimals,
-        quoteDecimals: 9,
-        lpDecimals: baseTokenDecimals,
-        lpSupply: BigInt(0),
-        startTime: BigInt(Math.floor(Date.now() / 1000)), // Iniciar agora
-        pnl: [0, 0],
-        // Valores padrão para um novo pool
-        status: 0,
-        minOrderSize: 0,
-        baseReserve: BigInt(0),
-        quoteReserve: BigInt(0),
+      startTime: new BN(Math.floor(Date.now() / 1000)),
+      baseDecimals: baseTokenDecimals,
+      quoteDecimals: 9,
+      lpDecimals: baseTokenDecimals,
+      lpSupply: new BN(0),
+      status: new BN(0),
+      baseReserve: new BN(0),
+      quoteReserve: new BN(0),
     };
     
-    // ---- 2. Construir as instruções ----
-    const instructions = [];
+    const instructions: TransactionInstruction[] = [];
+    instructions.push(ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }));
+    instructions.push(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }));
 
-    // Otimização de taxas
-    instructions.push(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }));
-    instructions.push(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }));
-
-    // Conta temporária de WSOL para depositar a liquidez de SOL
     const wrappedSolAccount = Keypair.generate();
     instructions.push(
       SystemProgram.createAccount({
@@ -110,48 +112,47 @@ class RaydiumIntegration {
       createSyncNativeInstruction(wrappedSolAccount.publicKey)
     );
     
-    // Instrução para criar e inicializar o pool
-    const initPoolInstruction = Liquidity.makeCreatePoolV4Instruction({
-        poolKeys: { authority, marketId, lpMint, ...poolKeys },
-        userKeys: {
-            payer: userPublicKey,
-            tokenAccounts: [], // Será preenchido pelo SDK
-        },
-        associatedPoolKeys: poolKeys,
-        startTime: poolInfo.startTime,
+    // ETAPA 4: Corrigir a chamada de criação do pool
+    const { instruction: initPoolInstruction } = Liquidity.makeCreatePoolV4InstructionV2({
+      poolKeys,
+      userKeys: { payer: userPublicKey },
+      poolInfo,
     });
     instructions.push(initPoolInstruction);
-
-
-    // Instrução para adicionar a liquidez inicial
-    const baseTokenAmount = new TokenAmount(baseToken, initialBaseTokenAmount, true);
-    const quoteTokenAmount = new TokenAmount(quoteToken, initialSolAmount, true);
-
-    const userTokenAccount = getAssociatedTokenAddressSync(baseMint, userPublicKey);
-
-    const addLiqInstruction = Liquidity.makeAddLiquidityInstruction({
-        poolKeys: { authority, marketId, lpMint, ...poolKeys },
-        userKeys: {
-            owner: userPublicKey,
-            payer: userPublicKey,
-            tokenAccounts: [
-                { account: userTokenAccount, mint: baseMint },
-                { account: wrappedSolAccount.publicKey, mint: quoteMint },
-            ],
-        },
-    }, {
-        baseAmount: BigInt(baseTokenAmount.raw.toString()),
-        quoteAmount: BigInt(quoteTokenAmount.raw.toString()),
-        fixedSide: 'base',
-    }).instruction;
-    instructions.push(addLiqInstruction);
     
-    // Fechar a conta temporária de WSOL
+    const userBaseTokenAccount = getAssociatedTokenAddressSync(baseMint, userPublicKey);
+    const lpTokenAccount = getAssociatedTokenAddressSync(poolKeys.lpMint, userPublicKey);
+    
+    // Adicionar instrução para criar a conta de token LP, se necessário
+    instructions.push(
+        createAssociatedTokenAccountInstruction(
+            userPublicKey, // payer
+            lpTokenAccount, // ata
+            userPublicKey, // owner
+            poolKeys.lpMint // mint
+        )
+    );
+
+
+    // ETAPA 5: Corrigir a chamada de adição de liquidez
+    const { innerTransaction } = Liquidity.makeAddLiquidityInstructionV2({
+      poolKeys,
+      userKeys: {
+        owner: userPublicKey,
+        baseTokenAccount: userBaseTokenAccount,
+        quoteTokenAccount: wrappedSolAccount.publicKey,
+        lpTokenAccount: lpTokenAccount,
+      },
+      baseAmount: new BN(initialBaseTokenAmount * (10 ** baseTokenDecimals)),
+      quoteAmount: new BN(initialSolAmount * (10 ** 9)),
+      fixedSide: 'base',
+    });
+    instructions.push(...innerTransaction.instructions);
+    
     instructions.push(
       createCloseAccountInstruction(wrappedSolAccount.publicKey, userPublicKey, userPublicKey)
     );
 
-    // ---- 3. Compilar e serializar a transação ----
     const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
     const messageV0 = new TransactionMessage({
       payerKey: userPublicKey,
@@ -160,17 +161,17 @@ class RaydiumIntegration {
     }).compileToV0Message();
 
     const transaction = new VersionedTransaction(messageV0);
-    // A conta de WSOL precisa assinar a transação
     transaction.sign([wrappedSolAccount]);
 
     const serializedTransaction = bs58.encode(transaction.serialize());
 
     return {
       transaction: serializedTransaction,
-      ammId: poolKeys.id.toBase58(),
-      lpTokenAddress: lpMint.toBase58(),
+      ammId: associatedPoolKeys.id.toBase58(),
+      lpTokenAddress: associatedPoolKeys.lpMint.toBase58(),
     };
   }
 }
 
 export const raydiumIntegration = new RaydiumIntegration();
+

@@ -5,9 +5,15 @@ import { z } from 'zod';
 import { liquidityService } from '@/lib/services/liquidityService';
 import { PublicKey } from '@solana/web3.js';
 
-// Define um "schema" para validar os dados de entrada da requisição.
-// Isso garante que os dados estão no formato correto antes de prosseguir.
 const addLiquiditySchema = z.object({
+  marketId: z.string().refine((val) => { // <-- Validação do Market ID adicionada
+    try {
+      new PublicKey(val);
+      return true;
+    } catch {
+      return false;
+    }
+  }, { message: 'Market ID inválido.' }),
   baseTokenMint: z.string().refine((val) => {
     try {
       new PublicKey(val);
@@ -33,24 +39,18 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // 1. Valida o corpo da requisição usando o schema do Zod
     const validation = addLiquiditySchema.safeParse(body);
     if (!validation.success) {
-      // Se a validação falhar, retorna um erro 400 com os detalhes
       return NextResponse.json({ error: 'Dados da requisição inválidos.', details: validation.error.flatten() }, { status: 400 });
     }
 
-    // 2. Chama o serviço de liquidez para construir a transação
-    // A camada da API não sabe sobre Raydium, ela apenas delega a tarefa.
     const result = await liquidityService.createRaydiumPoolWithSol(validation.data);
 
-    // 3. Retorna a transação serializada com sucesso
     return NextResponse.json(result);
 
   } catch (error) {
     console.error('[API Add-Liquidity] Erro detalhado:', error);
     const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro interno no servidor.';
-    // Retorna um erro 500 genérico para o cliente
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
