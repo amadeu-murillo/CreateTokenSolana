@@ -2,8 +2,9 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { liquidityService } from '@/lib/services/liquidityService';
-import { PublicKey } from '@solana/web3.js';
+import { customAmmService } from '@/lib/services/customAmmService';
+import { Keypair, PublicKey } from '@solana/web3.js';
+import { Wallet } from '@coral-xyz/anchor';
 
 // Define um "schema" para validar os dados de entrada da requisição.
 // Isso garante que os dados estão no formato correto antes de prosseguir.
@@ -40,9 +41,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Dados da requisição inválidos.', details: validation.error.flatten() }, { status: 400 });
     }
 
-    // 2. Chama o serviço de liquidez para construir a transação
-    // A camada da API não sabe sobre Raydium, ela apenas delega a tarefa.
-    const result = await liquidityService.createRaydiumPoolWithSol(validation.data);
+    // O serviço precisa de uma Wallet, mas como a assinatura final é no cliente,
+    // podemos usar uma dummy wallet aqui.
+    const dummyWallet = new Wallet(Keypair.generate());
+
+    // 2. Chama o serviço do AMM customizado para construir a transação
+    const result = await customAmmService.createPoolAndAddLiquidity({
+      ...validation.data,
+      wallet: dummyWallet
+    });
 
     // 3. Retorna a transação serializada com sucesso
     return NextResponse.json(result);
@@ -54,3 +61,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+
