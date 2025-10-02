@@ -1,7 +1,6 @@
 // src/types/api.ts
 
 export interface CreatePoolWithSolParams {
-  marketId: string; // Campo adicionado para o ID do mercado OpenBook
   baseTokenMint: string;
   baseTokenDecimals: number;
   initialBaseTokenAmount: number;
