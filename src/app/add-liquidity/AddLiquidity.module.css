@@ -179,3 +179,46 @@
     height: 1.25rem;
     margin-top: 2px;
 }
+/* Adicione estas classes ao final do arquivo AddLiquidity.module.css */
+
+.labelContainer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.maxButton {
+    background-color: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.maxButton:hover:not(:disabled) {
+    background-color: #444;
+}
+
+.maxButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Estilos para o grupo de consentimento (opcional, pode já existir) */
+.consentGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem; /* 12px */
+    margin-bottom: 1.25rem; /* 20px */
+}
+
+.consentLabel {
+    font-size: 0.875rem; /* 14px */
+    line-height: 1.25rem; /* 20px */
+    color: #a1a1aa; /* Cor de texto sutil */
+    cursor: pointer;
+}

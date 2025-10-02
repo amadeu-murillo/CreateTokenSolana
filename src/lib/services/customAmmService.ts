@@ -49,7 +49,6 @@ class CustomAmmService {
 
   constructor() {
     this.connection = new Connection(RPC_ENDPOINT, 'confirmed');
-    // CORREÇÃO: Use a função helper para criar uma carteira compatível.
     const dummyWallet = createDummyWallet();
     this.provider = new AnchorProvider(this.connection, dummyWallet, { commitment: 'confirmed' });
     this.program = new Program<Amm>(IDL, PROGRAM_ID, this.provider);
@@ -144,6 +143,8 @@ class CustomAmmService {
                 systemProgram: SystemProgram.programId,
                 rent: SYSVAR_RENT_PUBKEY,
             })
+            // <<< CORREÇÃO COMPLETA APLICADA AQUI >>>
+            .signers([poolKeypair, vaultAKeypair, vaultBKeypair, lpMintKeypair])
             .instruction();
         
         instructions.push(initPoolIx);
@@ -207,4 +208,3 @@ class CustomAmmService {
 }
 
 export const customAmmService = new CustomAmmService();
-
