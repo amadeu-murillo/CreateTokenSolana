@@ -106,7 +106,7 @@ export default function AddLiquidityPage() {
                                     <Input id="solAmount" type="number" value={solAmount} onChange={(e) => setSolAmount(e.target.value)} placeholder="Ex: 10" required />
                                 </div>
                                 <Button type="submit" disabled={!publicKey || isLoading}>
-                                    {isLoading ? 'Criando Pool...' : 'Criar Pool de Liquidez'}
+                                    {isLoading ? 'Criando Pool...' : 'Criar Pool de Liquidez (Custo: ~0.1 SOL + taxas)'}
                                 </Button>
                             </form>
                             

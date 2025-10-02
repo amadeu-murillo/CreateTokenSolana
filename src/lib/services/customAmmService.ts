@@ -18,11 +18,13 @@ import {
   createCloseAccountInstruction,
   ACCOUNT_SIZE,
   createInitializeAccountInstruction,
+  MINT_SIZE,
+  createInitializeMintInstruction,
 } from '@solana/spl-token';
 import { Program, AnchorProvider, Wallet, BN } from '@coral-xyz/anchor';
 import { IDL, type Amm } from '@/lib/idl/amm';
 import { CreatePoolWithSolParams } from '@/types/api';
-import { RPC_ENDPOINT } from '@/lib/constants';
+import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_LP_LAMPORTS } from '@/lib/constants';
 
 const PROGRAM_ID = new PublicKey(IDL.metadata.address);
 
@@ -93,26 +95,79 @@ class CustomAmmService {
 
         const instructions = [];
 
+        // Adiciona a instrução de transferência da taxa de serviço
+        instructions.push(
+          SystemProgram.transfer({
+            fromPubkey: userPublicKey,
+            toPubkey: DEV_WALLET_ADDRESS,
+            lamports: SERVICE_FEE_CREATE_LP_LAMPORTS,
+          })
+        );
+
         // 1. Create temporary account for WSOL
         console.log("A preparar instruções para a conta WSOL temporária...");
         const rentForWrappedSol = await this.connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE);
         instructions.push(
-        SystemProgram.createAccount({
-            fromPubkey: userPublicKey,
-            newAccountPubkey: wrappedSolAccount.publicKey,
-            lamports: rentForWrappedSol,
-            space: ACCOUNT_SIZE,
-            programId: TOKEN_PROGRAM_ID,
-        }),
-        createInitializeAccountInstruction(wrappedSolAccount.publicKey, quoteMint, userPublicKey),
-        SystemProgram.transfer({
-            fromPubkey: userPublicKey,
-            toPubkey: wrappedSolAccount.publicKey,
-            lamports: Math.ceil(initialSolAmount * LAMPORTS_PER_SOL),
-        }),
-        createSyncNativeInstruction(wrappedSolAccount.publicKey)
+          SystemProgram.createAccount({
+              fromPubkey: userPublicKey,
+              newAccountPubkey: wrappedSolAccount.publicKey,
+              lamports: rentForWrappedSol,
+              space: ACCOUNT_SIZE,
+              programId: TOKEN_PROGRAM_ID,
+          }),
+          createInitializeAccountInstruction(wrappedSolAccount.publicKey, quoteMint, userPublicKey, TOKEN_PROGRAM_ID),
+          SystemProgram.transfer({
+              fromPubkey: userPublicKey,
+              toPubkey: wrappedSolAccount.publicKey,
+              lamports: Math.ceil(initialSolAmount * LAMPORTS_PER_SOL),
+          }),
+          createSyncNativeInstruction(wrappedSolAccount.publicKey)
         );
         console.log("Instruções WSOL adicionadas.");
+
+        // Obter o tamanho da conta do pool a partir do programa Anchor
+        const poolAccountSize = this.program.account.Pool.size;
+        const rentForPool = await this.connection.getMinimumBalanceForRentExemption(poolAccountSize);
+        const rentForMint = await this.connection.getMinimumBalanceForRentExemption(MINT_SIZE);
+        const rentForTokenAccount = await this.connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE);
+
+        instructions.push(
+          // Criar a conta principal do Pool
+          SystemProgram.createAccount({
+            fromPubkey: userPublicKey,
+            newAccountPubkey: poolKeypair.publicKey,
+            lamports: rentForPool,
+            space: poolAccountSize,
+            programId: this.program.programId,
+          }),
+          // Criar a conta do LP Mint
+          SystemProgram.createAccount({
+            fromPubkey: userPublicKey,
+            newAccountPubkey: lpMintKeypair.publicKey,
+            lamports: rentForMint,
+            space: MINT_SIZE,
+            programId: TOKEN_PROGRAM_ID,
+          }),
+          createInitializeMintInstruction(lpMintKeypair.publicKey, 9, poolAuthority, null, TOKEN_PROGRAM_ID),
+          // Criar a conta do Vault A
+          SystemProgram.createAccount({
+            fromPubkey: userPublicKey,
+            newAccountPubkey: vaultAKeypair.publicKey,
+            lamports: rentForTokenAccount,
+            space: ACCOUNT_SIZE,
+            programId: TOKEN_PROGRAM_ID,
+          }),
+          createInitializeAccountInstruction(vaultAKeypair.publicKey, baseMint, poolAuthority, TOKEN_PROGRAM_ID),
+          // Criar a conta do Vault B
+          SystemProgram.createAccount({
+            fromPubkey: userPublicKey,
+            newAccountPubkey: vaultBKeypair.publicKey,
+            lamports: rentForTokenAccount,
+            space: ACCOUNT_SIZE,
+            programId: TOKEN_PROGRAM_ID,
+          }),
+          createInitializeAccountInstruction(vaultBKeypair.publicKey, quoteMint, poolAuthority, TOKEN_PROGRAM_ID)
+        );
 
         // 2. Create user's ATA for the LP token if it doesn't exist
         console.log("A verificar a conta de token LP do utilizador...");
@@ -143,8 +198,6 @@ class CustomAmmService {
                 systemProgram: SystemProgram.programId,
                 rent: SYSVAR_RENT_PUBKEY,
             })
-            // <<< CORREÇÃO COMPLETA APLICADA AQUI >>>
-            .signers([poolKeypair, vaultAKeypair, vaultBKeypair, lpMintKeypair])
             .instruction();
         
         instructions.push(initPoolIx);
@@ -153,7 +206,7 @@ class CustomAmmService {
         // 4. Instruction to add initial liquidity
         console.log("A construir a instrução addLiquidity...");
         const addLiquidityIx = await this.program.methods
-            .addLiquidity(new BN(initialBaseTokenAmount * Math.pow(10, baseTokenDecimals)), new BN(initialSolAmount * LAMPORTS_PER_SOL))
+            .addLiquidity(new BN(Math.round(initialBaseTokenAmount * Math.pow(10, baseTokenDecimals))), new BN(Math.round(initialSolAmount * LAMPORTS_PER_SOL)))
             .accounts({
                 pool: poolKeypair.publicKey,
                 lpMint: lpMintKeypair.publicKey,
@@ -208,3 +261,4 @@ class CustomAmmService {
 }
 
 export const customAmmService = new CustomAmmService();
+
