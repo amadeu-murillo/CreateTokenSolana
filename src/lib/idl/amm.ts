@@ -9,9 +9,10 @@ export type Amm = {
           { "name": "poolAuthority", "isMut": false, "isSigner": false },
           { "name": "mintA", "isMut": false, "isSigner": false },
           { "name": "mintB", "isMut": false, "isSigner": false },
-          { "name": "vaultA", "isMut": true, "isSigner": false },
-          { "name": "vaultB", "isMut": true, "isSigner": false },
-          { "name": "lpMint", "isMut": true, "isSigner": false },
+          // CORREÇÃO: As contas a serem inicializadas precisam ser marcadas como signers.
+          { "name": "vaultA", "isMut": true, "isSigner": true },
+          { "name": "vaultB", "isMut": true, "isSigner": true },
+          { "name": "lpMint", "isMut": true, "isSigner": true },
           { "name": "payer", "isMut": true, "isSigner": true },
           { "name": "tokenProgram", "isMut": false, "isSigner": false },
           { "name": "systemProgram", "isMut": false, "isSigner": false },
@@ -116,9 +117,10 @@ export type Amm = {
             { "name": "poolAuthority", "isMut": false, "isSigner": false },
             { "name": "mintA", "isMut": false, "isSigner": false },
             { "name": "mintB", "isMut": false, "isSigner": false },
-            { "name": "vaultA", "isMut": true, "isSigner": false },
-            { "name": "vaultB", "isMut": true, "isSigner": false },
-            { "name": "lpMint", "isMut": true, "isSigner": false },
+            // CORREÇÃO: As contas a serem inicializadas precisam ser marcadas como signers.
+            { "name": "vaultA", "isMut": true, "isSigner": true },
+            { "name": "vaultB", "isMut": true, "isSigner": true },
+            { "name": "lpMint", "isMut": true, "isSigner": true },
             { "name": "payer", "isMut": true, "isSigner": true },
             { "name": "tokenProgram", "isMut": false, "isSigner": false },
             { "name": "systemProgram", "isMut": false, "isSigner": false },
@@ -211,4 +213,3 @@ export type Amm = {
       "address": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
     }
   }));
-
