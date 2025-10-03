@@ -19,7 +19,7 @@ interface SolanaToken {
 }
 
 // Interface para o token do usuário
-interface UserToken {
+export interface UserToken {
     mint: string;
     amount: string;
     decimals: number;

@@ -90,6 +90,30 @@ class CustomAmmService {
         console.log("PDA da pool authority derivado:", poolAuthority.toBase58());
 
         const userTokenA = getAssociatedTokenAddressSync(baseMint, userPublicKey);
+        
+        // NOVO: Adiciona uma verificação para a conta de token base do usuário
+        console.log(`LOG: Verificando a conta de token base do usuário (${userTokenA.toBase58()})...`);
+        try {
+            const userTokenAAccountInfo = await this.connection.getAccountInfo(userTokenA);
+            if (!userTokenAAccountInfo) {
+                throw new Error(`A conta de token para o mint ${baseMint.toBase58()} não foi encontrada na sua carteira.`);
+            }
+            const tokenBalance = await this.connection.getTokenAccountBalance(userTokenA);
+            console.log(`LOG: Saldo encontrado na conta do token base: ${tokenBalance.value.uiAmount}`);
+            if (tokenBalance.value.uiAmount === null || tokenBalance.value.uiAmount < initialBaseTokenAmount) {
+                throw new Error(`Saldo insuficiente na conta do token base. Necessário: ${initialBaseTokenAmount}, Disponível: ${tokenBalance.value.uiAmount ?? 0}.`);
+            }
+        } catch (e: any) {
+            // Re-lança erros específicos ou um genérico se não for nosso erro personalizado
+            if (e.message.startsWith("A conta de token") || e.message.startsWith("Saldo insuficiente")) {
+                console.error("LOG: Erro na verificação da conta de token do usuário:", e.message);
+                throw e;
+            }
+            console.error("LOG: Erro ao buscar informações da conta de token do usuário:", e);
+            throw new Error(`Não foi possível verificar a sua conta de token para o mint ${baseMint.toBase58()}. Verifique se a conta existe.`);
+        }
+        console.log("LOG: Verificação da conta de token base do usuário bem-sucedida.");
+
         const userLpToken = getAssociatedTokenAddressSync(lpMintKeypair.publicKey, userPublicKey);
 
         const instructions = [];
@@ -164,7 +188,7 @@ class CustomAmmService {
                 systemProgram: SystemProgram.programId,
                 rent: SYSVAR_RENT_PUBKEY,
             })
-            .signers([poolKeypair, vaultAKeypair, vaultBKeypair, lpMintKeypair])
+            // CORREÇÃO: Removido o .signers() daqui. A assinatura será feita na transação final.
             .instruction();
         
         instructions.push(initPoolIx);
@@ -173,8 +197,8 @@ class CustomAmmService {
         // 4. Instruction to add initial liquidity
         console.log("A construir a instrução addLiquidity...");
         
-        // CORREÇÃO: Garantir que os valores de amount sejam inteiros antes de criar BN
-        const baseTokenAmountLamports = new BN(initialBaseTokenAmount * Math.pow(10, baseTokenDecimals));
+        // GARANTIA DE INTEIRO: Garante que os valores de amount sejam inteiros antes de criar BN.
+        const baseTokenAmountLamports = new BN(Math.trunc(initialBaseTokenAmount * Math.pow(10, baseTokenDecimals)));
         const solAmountLamports = new BN(solLamports);
 
         const addLiquidityIx = await this.program.methods
@@ -204,6 +228,15 @@ class CustomAmmService {
         const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
         console.log("Blockhash recente obtido:", blockhash);
 
+        // NOVO LOG: Detalha todas as instruções antes de criar a transação
+        console.log("LOG: Compilando mensagem com as seguintes instruções:", JSON.stringify(instructions.map((ix, i) => ({
+            [`instrucao_${i}`]: {
+                programId: ix.programId.toBase58(),
+                keys: ix.keys.map(k => ({ pubkey: k.pubkey.toBase58(), isSigner: k.isSigner, isWritable: k.isWritable })),
+                data: `(Buffer com tamanho: ${ix.data.length})`
+            }
+        })), null, 2));
+
         const messageV0 = new TransactionMessage({
             payerKey: userPublicKey,
             recentBlockhash: blockhash,
@@ -211,21 +244,35 @@ class CustomAmmService {
         }).compileToV0Message();
 
         const transaction = new VersionedTransaction(messageV0);
+        console.log("LOG: Transação (VersionedTransaction) criada:", transaction);
 
         // Sign with the newly generated accounts
-        console.log("A assinar a transação com as contas geradas...");
-        transaction.sign([poolKeypair, vaultAKeypair, vaultBKeypair, lpMintKeypair, wrappedSolAccount]);
+        const signers = [poolKeypair, vaultAKeypair, vaultBKeypair, lpMintKeypair, wrappedSolAccount];
+        console.log("LOG: A assinar a transação com as seguintes contas geradas:", signers.map(s => s.publicKey.toBase58()));
+        
+        transaction.sign(signers);
 
-        const serializedTransaction = Buffer.from(transaction.serialize()).toString('base64');
-        console.log("Transação serializada com sucesso.");
+        console.log("LOG: Assinaturas presentes após assinar com as contas geradas:", transaction.signatures);
+
+        const serializedTransaction = Buffer.from(transaction.serialize());
+        const base64Transaction = serializedTransaction.toString('base64');
+        console.log("LOG: Transação serializada com sucesso. Tamanho do buffer:", serializedTransaction.length);
 
         return {
-            transaction: serializedTransaction,
+            transaction: base64Transaction,
             ammId: poolKeypair.publicKey.toBase58(),
             lpTokenAddress: lpMintKeypair.publicKey.toBase58(),
         };
     } catch (error) {
-        console.error("ERRO DETALHADO em createPoolAndAddLiquidity:", error);
+        console.error("--- ERRO DETALHADO em createPoolAndAddLiquidity (SERVICE) ---");
+        if (error instanceof Error) {
+            console.error("Nome do Erro:", error.name);
+            console.error("Mensagem do Erro:", error.message);
+            console.error("Stack do Erro:", error.stack);
+        } else {
+            console.error("Objeto completo do erro:", error);
+        }
+        console.error("--- FIM DO ERRO DETALHADO ---");
         // Lança o erro para que a rota da API possa capturá-lo e retornar uma resposta 500
         throw error;
     }
@@ -233,7 +280,5 @@ class CustomAmmService {
 }
 
 export const customAmmService = new CustomAmmService();
-
-
 
 
