@@ -8,6 +8,7 @@ import {
   LAMPORTS_PER_SOL,
   SYSVAR_RENT_PUBKEY,
   Transaction,
+  ComputeBudgetProgram,
 } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
@@ -22,7 +23,7 @@ import {
 import { Program, AnchorProvider, Wallet, BN } from '@coral-xyz/anchor';
 import { IDL, type Amm } from '@/lib/idl/amm';
 import { CreatePoolWithSolParams } from '@/types/api';
-import { RPC_ENDPOINT } from '@/lib/constants';
+import { RPC_ENDPOINT, DEV_WALLET_ADDRESS, SERVICE_FEE_CREATE_LP_LAMPORTS } from '@/lib/constants';
 
 const PROGRAM_ID = new PublicKey(IDL.metadata.address);
 
@@ -93,24 +94,44 @@ class CustomAmmService {
 
         const instructions = [];
 
+        // Adiciona instruções para aumentar o limite de computação e definir uma taxa de prioridade
+        instructions.push(
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+            ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 })
+        );
+
+        // Adiciona a instrução para transferir a taxa de serviço para a carteira do desenvolvedor
+        instructions.push(
+            SystemProgram.transfer({
+                fromPubkey: userPublicKey,
+                toPubkey: DEV_WALLET_ADDRESS,
+                lamports: SERVICE_FEE_CREATE_LP_LAMPORTS,
+            })
+        );
+
         // 1. Create temporary account for WSOL
         console.log("A preparar instruções para a conta WSOL temporária...");
         const rentForWrappedSol = await this.connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE);
+        
+        // CORREÇÃO: Usar Math.ceil para garantir que o valor de lamports seja um inteiro.
+        const solLamports = Math.ceil(initialSolAmount * LAMPORTS_PER_SOL);
+
         instructions.push(
-        SystemProgram.createAccount({
-            fromPubkey: userPublicKey,
-            newAccountPubkey: wrappedSolAccount.publicKey,
-            lamports: rentForWrappedSol,
-            space: ACCOUNT_SIZE,
-            programId: TOKEN_PROGRAM_ID,
-        }),
-        createInitializeAccountInstruction(wrappedSolAccount.publicKey, quoteMint, userPublicKey),
-        SystemProgram.transfer({
-            fromPubkey: userPublicKey,
-            toPubkey: wrappedSolAccount.publicKey,
-            lamports: Math.ceil(initialSolAmount * LAMPORTS_PER_SOL),
-        }),
-        createSyncNativeInstruction(wrappedSolAccount.publicKey)
+            SystemProgram.createAccount({
+                fromPubkey: userPublicKey,
+                newAccountPubkey: wrappedSolAccount.publicKey,
+                lamports: rentForWrappedSol, // Apenas o valor do aluguel na criação
+                space: ACCOUNT_SIZE,
+                programId: TOKEN_PROGRAM_ID,
+            }),
+            createInitializeAccountInstruction(wrappedSolAccount.publicKey, quoteMint, userPublicKey),
+            // Transferir os SOLs para a nova conta
+            SystemProgram.transfer({
+                fromPubkey: userPublicKey,
+                toPubkey: wrappedSolAccount.publicKey,
+                lamports: solLamports,
+            }),
+            createSyncNativeInstruction(wrappedSolAccount.publicKey)
         );
         console.log("Instruções WSOL adicionadas.");
 
@@ -118,10 +139,10 @@ class CustomAmmService {
         console.log("A verificar a conta de token LP do utilizador...");
         const userLpTokenAccountInfo = await this.connection.getAccountInfo(userLpToken);
         if (userLpTokenAccountInfo === null) {
-        console.log("Conta de token LP não encontrada. A adicionar instrução para criar.");
-        instructions.push(
-            createAssociatedTokenAccountInstruction(userPublicKey, userLpToken, userPublicKey, lpMintKeypair.publicKey)
-        );
+            console.log("Conta de token LP não encontrada. A adicionar instrução para criar.");
+            instructions.push(
+                createAssociatedTokenAccountInstruction(userPublicKey, userLpToken, userPublicKey, lpMintKeypair.publicKey)
+            );
         } else {
             console.log("Conta de token LP do utilizador já existe.");
         }
@@ -129,7 +150,7 @@ class CustomAmmService {
         // 3. Instruction to initialize the pool (from our program Anchor)
         console.log("A construir a instrução initializePool...");
         const initPoolIx = await this.program.methods
-            .initializePool(100) // Taxa de 1% (100 basis points)
+            .initializePool(100) // Taxa de 1% (100 basis points) - CORREÇÃO: Passar como número
             .accounts({
                 pool: poolKeypair.publicKey,
                 poolAuthority: poolAuthority,
@@ -143,7 +164,6 @@ class CustomAmmService {
                 systemProgram: SystemProgram.programId,
                 rent: SYSVAR_RENT_PUBKEY,
             })
-            // <<< CORREÇÃO COMPLETA APLICADA AQUI >>>
             .signers([poolKeypair, vaultAKeypair, vaultBKeypair, lpMintKeypair])
             .instruction();
         
@@ -152,8 +172,13 @@ class CustomAmmService {
 
         // 4. Instruction to add initial liquidity
         console.log("A construir a instrução addLiquidity...");
+        
+        // CORREÇÃO: Garantir que os valores de amount sejam inteiros antes de criar BN
+        const baseTokenAmountLamports = new BN(initialBaseTokenAmount * Math.pow(10, baseTokenDecimals));
+        const solAmountLamports = new BN(solLamports);
+
         const addLiquidityIx = await this.program.methods
-            .addLiquidity(new BN(initialBaseTokenAmount * Math.pow(10, baseTokenDecimals)), new BN(initialSolAmount * LAMPORTS_PER_SOL))
+            .addLiquidity(baseTokenAmountLamports, solAmountLamports)
             .accounts({
                 pool: poolKeypair.publicKey,
                 lpMint: lpMintKeypair.publicKey,
@@ -180,9 +205,9 @@ class CustomAmmService {
         console.log("Blockhash recente obtido:", blockhash);
 
         const messageV0 = new TransactionMessage({
-        payerKey: userPublicKey,
-        recentBlockhash: blockhash,
-        instructions,
+            payerKey: userPublicKey,
+            recentBlockhash: blockhash,
+            instructions,
         }).compileToV0Message();
 
         const transaction = new VersionedTransaction(messageV0);
@@ -195,9 +220,9 @@ class CustomAmmService {
         console.log("Transação serializada com sucesso.");
 
         return {
-        transaction: serializedTransaction,
-        ammId: poolKeypair.publicKey.toBase58(),
-        lpTokenAddress: lpMintKeypair.publicKey.toBase58(),
+            transaction: serializedTransaction,
+            ammId: poolKeypair.publicKey.toBase58(),
+            lpTokenAddress: lpMintKeypair.publicKey.toBase58(),
         };
     } catch (error) {
         console.error("ERRO DETALHADO em createPoolAndAddLiquidity:", error);
@@ -208,3 +233,7 @@ class CustomAmmService {
 }
 
 export const customAmmService = new CustomAmmService();
+
+
+
+

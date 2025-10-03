@@ -4,7 +4,6 @@
 import { useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { VersionedTransaction } from '@solana/web3.js';
-import bs58 from 'bs58';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +55,9 @@ export default function AddLiquidityPage() {
                 throw new Error(data.error || 'Falha ao construir a transação.');
             }
 
-            const transaction = VersionedTransaction.deserialize(bs58.decode(data.transaction));
+            // CORREÇÃO: Decodificar de base64, não de base58.
+            const transactionBuffer = Buffer.from(data.transaction, 'base64');
+            const transaction = VersionedTransaction.deserialize(transactionBuffer);
             
             // A transação já vem parcialmente assinada do backend
             const txSignature = await sendTransaction(transaction, connection);
