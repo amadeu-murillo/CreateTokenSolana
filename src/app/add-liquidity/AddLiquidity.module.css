@@ -70,35 +70,6 @@
     gap: 0.5rem;
 }
 
-.featureList {
-    list-style: none;
-    padding-left: 0;
-    margin: 0 0 1.5rem 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.featureList li {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-}
-
-.featureList span {
-    background-color: hsl(var(--primary));
-    color: white;
-    font-size: 0.75rem;
-    font-weight: bold;
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
 .infoText {
     font-size: 0.875rem;
     color: hsl(var(--muted-foreground));
@@ -125,16 +96,17 @@
     font-weight: 500;
 }
 
-.amountHeader {
+.labelContainer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.25rem; /* 4px */
+    width: 100%;
 }
 
 .balance {
     font-size: 0.875rem; /* 14px */
     color: hsl(var(--muted-foreground));
+    font-family: monospace;
 }
 
 .amountInputContainer {
@@ -144,14 +116,18 @@
 }
 
 .maxButton {
-    height: 40px; /* Mesma altura do input */
+    height: 3rem; /* Mesma altura do input */
     padding: 0.5rem 0.75rem; /* 8px 12px - padding ajustado */
     flex-shrink: 0;
+    background-color: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    background-image: none;
+    border: 1px solid hsl(var(--border));
 }
 
-.amountInput {
-    flex-grow: 1;
-    min-width: 0;
+.maxButton:hover:not(:disabled) {
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
 }
 
 .sidebarTitle {
@@ -169,6 +145,7 @@
     padding: 1rem;
     border-radius: var(--radius);
     font-size: 0.9rem;
+    line-height: 1.6;
 }
 .dark .infoBox {
     color: hsl(210, 96%, 80%);
@@ -177,48 +154,5 @@
     flex-shrink: 0;
     width: 1.25rem;
     height: 1.25rem;
-    margin-top: 2px;
-}
-/* Adicione estas classes ao final do arquivo AddLiquidity.module.css */
-
-.labelContainer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-
-.maxButton {
-    background-color: #333;
-    color: #fff;
-    border: 1px solid #555;
-    border-radius: 6px;
-    padding: 2px 8px;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.maxButton:hover:not(:disabled) {
-    background-color: #444;
-}
-
-.maxButton:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-/* Estilos para o grupo de consentimento (opcional, pode já existir) */
-.consentGroup {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem; /* 12px */
-    margin-bottom: 1.25rem; /* 20px */
-}
-
-.consentLabel {
-    font-size: 0.875rem; /* 14px */
-    line-height: 1.25rem; /* 20px */
-    color: #a1a1aa; /* Cor de texto sutil */
-    cursor: pointer;
+    margin-top: 4px;
 }
