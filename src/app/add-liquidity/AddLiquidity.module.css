@@ -156,3 +156,37 @@
     height: 1.25rem;
     margin-top: 4px;
 }
+
+.select {
+    width: 100%;
+    height: 3rem;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--input));
+    background-color: hsl(var(--background));
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    color: hsl(var(--foreground));
+}
+
+.priceRange {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.currentPrice {
+    text-align: center;
+    font-size: 0.9rem;
+    color: hsl(var(--muted-foreground));
+    padding: 0.5rem;
+    background-color: hsl(var(--muted));
+    border-radius: var(--radius);
+    margin-top: 1rem;
+}
+
+.currentPrice strong {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+}
+

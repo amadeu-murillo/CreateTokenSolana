@@ -1,10 +1,9 @@
-// src/app/add-liquidity/page.tsx
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { VersionedTransaction, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { VersionedTransaction, PublicKey } from '@solana/web3.js';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,67 +12,128 @@ import Notification from '@/components/ui/Notification';
 import { TokenSelector } from '@/components/TokenSelector';
 import { useUserTokens } from '@/hooks/useUserTokens';
 import { SERVICE_FEE_CREATE_LP_SOL } from '@/lib/constants';
+import { PriceMath, WhirlpoolData } from '@orca-so/whirlpools-sdk';
+import { orcaWhirlpoolService } from '@/lib/services/orcaWhirlpoolService';
+import { NATIVE_MINT } from '@solana/spl-token';
 
-// Ícones para a seção de ajuda
-const IconInfo = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+const IconInfo = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+
+interface OrcaPool {
+    address: string;
+    tokenMintA: string;
+    tokenMintB: string;
+    tickSpacing: number;
+    name: string;
+}
 
 export default function AddLiquidityPage() {
     const { connection } = useConnection();
-    const { publicKey, sendTransaction } = useWallet();
+    const { publicKey, sendTransaction, wallet } = useWallet();
     const { tokens: userTokens, isLoading: isLoadingUserTokens } = useUserTokens();
 
     const [selectedTokenMint, setSelectedTokenMint] = useState('');
-    const [baseTokenAmount, setBaseTokenAmount] = useState('');
-    const [solAmount, setSolAmount] = useState('');
-    const [solBalance, setSolBalance] = useState(0);
+    const [tokenAmount, setTokenAmount] = useState('');
+
+    const [allOrcaPools, setAllOrcaPools] = useState<OrcaPool[]>([]);
+    const [filteredPools, setFilteredPools] = useState<OrcaPool[]>([]);
+    const [selectedPoolAddress, setSelectedPoolAddress] = useState<string>('');
+    const [poolData, setPoolData] = useState<WhirlpoolData | null>(null);
     
+    const [lowerPrice, setLowerPrice] = useState('');
+    const [upperPrice, setUpperPrice] = useState('');
+
     const [isLoading, setIsLoading] = useState(false);
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string; txId?: string } | null>(null);
 
     const selectedToken = useMemo(() => userTokens.find(t => t.mint === selectedTokenMint) || null, [userTokens, selectedTokenMint]);
-
+    const solToken = useMemo(() => ({
+        mint: NATIVE_MINT.toBase58(),
+        decimals: 9,
+        symbol: "SOL",
+        name: "Solana"
+    }), []);
+    
     useEffect(() => {
-        const fetchSolBalance = async () => {
-            if (publicKey) {
-                const balance = await connection.getBalance(publicKey);
-                setSolBalance(balance / LAMPORTS_PER_SOL);
+        const fetchAllPools = async () => {
+            try {
+                const response = await fetch('/api/pools');
+                if (response.ok) {
+                    const pools = await response.json();
+                    setAllOrcaPools(pools);
+                } else {
+                    console.error("Falha ao buscar pools");
+                }
+            } catch (error) {
+                console.error("Erro ao buscar pools:", error);
             }
         };
-        fetchSolBalance();
-    }, [publicKey, connection]);
+        fetchAllPools();
+    }, []);
 
-    const handleSetMax = (type: 'token' | 'sol') => {
-        if (type === 'token' && selectedToken) {
-            setBaseTokenAmount(selectedToken.amount);
+    useEffect(() => {
+        if (selectedTokenMint && allOrcaPools.length > 0) {
+            const pools = allOrcaPools.filter(p => p.tokenMintA === selectedTokenMint || p.tokenMintB === selectedTokenMint);
+            setFilteredPools(pools);
+            setSelectedPoolAddress(pools.length > 0 ? pools[0].address : '');
+        } else {
+            setFilteredPools([]);
+            setSelectedPoolAddress('');
         }
-        if (type === 'sol') {
-            // Deixar uma pequena margem para taxas de transação
-            const margin = 0.01;
-            const maxSol = solBalance > SERVICE_FEE_CREATE_LP_SOL + margin 
-                ? solBalance - SERVICE_FEE_CREATE_LP_SOL - margin 
-                : 0;
-            setSolAmount(maxSol.toFixed(4));
-        }
-    };
+    }, [selectedTokenMint, allOrcaPools]);
+
+    useEffect(() => {
+        const getPoolData = async () => {
+            if (selectedPoolAddress && selectedToken) {
+                setIsLoading(true);
+                try {
+                    const data = await orcaWhirlpoolService.fetchPoolData(connection, new PublicKey(selectedPoolAddress));
+                    setPoolData(data);
+                    if(data) {
+                        const tokenA = data.tokenMintA.toBase58() === selectedToken.mint ? selectedToken : solToken;
+                        const tokenB = data.tokenMintB.toBase58() === NATIVE_MINT.toBase58() ? solToken : selectedToken;
+                        
+                        const currentPrice = PriceMath.sqrtPriceX64ToPrice(
+                            data.sqrtPrice,
+                            tokenA.decimals,
+                            tokenB.decimals
+                        );
+                        
+                        setLowerPrice((currentPrice.mul(0.9)).toFixed(tokenB.decimals));
+                        setUpperPrice((currentPrice.mul(1.1)).toFixed(tokenB.decimals));
+                    }
+                } catch (e) {
+                    console.error("Falha ao buscar dados do pool", e);
+                    setPoolData(null);
+                } finally {
+                    setIsLoading(false);
+                }
+            } else {
+                setPoolData(null);
+            }
+        };
+        getPoolData();
+    }, [selectedPoolAddress, connection, selectedToken, solToken]);
+
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
 
-        if (!publicKey || !sendTransaction || !selectedToken) {
-            setFeedback({ type: 'error', message: 'Por favor, conecte sua carteira e selecione um token.' });
+        if (!publicKey || !sendTransaction || !selectedToken || !selectedPoolAddress || !poolData || !wallet) {
+            setFeedback({ type: 'error', message: 'Por favor, conecte a carteira e preencha todos os campos.' });
             return;
         }
-
+        
         setIsLoading(true);
         setFeedback(null);
 
         try {
             const payload = {
-                baseTokenMint: selectedToken.mint,
-                baseTokenDecimals: selectedToken.decimals,
-                initialBaseTokenAmount: parseFloat(baseTokenAmount),
-                initialSolAmount: parseFloat(solAmount),
                 userWalletAddress: publicKey.toBase58(),
+                tokenMint: selectedToken.mint,
+                tokenAmount: tokenAmount,
+                poolAddress: selectedPoolAddress,
+                lowerPrice: lowerPrice,
+                upperPrice: upperPrice,
             };
 
             const response = await fetch('/api/add-liquidity', {
@@ -97,17 +157,9 @@ export default function AddLiquidityPage() {
             
             setFeedback({
                 type: 'success',
-                message: `Pool de liquidez criado com sucesso! AMM ID: ${data.ammId}`,
+                message: `Liquidez adicionada com sucesso! Posição: ${data.positionMint}`,
                 txId: txSignature
             });
-
-            // Reset form
-            setSelectedTokenMint('');
-            setBaseTokenAmount('');
-            setSolAmount('');
-            // refetch sol balance
-            const balance = await connection.getBalance(publicKey);
-            setSolBalance(balance / LAMPORTS_PER_SOL);
 
         } catch (error: any) {
             const errorMessage = error.message || 'Ocorreu um erro desconhecido.';
@@ -116,15 +168,17 @@ export default function AddLiquidityPage() {
             setIsLoading(false);
         }
     };
+    
+    const currentPrice = poolData && selectedToken ? PriceMath.sqrtPriceX64ToPrice(poolData.sqrtPrice, selectedToken.decimals, 9).toFixed(selectedToken.decimals) : '0';
 
-    const isButtonDisabled = !publicKey || isLoading || !selectedToken || !baseTokenAmount || !solAmount;
+    const isButtonDisabled = !publicKey || isLoading || !selectedToken || !tokenAmount || !lowerPrice || !upperPrice;
 
     return (
         <div className={styles.pageContainer}>
             <header className={styles.pageHeader}>
                 <h1 className={styles.pageTitle}>Adicionar Liquidez</h1>
                 <p className={styles.pageDescription}>
-                    Crie um novo pool de liquidez (Token/SOL) para permitir que seu token seja negociado.
+                    Crie uma nova posição de liquidez (Token/SOL) num Orca Whirlpool para permitir negociações.
                 </p>
             </header>
 
@@ -141,7 +195,7 @@ export default function AddLiquidityPage() {
                                 />
                             )}
                             <div className={styles.inputGroup}>
-                                <Label htmlFor="token-select">Selecione o Token</Label>
+                                <Label htmlFor="token-select">Seu Token</Label>
                                 <TokenSelector
                                     tokens={userTokens}
                                     selectedTokenMint={selectedTokenMint}
@@ -151,51 +205,47 @@ export default function AddLiquidityPage() {
                                 />
                             </div>
                             
+                            {filteredPools.length > 0 && (
+                                <div className={styles.inputGroup}>
+                                    <Label htmlFor="pool-select">Pool de Liquidez (vs SOL)</Label>
+                                    <select id="pool-select" value={selectedPoolAddress} onChange={e => setSelectedPoolAddress(e.target.value)} className={styles.select}>
+                                        {filteredPools.map(pool => (
+                                            <option key={pool.address} value={pool.address}>
+                                                {pool.name} (Tick: {pool.tickSpacing})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                             {poolData && selectedToken && (
+                                <>
+                                    <div className={styles.currentPrice}>Preço Atual: <strong>{currentPrice}</strong> SOL por {selectedToken.symbol}</div>
+                                    <div className={styles.priceRange}>
+                                        <div className={styles.inputGroup}>
+                                            <Label htmlFor="lowerPrice">Preço Mínimo (em SOL)</Label>
+                                            <Input id="lowerPrice" type="number" value={lowerPrice} onChange={e => setLowerPrice(e.target.value)} placeholder="0.001" required />
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <Label htmlFor="upperPrice">Preço Máximo (em SOL)</Label>
+                                            <Input id="upperPrice" type="number" value={upperPrice} onChange={e => setUpperPrice(e.target.value)} placeholder="0.002" required />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                            
                             <div className={styles.inputGroup}>
                                 <div className={styles.labelContainer}>
-                                    <Label htmlFor="baseTokenAmount">Quantidade de Tokens</Label>
+                                    <Label htmlFor="tokenAmount">Quantidade de {selectedToken?.symbol || 'Tokens'} a depositar</Label>
                                     {selectedToken && <span className={styles.balance}>Saldo: {parseFloat(selectedToken.amount).toLocaleString()}</span>}
                                 </div>
-                                <div className={styles.amountInputContainer}>
-                                    <Input 
-                                      id="baseTokenAmount" 
-                                      type="number" 
-                                      value={baseTokenAmount} 
-                                      onChange={(e) => setBaseTokenAmount(e.target.value)} 
-                                      placeholder="Ex: 1000000" 
-                                      required 
-                                      disabled={!selectedToken || isLoading}
-                                    />
-                                    <Button type="button" onClick={() => handleSetMax('token')} className={styles.maxButton1} disabled={!selectedToken || isLoading}>
-                                        MAX
-                                    </Button>
-                                </div>
+                                <Input id="tokenAmount" type="number" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} placeholder="Ex: 1000000" required disabled={!selectedToken || isLoading} />
                             </div>
 
-                            <div className={styles.inputGroup}>
-                                 <div className={styles.labelContainer}>
-                                    <Label htmlFor="solAmount">Quantidade de SOL</Label>
-                                    <span className={styles.balance}>Saldo: {solBalance.toFixed(4)} SOL</span>
-                                </div>
-                                <div className={styles.amountInputContainer}>
-                                    <Input 
-                                      id="solAmount" 
-                                      type="number" 
-                                      value={solAmount} 
-                                      onChange={(e) => setSolAmount(e.target.value)} 
-                                      placeholder="Ex: 10" 
-                                      required 
-                                      disabled={!publicKey || isLoading}
-                                    />
-                                     <Button type="button" onClick={() => handleSetMax('sol')} className={styles.maxButton1} disabled={!publicKey || isLoading}>
-                                        MAX
-                                    </Button>
-                                </div>
-                            </div>
                         </CardContent>
                         <CardFooter>
                             <Button type="submit" disabled={isButtonDisabled} className="w-full">
-                                {isLoading ? 'A criar pool...' : `Criar Pool de Liquidez (Taxa: ${SERVICE_FEE_CREATE_LP_SOL} SOL)`}
+                                {isLoading ? 'A adicionar liquidez...' : `Adicionar Liquidez (Taxa: ${SERVICE_FEE_CREATE_LP_SOL} SOL)`}
                             </Button>
                         </CardFooter>
                     </form>
@@ -204,14 +254,13 @@ export default function AddLiquidityPage() {
                 <aside className={styles.infoCard}>
                      <Card>
                          <CardHeader>
-                            <CardTitle className={styles.sidebarTitle}>Como funciona?</CardTitle>
+                            <CardTitle className={styles.sidebarTitle}>Liquidez Concentrada</CardTitle>
                          </CardHeader>
                          <CardContent>
                              <div className={styles.infoBox}>
                                 <IconInfo />
                                 <span>
-                                    O preço inicial do seu token será definido pela proporção entre a quantidade de tokens e a quantidade de SOL que você depositar.
-                                    Ex: 1.000.000 tokens e 10 SOL resulta em um preço inicial de 0.00001 SOL por token.
+                                    Ao definir uma faixa de preço (mínimo e máximo), sua liquidez é "concentrada", gerando mais taxas quando o preço do token estiver dentro dessa faixa. Fora da faixa, sua posição se tornará inativa (composta por apenas um dos dois tokens) até que o preço retorne.
                                 </span>
                              </div>
                          </CardContent>
@@ -221,3 +270,4 @@ export default function AddLiquidityPage() {
         </div>
     );
 }
+
