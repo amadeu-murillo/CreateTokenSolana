@@ -1,77 +1,72 @@
-// src/app/api/create-token/route.ts
-
 import { NextResponse } from 'next/server';
-import { createSplTokenTransaction } from '@/lib/services/splTokenService';
-import { createToken2022Transaction } from '@/lib/services/token2022Service';
+import { orcaWhirlpoolService } from '@/lib/services/orcaWhirlpoolService';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
+import { Commitment, Connection, Keypair, PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { RPC_ENDPOINT } from '@/lib/constants';
+
+// Implementação de uma carteira "dummy" para o backend, que não assina transações.
+class DummyWallet implements Wallet {
+    constructor(readonly payer: Keypair) {}
+
+    get publicKey(): PublicKey {
+        return this.payer.publicKey;
+    }
+
+    async signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T> {
+        // O backend não deve assinar, apenas construir a transação.
+        // A assinatura real acontece no frontend com a carteira do usuário.
+        return tx;
+    }
+
+    async signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]> {
+        // O backend não deve assinar, apenas construir a transação.
+        return txs;
+    }
+}
+
 
 export async function POST(request: Request) {
-  try {
-    const {
-        name,
-        symbol,
-        imageUrl,
-        decimals,
-        supply,
-        wallet,
-        mintAuthority,
-        freezeAuthority,
-        isMetadataMutable,
-        tokenStandard,
-        transferFee,
-        affiliate
-    } = await request.json();
+    try {
+        const body = await request.json();
 
-    if (!name || !symbol || !imageUrl || decimals === undefined || !supply || !wallet) {
-      return NextResponse.json({ error: 'Dados incompletos fornecidos.' }, { status: 400 });
-    }
+        const { userWalletAddress, tokenMint, tokenAmount, poolAddress, lowerPrice, upperPrice } = body;
+        if (!userWalletAddress || !tokenMint || !tokenAmount || !poolAddress || !lowerPrice || !upperPrice ) {
+            return NextResponse.json({ error: 'Dados incompletos fornecidos.' }, { status: 400 });
+        }
 
-    const numericSupply = typeof supply === 'string'
-        ? Number(supply.replace(/[^0-9]/g, ''))
-        : Number(supply);
+        const connection = new Connection(RPC_ENDPOINT, 'confirmed' as Commitment);
+        const userPublicKey = new PublicKey(userWalletAddress);
+        
+        // Usamos uma carteira "dummy" porque o backend apenas constrói a transação.
+        // A assinatura real será feita pelo frontend.
+        const dummyWallet = new DummyWallet(Keypair.generate());
+        const provider = new AnchorProvider(connection, dummyWallet, { commitment: 'confirmed' });
 
-    if (isNaN(numericSupply) || numericSupply <= 0) {
-        return NextResponse.json({ error: 'Fornecimento inválido.' }, { status: 400 });
-    }
-
-    let result;
-
-    if (tokenStandard === 'token-2022') {
-        result = await createToken2022Transaction({
-            name,
-            symbol,
-            imageUrl,
-            decimals,
-            supply: numericSupply,
-            wallet,
-            mintAuthority,
-            freezeAuthority,
-            isMetadataMutable,
-            transferFee,
-            affiliate,
+        const result = await orcaWhirlpoolService.createLiquidityPool({
+            provider,
+            poolAddress: new PublicKey(poolAddress),
+            tokenMint: new PublicKey(tokenMint),
+            tokenAmount: parseFloat(tokenAmount), // Convertido para número
+            lowerPrice: parseFloat(lowerPrice),   // Convertido para número
+            upperPrice: parseFloat(upperPrice),   // Convertido para número
+            user: userPublicKey,
         });
-    } else {
-        result = await createSplTokenTransaction({
-            name,
-            symbol,
-            imageUrl,
-            decimals,
-            supply: numericSupply,
-            wallet,
-            mintAuthority,
-            freezeAuthority,
-            isMetadataMutable,
-            affiliate,
+
+        // O `result.transaction` é um `TransactionPayload`, que contém a transação e os signers.
+        // Acessamos a transação através de `result.transaction.transaction`.
+        const transaction = result.transaction.transaction;
+
+        // Serializamos a transação para enviar ao frontend.
+        const serializedTransaction = Buffer.from(transaction.serialize()).toString('base64');
+
+        return NextResponse.json({
+            transaction: serializedTransaction,
+            positionMint: result.positionMint
         });
-    }
 
-    return NextResponse.json(result);
-
-  } catch (error) {
-    console.error('Erro detalhado ao criar transação:', error);
-    let errorMessage = 'Erro interno do servidor ao criar a transação.';
-    if (error instanceof Error) {
-        errorMessage = error.message;
+    } catch (error: any) {
+        console.error('Erro na API de adicionar liquidez:', error);
+        return NextResponse.json({ error: error.message || 'Erro interno do servidor.' }, { status: 500 });
     }
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
-  }
 }
+
