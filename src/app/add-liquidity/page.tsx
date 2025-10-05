@@ -2,102 +2,113 @@
 
 import { useState, useMemo } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { VersionedTransaction } from '@solana/web3.js';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import styles from "./AddLiquidity.module.css";
 import Notification from '@/components/ui/Notification';
-import { useUserTokens } from '@/hooks/useUserTokens';
 import { TokenSelector } from '@/components/TokenSelector';
-import { orcaLiquidityService } from '@/lib/services/orcaWhirlpoolService';
+import { useUserTokens } from '@/hooks/useUserTokens';
+import { SERVICE_FEE_CREATE_LP_SOL } from '@/lib/constants';
+
+const IconInfo = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
 
 export default function AddLiquidityPage() {
     const { connection } = useConnection();
-    const { wallet, publicKey } = useWallet();
+    const { publicKey, sendTransaction } = useWallet();
     const { tokens: userTokens, isLoading: isLoadingUserTokens } = useUserTokens();
 
-    // Estados do formulário
     const [selectedTokenMint, setSelectedTokenMint] = useState('');
     const [tokenAmount, setTokenAmount] = useState('');
     const [solAmount, setSolAmount] = useState('');
-    const [lowerPrice, setLowerPrice] = useState('');
-    const [upperPrice, setUpperPrice] = useState('');
-    
-    // Estados de controle da UI
-    const [isLoading, setIsLoading] = useState(false);
-    const [statusMessage, setStatusMessage] = useState('');
-    const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
-    const [signature, setSignature] = useState('');
 
-    const selectedToken = useMemo(() => userTokens.find(t => t.mint === selectedTokenMint), [userTokens, selectedTokenMint]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string; txId?: string } | null>(null);
+
+    const selectedToken = useMemo(() => userTokens.find(t => t.mint === selectedTokenMint) || null, [userTokens, selectedTokenMint]);
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
-        if (!wallet || !publicKey || !selectedToken) {
-            setFeedback({ type: 'error', message: 'Por favor, conecte sua carteira e selecione um token.' });
+
+        if (!publicKey || !sendTransaction || !selectedToken) {
+            setFeedback({ type: 'error', message: 'Por favor, conecte a carteira e preencha todos os campos.' });
             return;
         }
 
         setIsLoading(true);
         setFeedback(null);
-        setSignature('');
 
         try {
-            setStatusMessage('Encontrando o pool de liquidez...');
-            const poolAddress = await orcaLiquidityService.findPoolAddressForTokens(selectedToken.mint);
+            const payload = {
+                userWalletAddress: publicKey.toBase58(),
+                baseTokenMint: selectedToken.mint,
+                baseTokenDecimals: selectedToken.decimals,
+                initialBaseTokenAmount: Number(tokenAmount),
+                initialSolAmount: Number(solAmount),
+            };
 
-            if (!poolAddress) {
-                throw new Error(`Não foi encontrado um pool de liquidez SOL para o token ${selectedToken.symbol}.`);
-            }
-            setStatusMessage('Pool encontrado. Criando a transação...');
-
-            const result = await orcaLiquidityService.addLiquidity(wallet, connection, {
-                poolAddress,
-                tokenMint: selectedToken.mint,
-                tokenAmount: parseFloat(tokenAmount),
-                solAmount: parseFloat(solAmount),
-                lowerPrice: parseFloat(lowerPrice),
-                upperPrice: parseFloat(upperPrice),
+            const response = await fetch('/api/create-liquidity-pool', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
             });
+            
+            const data = await response.json();
 
-            setSignature(result.transactionSignature);
+            if (!response.ok) {
+                throw new Error(data.error || 'Falha ao construir a transação no backend.');
+            }
+            
+            const transactionBuffer = Buffer.from(data.transaction, 'base64');
+            const transaction = VersionedTransaction.deserialize(transactionBuffer);
+            
+            const txSignature = await sendTransaction(transaction, connection);
+            
+            setFeedback({ type: 'info', message: 'Aguardando confirmação da transação...' });
+            
+            await connection.confirmTransaction(txSignature, 'confirmed');
+            
             setFeedback({
                 type: 'success',
-                message: `Posição de liquidez criada com sucesso! NFT da Posição: ${result.positionNftMint}`,
+                message: `Pool de liquidez criado com sucesso! AMM ID: ${data.ammId}`,
+                txId: txSignature
             });
 
         } catch (error: any) {
-            setFeedback({ type: 'error', message: `Erro: ${error.message}` });
+            const errorMessage = error.message || 'Ocorreu um erro desconhecido.';
+            setFeedback({ type: 'error', message: `Erro: ${errorMessage}` });
         } finally {
             setIsLoading(false);
-            setStatusMessage('');
         }
     };
+    
+    const isButtonDisabled = !publicKey || isLoading || !selectedToken || !tokenAmount || !solAmount;
 
     return (
         <div className={styles.pageContainer}>
             <header className={styles.pageHeader}>
-                <h1 className={styles.pageTitle}>Adicionar Liquidez (Token/SOL)</h1>
+                <h1 className={styles.pageTitle}>Criar Pool de Liquidez</h1>
                 <p className={styles.pageDescription}>
-                    Selecione um token da sua carteira para prover liquidez em um par com SOL.
+                    Crie um novo pool de liquidez (Token/SOL) na Raydium para permitir que seu token seja negociado.
                 </p>
             </header>
+
             <div className={styles.container}>
                 <Card className={styles.actionCard}>
                     <form onSubmit={handleSubmit}>
                         <CardContent className={styles.cardContent}>
-                            {feedback && (
+                             {feedback && (
                                 <Notification
                                     message={feedback.message}
                                     type={feedback.type}
                                     onClose={() => setFeedback(null)}
-                                    txId={signature}
+                                    txId={feedback.txId}
                                 />
                             )}
-                            
                             <div className={styles.inputGroup}>
-                                <Label htmlFor="token-select">Selecione o seu Token</Label>
+                                <Label htmlFor="token-select">Seu Token</Label>
                                 <TokenSelector
                                     tokens={userTokens}
                                     selectedTokenMint={selectedTokenMint}
@@ -106,56 +117,51 @@ export default function AddLiquidityPage() {
                                     disabled={isLoading}
                                 />
                             </div>
-
-                            {selectedToken && (
-                                <>
-                                    <div className={styles.inputGroup}>
-                                        <div className={styles.labelContainer}>
-                                            <Label htmlFor="tokenAmount">Quantidade de {selectedToken.symbol}</Label>
-                                            <span className={styles.balance}>Saldo: {selectedToken.amount}</span>
-                                        </div>
-                                        <Input id="tokenAmount" type="number" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} placeholder={`Ex: 1000 ${selectedToken.symbol}`} required disabled={isLoading} />
-                                    </div>
-                                     <div className={styles.inputGroup}>
-                                        <Label htmlFor="solAmount">Quantidade de SOL</Label>
-                                        <Input id="solAmount" type="number" value={solAmount} onChange={(e) => setSolAmount(e.target.value)} placeholder="Ex: 10.5" required disabled={isLoading} />
-                                    </div>
-                                </>
-                            )}
-
-
+                            
                             <div className={styles.inputGroup}>
-                                <Label htmlFor="lowerPrice">Preço Mínimo (Faixa)</Label>
-                                <Input id="lowerPrice" type="number" value={lowerPrice} onChange={(e) => setLowerPrice(e.target.value)} placeholder="Preço do token em SOL" required disabled={isLoading} />
+                                <div className={styles.labelContainer}>
+                                    <Label htmlFor="tokenAmount">Quantidade de {selectedToken?.symbol || 'Tokens'} a depositar</Label>
+                                    {selectedToken && <span className={styles.balance}>Saldo: {parseFloat(selectedToken.amount).toLocaleString()}</span>}
+                                </div>
+                                <div className={styles.amountInputContainer}>
+                                    <Input id="tokenAmount" type="number" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} placeholder="Ex: 1000000" required disabled={!selectedToken || isLoading} />
+                                    {selectedToken && (
+                                        <Button type="button" onClick={() => setTokenAmount(selectedToken.amount)} className={styles.maxButton} disabled={isLoading}>
+                                            MAX
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
                             <div className={styles.inputGroup}>
-                                <Label htmlFor="upperPrice">Preço Máximo (Faixa)</Label>
-                                <Input id="upperPrice" type="number" value={upperPrice} onChange={(e) => setUpperPrice(e.target.value)} placeholder="Preço do token em SOL" required disabled={isLoading} />
+                                <Label htmlFor="solAmount">Quantidade de SOL a depositar</Label>
+                                <Input id="solAmount" type="number" value={solAmount} onChange={(e) => setSolAmount(e.target.value)} placeholder="Ex: 10" required disabled={isLoading} />
                             </div>
                         </CardContent>
                         <CardFooter className={styles.cardFooter}>
-                             <Button type="submit" disabled={isLoading || !publicKey || !selectedToken} className="w-full">
-                                {isLoading ? statusMessage || 'Processando...' : 'Adicionar Liquidez'}
+                            <Button type="submit" disabled={isButtonDisabled} className="w-full">
+                                {isLoading ? 'Criando pool...' : `Criar Pool (Taxa: ${SERVICE_FEE_CREATE_LP_SOL} SOL + Custo de Rede)`}
                             </Button>
                         </CardFooter>
                     </form>
                 </Card>
-                <aside className={styles.sidebar}>
-                   <Card className={styles.infoCard}>
+
+                <aside className={styles.infoCard}>
+                     <Card>
                          <CardHeader>
-                            <CardTitle className={styles.sidebarTitle}>Como Funciona</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className={styles.infoBox}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                                <span>Esta ferramenta encontrará automaticamente o pool de liquidez Token/SOL correto na Orca. Se um pool não existir, a operação falhará.</span>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            <CardTitle className={styles.sidebarTitle}>Como Funciona a Criação</CardTitle>
+                         </CardHeader>
+                         <CardContent>
+                             <div className={styles.infoBox}>
+                                <IconInfo />
+                                <span>
+                                    Este processo irá criar um mercado no OpenBook e um pool de liquidez na Raydium. A proporção inicial de tokens e SOL que você depositar definirá o preço inicial do seu token.
+                                </span>
+                             </div>
+                         </CardContent>
+                     </Card>
                 </aside>
             </div>
         </div>
     );
 }
-

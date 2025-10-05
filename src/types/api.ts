@@ -24,7 +24,23 @@ export interface CreateMarketParams {
   userWalletAddress: string;
 }
 
+export interface InitializePoolParams {
+  userWalletAddress: string;
+  marketId: string;
+  baseToken: { mint: string; decimals: number };
+  quoteToken: { mint: string; decimals: number };
+  baseAmount: number;
+  quoteAmount: number;
+}
+
+export interface InitializePoolResponse {
+  transaction: string;
+  ammId: string;
+  lpMintAddress: string;
+}
+
 export interface CreateMarketResponse {
   transaction: string;
   marketId: string;
 }
+
