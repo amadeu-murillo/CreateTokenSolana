@@ -22,6 +22,69 @@
     color: hsl(var(--muted-foreground));
     max-width: 600px;
     margin: 0 auto;
+    margin-bottom: 2rem;
+}
+
+.tabContainer {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+    margin-bottom: 2rem;
+}
+
+.tab {
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: hsl(var(--muted-foreground));
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+}
+
+.tab:hover {
+    color: hsl(var(--foreground));
+}
+
+.tabActive {
+    color: hsl(var(--primary));
+    border-bottom-color: hsl(var(--primary));
+    font-weight: 600;
+}
+
+.stepContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background-color: hsl(var(--card));
+    margin-top: 1rem;
+}
+
+.stepHeader {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.stepContent {
+    font-size: 0.9rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.priceInfo {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background-color: hsl(var(--muted));
+    border-radius: var(--radius);
+    text-align: center;
+    font-size: 0.9rem;
+    color: hsl(var(--muted-foreground));
+    font-family: monospace;
+}
+
+.priceInfo strong {
+    color: hsl(var(--foreground));
 }
 
 .container {
@@ -189,4 +252,3 @@
     color: hsl(var(--foreground));
     font-weight: 600;
 }
-
