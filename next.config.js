@@ -32,9 +32,9 @@ const nextConfig = {
         if (!isServer) {
             config.resolve.fallback.fs = false;
         }
-        // Adiciona @orca-so/sdk aos pacotes externos no servidor
+        // Adiciona pacotes externos para evitar problemas de compilação no lado do servidor.
         if (isServer) {
-            config.externals.push('@raydium-io/raydium-sdk');
+            config.externals.push('@meteora-ag/dlmm-sdk', 'bn.js');
         }
         config.externals.push('pino-pretty', 'lokijs', 'encoding');
         return config;

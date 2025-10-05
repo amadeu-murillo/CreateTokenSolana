@@ -25,7 +25,7 @@ export default function AddLiquidityPage() {
     const [solAmount, setSolAmount] = useState('');
 
     const [isLoading, setIsLoading] = useState(false);
-    const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string; txId?: string } | null>(null);
+    const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string; poolAddress?: string, txId?: string } | null>(null);
 
     const selectedToken = useMemo(() => userTokens.find(t => t.mint === selectedTokenMint) || null, [userTokens, selectedTokenMint]);
 
@@ -72,7 +72,8 @@ export default function AddLiquidityPage() {
             
             setFeedback({
                 type: 'success',
-                message: `Pool de liquidez criado com sucesso! AMM ID: ${data.ammId}`,
+                message: `Pool de liquidez criado com sucesso na Meteora!`,
+                poolAddress: data.poolAddress,
                 txId: txSignature
             });
 
@@ -91,7 +92,7 @@ export default function AddLiquidityPage() {
             <header className={styles.pageHeader}>
                 <h1 className={styles.pageTitle}>Criar Pool de Liquidez</h1>
                 <p className={styles.pageDescription}>
-                    Crie um novo pool de liquidez (Token/SOL) na Raydium para permitir que seu token seja negociado.
+                    Crie um novo pool de liquidez (Token/SOL) na Meteora para permitir que seu token seja negociado.
                 </p>
             </header>
 
@@ -106,6 +107,11 @@ export default function AddLiquidityPage() {
                                     onClose={() => setFeedback(null)}
                                     txId={feedback.txId}
                                 />
+                            )}
+                            {feedback?.type === 'success' && feedback.poolAddress && (
+                                <a href={`https://app.meteora.ag/dlmm/${feedback.poolAddress}`} target="_blank" rel="noopener noreferrer" className={styles.link}>
+                                    Ver pool na Meteora
+                                </a>
                             )}
                             <div className={styles.inputGroup}>
                                 <Label htmlFor="token-select">Seu Token</Label>
@@ -140,7 +146,7 @@ export default function AddLiquidityPage() {
                         </CardContent>
                         <CardFooter className={styles.cardFooter}>
                             <Button type="submit" disabled={isButtonDisabled} className="w-full">
-                                {isLoading ? 'Criando pool...' : `Criar Pool (Taxa: ${SERVICE_FEE_CREATE_LP_SOL} SOL + Custo de Rede)`}
+                                {isLoading ? 'Criando pool...' : `Criar Pool na Meteora (Taxa: ${SERVICE_FEE_CREATE_LP_SOL} SOL + Custo de Rede)`}
                             </Button>
                         </CardFooter>
                     </form>
@@ -149,13 +155,13 @@ export default function AddLiquidityPage() {
                 <aside className={styles.infoCard}>
                      <Card>
                          <CardHeader>
-                            <CardTitle className={styles.sidebarTitle}>Como Funciona a Criação</CardTitle>
+                            <CardTitle className={styles.sidebarTitle}>Como Funciona</CardTitle>
                          </CardHeader>
                          <CardContent>
                              <div className={styles.infoBox}>
                                 <IconInfo />
                                 <span>
-                                    Este processo irá criar um mercado no OpenBook e um pool de liquidez na Raydium. A proporção inicial de tokens e SOL que você depositar definirá o preço inicial do seu token.
+                                    Este processo criará um pool de liquidez dinâmico (DLMM) na Meteora. A proporção inicial de tokens e SOL que você depositar definirá o preço inicial do seu token.
                                 </span>
                              </div>
                          </CardContent>

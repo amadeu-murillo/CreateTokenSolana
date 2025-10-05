@@ -1,6 +1,6 @@
 // src/app/api/create-liquidity-pool/route.ts
 import { NextResponse } from 'next/server';
-import { createAndInitializeLiquidityPool } from '@/lib/services/raydiumService';
+import { createMeteoraPoolAndAddLiquidity } from '@/lib/services/meteoraService';
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await createAndInitializeLiquidityPool({
+    const result = await createMeteoraPoolAndAddLiquidity({
       baseTokenMint,
       baseTokenDecimals,
       initialBaseTokenAmount,
@@ -34,7 +34,9 @@ export async function POST(request: Request) {
       userWalletAddress,
     });
 
+    // The response now contains `poolAddress` instead of `ammId`
     return NextResponse.json(result);
+
   } catch (error: any) {
     console.error('Erro na API de criação de pool de liquidez:', error);
     return NextResponse.json(
