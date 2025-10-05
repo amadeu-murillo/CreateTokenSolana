@@ -31,14 +31,25 @@ export default function AddLiquidityPage() {
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        console.log("handleSubmit chamado.");
+
+        if (Number(tokenAmount) <= 0 || Number(solAmount) <= 0) {
+            const errorMsg = "As quantidades de token e SOL devem ser maiores que zero.";
+            console.error(errorMsg);
+            setFeedback({ type: 'error', message: errorMsg });
+            return;
+        }
 
         if (!publicKey || !sendTransaction || !selectedToken) {
-            setFeedback({ type: 'error', message: 'Por favor, conecte a carteira e preencha todos os campos.' });
+            const errorMsg = 'Por favor, conecte a carteira e preencha todos os campos.';
+            console.error(errorMsg, { publicKey, sendTransaction, selectedToken });
+            setFeedback({ type: 'error', message: errorMsg });
             return;
         }
 
         setIsLoading(true);
         setFeedback(null);
+        console.log("Estado inicial de submissão:", { isLoading: true, feedback: null });
 
         try {
             const payload = {
@@ -48,6 +59,7 @@ export default function AddLiquidityPage() {
                 initialBaseTokenAmount: Number(tokenAmount),
                 initialSolAmount: Number(solAmount),
             };
+            console.log("Payload a ser enviado para a API:", payload);
 
             const response = await fetch('/api/create-liquidity-pool', {
                 method: 'POST',
@@ -55,20 +67,26 @@ export default function AddLiquidityPage() {
                 body: JSON.stringify(payload),
             });
             
+            console.log("Resposta da API recebida, status:", response.status);
             const data = await response.json();
+            console.log("Dados da resposta da API:", data);
 
             if (!response.ok) {
-                throw new Error(data.error || 'Falha ao construir a transação no backend.');
+                // Lança um erro com a mensagem do servidor para ser capturado pelo bloco catch
+                throw new Error(data.error || `Falha na API com status ${response.status}`);
             }
             
             const transactionBuffer = Buffer.from(data.transaction, 'base64');
             const transaction = VersionedTransaction.deserialize(transactionBuffer);
+            console.log("Transação desserializada com sucesso.");
             
             const txSignature = await sendTransaction(transaction, connection);
+            console.log("Transação enviada para a carteira. Assinatura:", txSignature);
             
             setFeedback({ type: 'info', message: 'Aguardando confirmação da transação...' });
             
             await connection.confirmTransaction(txSignature, 'confirmed');
+            console.log("Transação confirmada na blockchain.");
             
             setFeedback({
                 type: 'success',
@@ -78,10 +96,18 @@ export default function AddLiquidityPage() {
             });
 
         } catch (error: any) {
+            // Log aprimorado do erro no cliente
+            console.error('--- ERRO DETALHADO NO LADO DO CLIENTE (handleSubmit) ---');
+            console.error('Mensagem de Erro:', error.message);
+            console.error('Stack Trace:', error.stack);
+            console.error('Objeto de erro completo:', error);
+            console.error('--- FIM DO ERRO DETALHADO ---');
+
             const errorMessage = error.message || 'Ocorreu um erro desconhecido.';
             setFeedback({ type: 'error', message: `Erro: ${errorMessage}` });
         } finally {
             setIsLoading(false);
+            console.log("handleSubmit finalizado. isLoading: false.");
         }
     };
     
@@ -130,7 +156,7 @@ export default function AddLiquidityPage() {
                                     {selectedToken && <span className={styles.balance}>Saldo: {parseFloat(selectedToken.amount).toLocaleString()}</span>}
                                 </div>
                                 <div className={styles.amountInputContainer}>
-                                    <Input id="tokenAmount" type="number" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} placeholder="Ex: 1000000" required disabled={!selectedToken || isLoading} />
+                                    <Input id="tokenAmount" type="number" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} placeholder="Ex: 1000000" required disabled={!selectedToken || isLoading} min="0.000000001" step="any" />
                                     {selectedToken && (
                                         <Button type="button" onClick={() => setTokenAmount(selectedToken.amount)} className={styles.maxButton1} disabled={isLoading}>
                                             MAX
@@ -141,7 +167,7 @@ export default function AddLiquidityPage() {
 
                             <div className={styles.inputGroup}>
                                 <Label htmlFor="solAmount">Quantidade de SOL a depositar</Label>
-                                <Input id="solAmount" type="number" value={solAmount} onChange={(e) => setSolAmount(e.target.value)} placeholder="Ex: 10" required disabled={isLoading} />
+                                <Input id="solAmount" type="number" value={solAmount} onChange={(e) => setSolAmount(e.target.value)} placeholder="Ex: 10" required disabled={isLoading} min="0.000000001" step="any"/>
                             </div>
                         </CardContent>
                         <CardFooter className={styles.cardFooter}>
@@ -171,3 +197,4 @@ export default function AddLiquidityPage() {
         </div>
     );
 }
+
