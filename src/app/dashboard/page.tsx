@@ -14,6 +14,12 @@ import { TokenSelector } from "@/components/TokenSelector";
 import { getMint, Mint, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 
+// Ícones SVG
+const IconLock = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
+const IconCheckCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
+const IconAlertTriangle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>;
+
+
 // Tipagem para o estado do modal de confirmação
 type AuthorityModalState = {
     isOpen: boolean;
@@ -28,6 +34,24 @@ type NotificationState = {
     message: string;
     txId?: string | null;
 } | null;
+
+const guideSections = [
+    {
+        icon: <IconLock />,
+        title: "O que são Autoridades?",
+        description: "As autoridades de 'Mint' e 'Freeze' são chaves especiais que dão controle sobre o token. A autoridade de Mint pode criar novos tokens, enquanto a de Freeze pode congelar tokens em uma carteira específica, impedindo transferências."
+    },
+    {
+        icon: <IconCheckCircle />,
+        title: "Por que Remover as Autoridades?",
+        description: "Remover a autoridade de Mint ('renunciar ao mint') torna o fornecimento do token fixo e imutável. Remover a de Freeze garante que ninguém poderá ter seus tokens bloqueados. Ambas as ações aumentam a descentralização e a confiança da sua comunidade no projeto."
+    },
+    {
+        icon: <IconAlertTriangle />,
+        title: "Ação Irreversível",
+        description: "Tenha atenção: remover uma autoridade é uma ação permanente na blockchain. Uma vez removida, ela nunca mais poderá ser recuperada. Pense com cuidado antes de confirmar a transação."
+    }
+];
 
 // Componente para o estado vazio ou de carregamento inicial
 const InfoState = ({ message, showSpinner = false }: { message: string, showSpinner?: boolean }) => (
@@ -111,7 +135,14 @@ export default function DashboardPage() {
             setMintInfo(null);
             try {
                 const mintPublicKey = new PublicKey(selectedTokenMint);
-                const programId = new PublicKey(selectedToken?.programId || TOKEN_PROGRAM_ID);
+                // CORREÇÃO: O programId pode não estar disponível imediatamente, então buscamos a informação do mint primeiro para determinar o programId.
+                const accountInfo = await connection.getAccountInfo(mintPublicKey);
+                const programId = accountInfo?.owner;
+
+                if (!programId || (programId.toBase58() !== TOKEN_PROGRAM_ID.toBase58() && programId.toBase58() !== TOKEN_2022_PROGRAM_ID.toBase58())) {
+                     throw new Error("Programa de token desconhecido.");
+                }
+
                 const info = await getMint(connection, mintPublicKey, 'confirmed', programId);
                 setMintInfo(info);
             } catch (err) {
@@ -123,7 +154,7 @@ export default function DashboardPage() {
         };
 
         fetchMintInfo();
-    }, [selectedTokenMint, connection, selectedToken]);
+    }, [selectedTokenMint, connection]);
 
     const handleManageAuthorityClick = (mint: string, type: 'mint' | 'freeze', programId: string) => {
         setModalState({ isOpen: true, mint, type, programId });
@@ -181,7 +212,7 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className={styles.container}>
+        <div className={styles.pageContainer}>
              {notification && (
                 <Notification
                     type={notification.type}
@@ -190,17 +221,44 @@ export default function DashboardPage() {
                     onClose={() => setNotification(null)}
                 />
             )}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Gerir Autoridades do Token</CardTitle>
-                    <CardDescription>
-                        Selecione um token da sua carteira para visualizar e remover as autoridades de mint e freeze.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {renderContent()}
-                </CardContent>
-            </Card>
+
+            <header className={styles.pageHeader}>
+                <h1 className={styles.pageTitle}>Gerenciar Autoridades do Token</h1>
+                <p className={styles.pageDescription}>
+                    Revogue as autoridades de Mint (criação) e Freeze (congelamento) dos seus tokens para aumentar a segurança e a confiança do seu projeto.
+                </p>
+            </header>
+
+            <div className={styles.grid}>
+                 <main className={styles.mainContent}>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Painel de Gerenciamento</CardTitle>
+                            <CardDescription>
+                                Selecione um token da sua carteira para visualizar e gerenciar suas autoridades.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {renderContent()}
+                        </CardContent>
+                    </Card>
+                </main>
+
+                <aside className={styles.sidebar}>
+                    {guideSections.map((section, index) => (
+                         <Card key={index} className={styles.guideCard}>
+                            <CardContent className={styles.guideCardContent}>
+                                <div className={styles.guideIcon}>{section.icon}</div>
+                                <div>
+                                    <p className={styles.guideTitle}>{section.title}</p>
+                                    <p className={styles.guideDescription}>{section.description}</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </aside>
+            </div>
+
 
             <ManageAuthorityModal
                 isOpen={modalState.isOpen}

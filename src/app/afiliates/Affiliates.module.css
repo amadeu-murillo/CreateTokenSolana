@@ -1,35 +1,38 @@
 /* --- LAYOUT GERAL --- */
 .pageContainer {
-    max-width: 1100px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 0 1.5rem;
 }
 
 .pageHeader {
     text-align: center;
-    margin-bottom: 3rem;
+    margin-bottom: 3.5rem;
 }
 
 .pageTitle {
-    font-size: 2.5rem;
-    font-weight: 700;
+    font-size: 2.8rem;
+    font-weight: 800;
     letter-spacing: -0.05em;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
 }
 
 .pageDescription {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     color: hsl(var(--muted-foreground));
-    max-width: 600px;
+    max-width: 650px;
     margin: 0 auto;
+    line-height: 1.6;
+}
+
+.highlight {
+    color: hsl(var(--primary));
+    font-weight: 600;
 }
 
 .grid {
     display: grid;
     gap: 2.5rem;
-    max-width: 72rem;
-    margin-left: auto;
-    margin-right: auto;
     align-items: start;
     grid-template-columns: 1fr;
 }
@@ -55,6 +58,12 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+}
+
+.linkExplanation {
+    font-size: 0.9rem;
+    color: hsl(var(--muted-foreground));
+    line-height: 1.6;
 }
 
 .inputWrapper {
@@ -138,17 +147,35 @@
 .historyTable {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
 }
 
-.historyRow {
+.historyTableHeader, .historyRow {
     display: grid;
     grid-template-columns: 2fr 1fr 1fr;
     align-items: center;
     gap: 1rem;
     padding: 0.75rem;
     border-radius: calc(var(--radius) * 0.75);
+}
+
+.historyTableHeader {
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: hsl(var(--muted-foreground));
+    border-bottom: 1px solid hsl(var(--border));
+    background-color: transparent;
+    text-transform: uppercase;
+}
+.amountHeader, .txHeader {
+    text-align: right;
+}
+
+.historyRow {
     background-color: hsl(var(--background));
+    transition: background-color 0.2s ease;
+}
+.historyRow:hover {
+    background-color: hsl(var(--muted) / 0.5);
 }
 
 .historyDate {
@@ -166,16 +193,21 @@
 .historyLink {
     font-size: 0.8rem;
     color: hsl(var(--primary));
-    text-decoration: underline;
+    text-decoration: none;
     text-align: right;
     justify-self: end;
+}
+.historyLink:hover {
+    text-decoration: underline;
 }
 
 .noHistoryText {
     font-size: 0.9rem;
     color: hsl(var(--muted-foreground));
     text-align: center;
-    padding: 1rem 0;
+    padding: 1.5rem 0;
+    background-color: hsl(var(--muted)/0.3);
+    border-radius: var(--radius);
 }
 
 .loadingContainer {
@@ -215,50 +247,70 @@
     top: 6rem;
 }
 
-.sidebarTitle {
-    font-size: 1.25rem;
-    font-weight: 600;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid hsl(var(--border));
-    color: hsl(var(--foreground));
-    margin-bottom: -0.5rem;
-}
-
-.tutorialCard {
+.sidebarCard {
     background-color: hsla(var(--card), 0.5);
     border: 1px solid hsl(var(--border));
 }
 
-.tutorialCard > :global(div) {
-    padding: 1.25rem !important;
-}
-
-.tutorialCardContent {
+.sidebarCardTitle {
     display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-}
-
-.tutorialIcon {
-    color: hsl(var(--primary));
-    margin-top: 2px;
-}
-
-.tutorialIcon svg {
-    width: 22px;
-    height: 22px;
-    flex-shrink: 0;
-}
-
-.tutorialTitle {
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.1rem;
     font-weight: 600;
-    margin-bottom: 0.25rem;
-    color: hsl(var(--foreground));
-    font-size: 1rem;
 }
 
-.tutorialDescription {
+.sidebarCardTitle svg {
+    color: hsl(var(--primary));
+    width: 20px;
+    height: 20px;
+}
+
+.sidebarText {
     color: hsl(var(--muted-foreground));
-    font-size: 0.875rem;
-    line-height: 1.5;
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.stepList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    counter-reset: step-counter;
+}
+
+.stepItem {
+    position: relative;
+    padding-left: 2.25rem;
+    font-size: 0.9rem;
+    color: hsl(var(--muted-foreground));
+    line-height: 1.6;
+}
+
+.stepItem::before {
+    content: counter(step-counter);
+    counter-increment: step-counter;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+}
+
+.stepItem strong {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.25rem;
 }

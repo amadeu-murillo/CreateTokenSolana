@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useDropzone } from 'react-dropzone';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,33 +39,15 @@ const tokenSchema = z.object({
 
 type TokenFormData = z.infer<typeof tokenSchema>;
 
-// --- Componentes Auxiliares ---
-const Tooltip = ({ text, children }: { text: string; children: React.ReactNode }) => {
-    const [showTooltip, setShowTooltip] = useState(false);
-    return (
-        <div 
-            className={styles.tooltipContainer}
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setShowTooltip(false)}
-            onClick={() => setShowTooltip(prev => !prev)}
-        >
-            {children}
-            {showTooltip && <div className={styles.tooltip}>{text}</div>}
-        </div>
-    );
-};
-const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={styles.infoIcon}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
 const ProgressBar = ({ progress }: { progress: number }) => <div className={styles.progressBarContainer}><div className={styles.progressBar} style={{ width: `${progress}%` }}></div></div>;
 
 
 export default function TokenForm() {
   const { createToken, isLoading: isCreatingToken } = useCreateToken();
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [totalCost, setTotalCost] = useState<string | null>(null);
 
   const {
     control,
@@ -81,8 +63,8 @@ export default function TokenForm() {
       decimals: 9,
       supply: "",
       imageUrl: "",
-      mintAuthority: false,
-      freezeAuthority: true,
+      mintAuthority: true,
+      freezeAuthority: false,
       isMetadataMutable: true,
       tokenStandard: 'spl',
       transferFee: { basisPoints: 0, maxFee: 0 },
@@ -91,20 +73,6 @@ export default function TokenForm() {
   });
 
   const watchedFields = watch();
-
-  useEffect(() => {
-    const fetchCosts = async () => {
-      try {
-        const response = await fetch('/api/costs');
-        const data = await response.json();
-        setTotalCost(parseFloat(data.totalCost).toFixed(3));
-      } catch (error) {
-        console.error(error);
-        setTotalCost('0.094'); // Fallback
-      }
-    };
-    fetchCosts();
-  }, []);
 
   const onDrop = async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -149,12 +117,9 @@ export default function TokenForm() {
   }
 
   const onSubmit = async (data: TokenFormData) => {
-    // CORREÇÃO: Transforma os dados do formulário para garantir a compatibilidade de tipos.
     const tokenDataForApi = {
         ...data,
-        // Garante que o supply seja um número, removendo qualquer formatação.
         supply: Number(String(data.supply).replace(/[^0-9]/g, '')),
-        // Garante que o objeto transferFee e suas propriedades tenham valores padrão.
         transferFee: {
             basisPoints: data.transferFee?.basisPoints ?? 0,
             maxFee: data.transferFee?.maxFee ?? 0,
@@ -166,8 +131,7 @@ export default function TokenForm() {
   const getButtonText = () => {
       if (isCreatingToken) return "Aguardando confirmação...";
       if (isUploading) return "Fazendo upload...";
-      if (totalCost) return `Criar Token (~${totalCost} SOL)`;
-      return "Carregando Custo...";
+      return `Criar Token (~0.1 SOL + taxas)`;
   }
 
   return (
@@ -250,34 +214,64 @@ export default function TokenForm() {
             </div>
         )}
         
-        {/* --- Opções Avançadas --- */}
-        <div className={styles.advancedSection}>
-            <button type="button" onClick={() => setShowAdvanced(!showAdvanced)} className={styles.advancedButton}>
-                Opções de Autoridade
-                <span>{showAdvanced ? '−' : '+'}</span>
-            </button>
-            {showAdvanced && (
-                <div className={styles.advancedContent}>
-                    <div className={styles.checkboxWrapper}>
-                        <Controller name="mintAuthority" control={control} render={({ field }) => <input type="checkbox" id="mintAuthority" checked={field.value} onChange={field.onChange} />} />
-                        <Label htmlFor="mintAuthority">Manter autoridade para criar mais tokens</Label>
-                        <Tooltip text="Marcado: Você poderá criar mais tokens no futuro. Desmarcado: O fornecimento será fixo e imutável."><InfoIcon /></Tooltip>
-                    </div>
-                     <div className={styles.checkboxWrapper}>
-                        <Controller name="freezeAuthority" control={control} render={({ field }) => <input type="checkbox" id="freezeAuthority" checked={field.value} onChange={field.onChange} />} />
-                        <Label htmlFor="freezeAuthority">Manter autoridade para congelar tokens</Label>
-                        <Tooltip text="Marcado: Você poderá congelar tokens em qualquer carteira. Desmarcado: Ninguém poderá ter seus tokens congelados."><InfoIcon /></Tooltip>
-                    </div>
-                     <div className={styles.checkboxWrapper}>
-                        <Controller name="isMetadataMutable" control={control} render={({ field }) => <input type="checkbox" id="isMetadataMutable" checked={field.value} onChange={field.onChange} />} />
-                        <Label htmlFor="isMetadataMutable">Metadados mutáveis</Label>
-                        <Tooltip text="Marcado: Você poderá alterar o nome, símbolo e imagem do token no futuro. Desmarcado: Os metadados serão permanentes."><InfoIcon /></Tooltip>
-                    </div>
-                </div>
-            )}
+        {/* --- Novas Opções de Autoridade --- */}
+        <div className={styles.authoritySection}>
+          <h3 className={styles.authorityTitle}>Opções de Autoridade</h3>
+          <div className={styles.authorityOptionsGrid}>
+            <div className={styles.authorityOption}>
+              <div className={styles.authorityText}>
+                <Label htmlFor="mintAuthority">Autoridade de Mint (Criar mais tokens)</Label>
+                <p>Permite aumentar o fornecimento total no futuro. Desative para um fornecimento fixo.</p>
+              </div>
+              <Controller 
+                name="mintAuthority" 
+                control={control} 
+                render={({ field }) => (
+                  <label className={styles.switch}>
+                    <input type="checkbox" id="mintAuthority" checked={field.value} onChange={field.onChange} />
+                    <span className={styles.slider}></span>
+                  </label>
+                )} 
+              />
+            </div>
+
+            <div className={styles.authorityOption}>
+              <div className={styles.authorityText}>
+                <Label htmlFor="isMetadataMutable">Metadados Mutáveis</Label>
+                <p>Permite alterar nome, símbolo e imagem do token no futuro. Desative para metadados permanentes.</p>
+              </div>
+              <Controller 
+                name="isMetadataMutable" 
+                control={control} 
+                render={({ field }) => (
+                  <label className={styles.switch}>
+                    <input type="checkbox" id="isMetadataMutable" checked={field.value} onChange={field.onChange} />
+                    <span className={styles.slider}></span>
+                  </label>
+                )} 
+              />
+            </div>
+            
+            <div className={styles.authorityOption}>
+              <div className={styles.authorityText}>
+                <Label htmlFor="freezeAuthority">Autoridade de Freeze (Congelar tokens)</Label>
+                <p>Permite congelar tokens em qualquer carteira. Geralmente desativado para descentralização.</p>
+              </div>
+              <Controller 
+                name="freezeAuthority" 
+                control={control} 
+                render={({ field }) => (
+                  <label className={styles.switch}>
+                    <input type="checkbox" id="freezeAuthority" checked={field.value} onChange={field.onChange} />
+                    <span className={styles.slider}></span>
+                  </label>
+                )} 
+              />
+            </div>
+          </div>
         </div>
 
-        <Button type="submit" disabled={isCreatingToken || isUploading || !totalCost || !isValid}>
+        <Button type="submit" disabled={isCreatingToken || isUploading || !isValid}>
           {getButtonText()}
         </Button>
       </form>
@@ -294,4 +288,3 @@ export default function TokenForm() {
     </div>
   );
 }
-

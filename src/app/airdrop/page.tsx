@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { useAirdrop } from '@/hooks/useAirdrop';
-import { useUserTokens } from '@/hooks/useUserTokens';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { TokenSelector } from '@/components/TokenSelector';
-import Notification from '@/components/ui/Notification';
+import { useAirdrop } from '../../hooks/useAirdrop';
+import { useUserTokens } from '../../hooks/useUserTokens';
+import { Button } from '../../components/ui/button';
+import { Label } from '../../components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../../components/ui/card';
+import { TokenSelector } from '../../components/TokenSelector';
+import Notification from '../../components/ui/Notification';
 import styles from './Airdrop.module.css';
 import { PublicKey } from '@solana/web3.js';
 
@@ -24,9 +24,9 @@ interface ParsedResult {
 }
 
 // Ícones SVG
-const TokenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /></svg>;
-const UsersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
-const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>;
+const TokenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /></svg>;
+const UsersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>;
 
 
 const tutorialSteps = [
@@ -74,8 +74,6 @@ export default function AirdropPage() {
             let error = '';
             if (!address || !amountStr) {
                 error = 'Formato inválido.';
-            } else if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
-                error = 'Endereço Solana inválido.';
             } else {
                  try {
                     new PublicKey(address);
@@ -114,6 +112,11 @@ export default function AirdropPage() {
         reset();
     }
 
+    const successMessage = signature && !signature.startsWith('Preparando') && !signature.startsWith('Aguardando') && !signature.startsWith('Enviando')
+        ? (parsedResult && parsedResult.valid.length > 10 ? "Airdrop enviado com sucesso em múltiplas transações! A primeira transação é mostrada." : "Airdrop enviado com sucesso!")
+        : "Airdrop concluído!";
+
+
     return (
         <div className={styles.grid}>
             <div className={styles.formContainer}>
@@ -125,9 +128,9 @@ export default function AirdropPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {signature ? (
+                        {signature && !isLoading && !error ? (
                              <div className={styles.successContainer}>
-                                <Notification type="success" message="Airdrop enviado com sucesso!" txId={signature} onClose={clearAll} />
+                                <Notification type="success" message={successMessage} txId={signature} onClose={clearAll} />
                                 <Button onClick={clearAll} className="w-full">Fazer Novo Airdrop</Button>
                              </div>
                         ) : (
@@ -195,7 +198,7 @@ export default function AirdropPage() {
                             onClick={handleSubmit} 
                             disabled={isLoading || !parsedResult || parsedResult.invalid.length > 0 || parsedResult.valid.length === 0}
                         >
-                            {isLoading ? 'Enviando...' : `Enviar Airdrop (Custo: ~0.05 SOL)`}
+                            {isLoading ? (signature || 'Processando...') : `Enviar Airdrop (Taxa: ~0.05 SOL)`}
                         </Button>
                     </CardFooter>
                     )}
@@ -218,3 +221,4 @@ export default function AirdropPage() {
         </div>
     );
 }
+

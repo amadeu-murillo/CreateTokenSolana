@@ -1,7 +1,45 @@
-.container {
-  max-width: 64rem;
-  margin-left: auto;
-  margin-right: auto;
+/* src/app/dashboard/Dashboard.module.css */
+
+.pageContainer {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+}
+
+.pageHeader {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.pageTitle {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.pageDescription {
+    font-size: 1.1rem;
+    color: hsl(var(--muted-foreground));
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+    align-items: start;
+}
+
+@media (min-width: 1024px) {
+    .grid {
+        grid-template-columns: 2fr 1fr;
+    }
+}
+
+.mainContent {
+  width: 100%;
 }
 
 .infoStateContainer {
@@ -70,7 +108,7 @@
 }
 
 .tokenCard:hover {
-    border-color: hsl(var(--primary) / 0.5);
+    border-color: hsla(var(--primary), 0.5);
     transform: translateY(-2px);
 }
 
@@ -157,4 +195,52 @@
     text-align: center;
     font-size: 0.875rem;
     color: hsl(var(--muted-foreground));
+}
+
+/* Sidebar */
+.sidebar {
+    position: sticky;
+    top: 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.guideCard {
+    background-color: hsla(var(--card), 0.5);
+    border: 1px solid hsl(var(--border));
+}
+
+.guideCard > :global(div) { /* Target CardContent */
+  padding: 1.25rem !important;
+}
+
+.guideCardContent {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.guideIcon {
+  color: hsl(var(--primary));
+  margin-top: 2px;
+}
+
+.guideIcon svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.guideTitle {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: hsl(var(--foreground));
+  font-size: 1rem;
+}
+
+.guideDescription {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+  line-height: 1.6;
 }

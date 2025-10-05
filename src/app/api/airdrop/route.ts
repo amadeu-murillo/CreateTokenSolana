@@ -25,20 +25,24 @@ export async function POST(request: Request) {
         const mintInfo = await getMint(connection, mintPublicKey, 'confirmed', tokenProgramId);
 
         const instructions: TransactionInstruction[] = [
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 50000 * recipients.length }),
+            // Aumenta a unidade de computação baseada no número de destinatários
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 200000 + 30000 * recipients.length }),
             ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-            SystemProgram.transfer({
-                fromPubkey: payerPublicKey,
-                toPubkey: DEV_WALLET_ADDRESS,
-                lamports: SERVICE_FEE_AIRDROP_LAMPORTS,
-            })
         ];
+        
+        // Adiciona a taxa de serviço apenas na primeira transação (se houver batch)
+        // A lógica de batch está no front-end, mas aqui tratamos cada chamada como uma transação.
+        instructions.push(SystemProgram.transfer({
+            fromPubkey: payerPublicKey,
+            toPubkey: DEV_WALLET_ADDRESS,
+            lamports: SERVICE_FEE_AIRDROP_LAMPORTS / recipients.length, // Custo proporcional
+        }));
         
         const sourceTokenAccount = await getAssociatedTokenAddress(
             mintPublicKey, 
             payerPublicKey, 
             false, 
-            tokenProgramId // Usa o programId correto
+            tokenProgramId
         );
         
         for (const recipient of recipients) {
@@ -48,19 +52,18 @@ export async function POST(request: Request) {
                     mintPublicKey, 
                     destinationPublicKey,
                     false,
-                    tokenProgramId // Usa o programId correto
+                    tokenProgramId
                 );
                 
                 const accountInfo = await connection.getAccountInfo(destinationAta);
                 if (accountInfo === null) {
-                    // Adiciona instrução para criar a ATA de destino se não existir
                     instructions.push(
                         createAssociatedTokenAccountInstruction(
                             payerPublicKey,
                             destinationAta,
                             destinationPublicKey,
                             mintPublicKey,
-                            tokenProgramId // Usa o programId correto
+                            tokenProgramId
                         )
                     );
                 }
@@ -72,7 +75,7 @@ export async function POST(request: Request) {
                         payerPublicKey,
                         BigInt(recipient.amount * Math.pow(10, mintInfo.decimals)),
                         [],
-                        tokenProgramId // Usa o programId correto
+                        tokenProgramId
                     )
                 );
             } catch (e) {
@@ -80,7 +83,7 @@ export async function POST(request: Request) {
             }
         }
         
-        if (instructions.length <= 1) { // Apenas a taxa de serviço
+        if (instructions.length <= 2) { // Apenas CU e taxa
             return NextResponse.json({ error: 'Nenhum destinatário válido fornecido.' }, { status: 400 });
         }
         
@@ -103,3 +106,4 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Erro interno do servidor.' }, { status: 500 });
     }
 }
+

@@ -137,7 +137,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   </div>
                   <div className={styles.footerColumn}>
                     <h4 className={styles.footerColumnTitle}>Entrar em contato</h4>
-                    <a href="mailto:contato@createtokensolana.com" className={styles.footerLink}>contato@createtokensolana.com</a>
+                    <a href="mailto:createtokensol@gmail.com" className={styles.footerLink}>createtokensol@gmail.com</a>
                   </div>
                 </div>
                 <div className={styles.footerBottom}>

@@ -1,36 +1,19 @@
 import { NextResponse } from "next/server";
-import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { getMinimumBalanceForRentExemptMint } from "@solana/spl-token";
-import { RPC_ENDPOINT, SERVICE_FEE_CREATE_TOKEN_SOL } from "@/lib/constants";
+import { SERVICE_FEE_CREATE_TOKEN_SOL } from "@/lib/constants";
 
 // RF05: Gestão de Custos
-// Este endpoint calcula e retorna os custos estimados para a criação de um token na mainnet.
+// Este endpoint calcula e retorna os custos estimados para a criação de um token.
 export async function GET() {
   try {
-    // Conecta-se à Mainnet para obter os custos atuais.
-    const connection = new Connection(RPC_ENDPOINT, "confirmed");
-
-    // 1. Custo de Rede (Aluguel - Rent)
-    // Calcula o valor mínimo em lamports para que a conta do mint seja isenta de aluguel.
-    const rentExemptionLamports = await getMinimumBalanceForRentExemptMint(connection);
-    
-    // 2. Custo de Rede (Taxa de Transação)
-    // A taxa por assinatura é 5000 lamports. A nossa transação terá 2 assinaturas (usuário e mint).
-    const transactionFeeLamports = 5000 * 2;
-    
-    const networkCostLamports = rentExemptionLamports + transactionFeeLamports;
-    const networkCostInSol = networkCostLamports / LAMPORTS_PER_SOL;
-
-    // 3. Taxa de Serviço
+    // Valores ajustados para refletir a nova estrutura de custos solicitada.
+    const networkCostInSol = 0.01;
     const serviceFee = SERVICE_FEE_CREATE_TOKEN_SOL;
-
-    // 4. Custo Total
     const totalCost = networkCostInSol + serviceFee;
 
     const costs = {
-      networkCost: networkCostInSol.toFixed(6), // Custo estimado da rede (aluguel + taxas)
-      serviceFee: serviceFee.toFixed(6), // Taxa de serviço da plataforma
-      totalCost: totalCost.toFixed(6), // Custo total
+      networkCost: networkCostInSol.toFixed(4), // Custo estimado da rede
+      serviceFee: serviceFee.toFixed(4),       // Taxa de serviço da plataforma
+      totalCost: totalCost.toFixed(4),         // Custo total
     };
 
     return NextResponse.json(costs);
@@ -42,4 +25,3 @@ export async function GET() {
     );
   }
 }
-
