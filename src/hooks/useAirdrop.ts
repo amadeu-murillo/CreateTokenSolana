@@ -1,20 +1,20 @@
 import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { VersionedTransaction, SendTransactionError } from "@solana/web3.js";
+import { VersionedTransaction, SendTransactionError, Connection } from "@solana/web3.js";
 
 // Função de tratamento de erro aprimorada
-async function getFriendlyErrorMessage(error: any, connection: any): Promise<string> {
+async function getFriendlyErrorMessage(error: any, connection: Connection): Promise<string> {
     const message = error.message || String(error);
     console.error("Airdrop error:", error);
 
     if (error instanceof SendTransactionError) {
-        const logs = await error.getLogs(connection);
+        const logs = error.logs;
         if (logs && logs.some(log => log.includes("insufficient lamports"))) {
              return "Você não possui SOL suficiente para cobrir as taxas da rede e do serviço.";
         }
     }
 
-    if (message.includes("User rejected the request")) {
+    if (message.includes("User rejected the request") || message.includes("Transações não assinadas pelo usuário")) {
         return "Transação rejeitada pelo usuário na carteira.";
     }
     if (message.includes("insufficient lamports")) {
@@ -22,7 +22,7 @@ async function getFriendlyErrorMessage(error: any, connection: any): Promise<str
     }
     if (message.includes("Transaction simulation failed")) {
          if (message.includes("already been processed")) {
-            return "Esta transação já foi processada. Se o erro persistir, atualize a página.";
+            return "sucesso";
         }
         return "A simulação da transação falhou. Verifique os endereços e se você possui saldo suficiente.";
     }
@@ -62,9 +62,14 @@ export const useAirdrop = () => {
     try {
         const BATCH_SIZE = 10;
         const recipientChunks: Recipient[][] = [];
-        for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
-            recipientChunks.push(recipients.slice(i, i + BATCH_SIZE));
+        if (recipients && recipients.length > 0) {
+            for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+                recipientChunks.push(recipients.slice(i, i + BATCH_SIZE));
+            }
+        } else {
+            throw new Error("A lista de destinatários está vazia ou é inválida.");
         }
+
 
         const transactions: VersionedTransaction[] = [];
         
@@ -87,15 +92,26 @@ export const useAirdrop = () => {
         setSignature(`Aguardando aprovação para ${transactions.length} transações...`);
         const signedTransactions = await signAllTransactions(transactions);
 
-        let firstSignature: string | null = null;
-        for (let i = 0; i < signedTransactions.length; i++) {
-            const signedTx = signedTransactions[i];
-            setSignature(`Enviando transação ${i + 1} de ${signedTransactions.length}...`);
-            const sig = await connection.sendRawTransaction(signedTx.serialize());
-            await connection.confirmTransaction(sig, 'confirmed');
-            if (!firstSignature) {
-                firstSignature = sig;
-            }
+        if (!signedTransactions) {
+            throw new Error("Transações não assinadas pelo usuário.");
+        }
+
+        setSignature(`Enviando ${signedTransactions.length} transações...`);
+
+        const signatures = await Promise.all(
+            signedTransactions.map(tx => connection.sendRawTransaction(tx.serialize()))
+        );
+
+        setSignature('Confirmando transações...');
+
+        const firstSignature = signatures[0];
+        if (firstSignature) {
+            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+            await connection.confirmTransaction({
+                signature: firstSignature,
+                blockhash,
+                lastValidBlockHeight
+            }, 'confirmed');
         }
 
         setSignature(firstSignature);

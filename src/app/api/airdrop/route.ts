@@ -7,13 +7,13 @@ export async function POST(request: Request) {
     try {
         const { mint, recipients, wallet, programId } = await request.json();
 
-        if (!mint || !recipients || !wallet || !programId) {
-            return NextResponse.json({ error: 'Dados incompletos.' }, { status: 400 });
+        if (!mint || !recipients || !wallet || !programId || !Array.isArray(recipients) || recipients.length === 0) {
+            return NextResponse.json({ error: 'Dados incompletos ou inválidos.' }, { status: 400 });
         }
         
         // Valida se o programId é um dos conhecidos
         if (programId !== TOKEN_PROGRAM_ID.toBase58() && programId !== TOKEN_2022_PROGRAM_ID.toBase58()) {
-            return NextResponse.json({ error: 'Program ID inválido.' }, { status: 400 });
+            return NextResponse.json({ error: 'Program ID do token é inválido.' }, { status: 400 });
         }
 
         const connection = new Connection(RPC_ENDPOINT, 'confirmed');
@@ -25,18 +25,16 @@ export async function POST(request: Request) {
         const mintInfo = await getMint(connection, mintPublicKey, 'confirmed', tokenProgramId);
 
         const instructions: TransactionInstruction[] = [
-            // Aumenta a unidade de computação baseada no número de destinatários
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 200000 + 30000 * recipients.length }),
+            // Aumenta a unidade de computação baseada no número de destinatários para evitar erros
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 200000 + 40000 * recipients.length }),
             ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
+            // Taxa de serviço por lote de transação
+            SystemProgram.transfer({
+                fromPubkey: payerPublicKey,
+                toPubkey: DEV_WALLET_ADDRESS,
+                lamports: SERVICE_FEE_AIRDROP_LAMPORTS,
+            }),
         ];
-        
-        // Adiciona a taxa de serviço apenas na primeira transação (se houver batch)
-        // A lógica de batch está no front-end, mas aqui tratamos cada chamada como uma transação.
-        instructions.push(SystemProgram.transfer({
-            fromPubkey: payerPublicKey,
-            toPubkey: DEV_WALLET_ADDRESS,
-            lamports: SERVICE_FEE_AIRDROP_LAMPORTS / recipients.length, // Custo proporcional
-        }));
         
         const sourceTokenAccount = await getAssociatedTokenAddress(
             mintPublicKey, 
@@ -45,47 +43,44 @@ export async function POST(request: Request) {
             tokenProgramId
         );
         
-        for (const recipient of recipients) {
-            try {
-                const destinationPublicKey = new PublicKey(recipient.address);
-                const destinationAta = await getAssociatedTokenAddress(
-                    mintPublicKey, 
-                    destinationPublicKey,
-                    false,
-                    tokenProgramId
-                );
-                
-                const accountInfo = await connection.getAccountInfo(destinationAta);
-                if (accountInfo === null) {
-                    instructions.push(
-                        createAssociatedTokenAccountInstruction(
-                            payerPublicKey,
-                            destinationAta,
-                            destinationPublicKey,
-                            mintPublicKey,
-                            tokenProgramId
-                        )
-                    );
-                }
+        // Usando Promise.all para verificar as contas de token associadas (ATAs) em paralelo
+        const destinationAtas = await Promise.all(recipients.map(async (recipient: { address: string }) => {
+            const destinationPublicKey = new PublicKey(recipient.address);
+            return getAssociatedTokenAddress(mintPublicKey, destinationPublicKey, false, tokenProgramId);
+        }));
 
+        const accountsInfo = await connection.getMultipleAccountsInfo(destinationAtas);
+
+        recipients.forEach((recipient: { address: string, amount: number }, index: number) => {
+            const destinationPublicKey = new PublicKey(recipient.address);
+            const destinationAta = destinationAtas[index];
+            const accountInfo = accountsInfo[index];
+
+            // Se a conta de token associada não existir, cria a instrução para criá-la
+            if (accountInfo === null) {
                 instructions.push(
-                    createTransferInstruction(
-                        sourceTokenAccount,
-                        destinationAta,
+                    createAssociatedTokenAccountInstruction(
                         payerPublicKey,
-                        BigInt(recipient.amount * Math.pow(10, mintInfo.decimals)),
-                        [],
+                        destinationAta,
+                        destinationPublicKey,
+                        mintPublicKey,
                         tokenProgramId
                     )
                 );
-            } catch (e) {
-                console.warn(`Endereço inválido ou problema com ${recipient.address}, pulando.`);
             }
-        }
-        
-        if (instructions.length <= 2) { // Apenas CU e taxa
-            return NextResponse.json({ error: 'Nenhum destinatário válido fornecido.' }, { status: 400 });
-        }
+
+            // Cria a instrução de transferência
+            instructions.push(
+                createTransferInstruction(
+                    sourceTokenAccount,
+                    destinationAta,
+                    payerPublicKey,
+                    BigInt(recipient.amount * Math.pow(10, mintInfo.decimals)),
+                    [],
+                    tokenProgramId
+                )
+            );
+        });
         
         const { blockhash } = await connection.getLatestBlockhash('confirmed');
         
@@ -103,7 +98,7 @@ export async function POST(request: Request) {
 
     } catch (error) {
         console.error('Erro na API de airdrop:', error);
-        return NextResponse.json({ error: 'Erro interno do servidor.' }, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : 'Erro interno do servidor.';
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
-
