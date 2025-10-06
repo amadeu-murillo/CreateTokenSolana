@@ -39,7 +39,7 @@ const IconInfo = () => (
 
 export default function AddLiquidityPage() {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const { tokens: userTokens, isLoading: isLoadingUserTokens } = useUserTokens();
 
   const [selectedTokenMint, setSelectedTokenMint] = useState("");
@@ -71,7 +71,7 @@ export default function AddLiquidityPage() {
       return;
     }
 
-    if (!publicKey || !sendTransaction || !selectedToken) {
+    if (!publicKey || !signTransaction || !selectedToken) {
       setFeedback({
         type: "error",
         message: "Conecte sua carteira e preencha todos os campos.",
@@ -114,11 +114,19 @@ export default function AddLiquidityPage() {
         Buffer.from(txBase64, "base64")
       );
 
+      console.log("Tipo da transação:", transaction.constructor.name);
       console.log("✅ Transação desserializada com sucesso.");
 
-      // Envia para carteira
-      const txSignature = await sendTransaction(transaction, connection);
-      console.log("💾 Transação enviada:", txSignature);
+      // --- Assina ---
+      const signedTx = await signTransaction(transaction);
+      console.log("✍️ Transação assinada com sucesso.");
+
+      // --- Envia ---
+      const txSignature = await connection.sendRawTransaction(
+        signedTx.serialize(),
+        { skipPreflight: false }
+      );
+      console.log("🚀 Transação enviada:", txSignature);
 
       setFeedback({
         type: "info",

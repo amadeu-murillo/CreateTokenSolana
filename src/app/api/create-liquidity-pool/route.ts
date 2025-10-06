@@ -10,8 +10,8 @@ import { buildCreatePairTx, buildAddLiquidityTx } from "@/lib/services/meteoraSe
  *   userWalletAddress: string,
  *   baseTokenMint: string,
  *   baseTokenDecimals: number,
- *   initialBaseTokenAmount?: number,
- *   initialSolAmount?: number,
+ *   initialBaseTokenAmount?: number, // ATOMS, não normalizado
+ *   initialSolAmount?: number,       // LAMPORTS, não normalizado
  *   pairAddress?: string,
  *   addBaseAmount?: number,
  *   addSolAmount?: number
@@ -37,7 +37,10 @@ export async function POST(request: Request) {
     } = body;
 
     if (!userWalletAddress) {
-      return NextResponse.json({ error: "Endereço da carteira é obrigatório." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Endereço da carteira é obrigatório." },
+        { status: 400 }
+      );
     }
 
     // --- CRIAÇÃO DE POOL ---
@@ -54,24 +57,69 @@ export async function POST(request: Request) {
         );
       }
 
-      console.log("🚀 Criando novo par DLMM com baseTokenMint:", baseTokenMint);
+      console.log("🔎 Debug criação pool:");
+      console.log(" - BaseTokenDecimals:", baseTokenDecimals);
+      console.log(" - initialBaseTokenAmount (atoms):", initialBaseTokenAmount);
+      console.log(" - initialSolAmount (lamports):", initialSolAmount);
 
-      const result = await buildCreatePairTx({
-        baseTokenMint,
-        baseTokenDecimals,
-        initialBaseTokenAmount,
-        initialSolAmount,
-        userWalletAddress,
-      });
+      // Tentar múltiplos binSteps até achar válido
+      const candidateBinSteps = [1, 5, 10, 25];
+      let result: any = null;
+      let usedBinStep: number | undefined;
+
+      for (const step of candidateBinSteps) {
+        try {
+          console.log(`➡️ Tentando criar pool com binStep = ${step}...`);
+
+          result = await buildCreatePairTx({
+            baseTokenMint,
+            baseTokenDecimals,
+            initialBaseTokenAmount, // já em atoms
+            initialSolAmount,       // já em lamports
+            userWalletAddress,
+            binStep: step,
+          });
+
+          usedBinStep = step;
+
+          console.log("✅ Sucesso com binStep:", step);
+          break;
+        } catch (err: any) {
+          console.error(`❌ Erro com binStep=${step}:`, err.message);
+        }
+      }
+
+      if (!result || !usedBinStep) {
+        return NextResponse.json(
+          { error: "Não foi possível encontrar um binStep válido para criação do pool." },
+          { status: 500 }
+        );
+      }
+
+      // --- Cálculo do preço teórico (pode falhar se binId for extremo)
+      let theoreticalPrice: number | undefined = undefined;
+      try {
+        const step = result.binStep / 10_000;
+        theoreticalPrice = Math.pow(1 + step, Number(result.activeBinId));
+      } catch (e) {
+        console.warn("⚠️ Erro ao calcular preço teórico:", e);
+      }
 
       console.log("✅ Transação de criação construída com sucesso:", {
         activeBinId: result.activeBinId,
         binStep: result.binStep,
+        amountA: result.amountA,
+        amountB: result.amountB,
+        theoreticalPrice,
       });
 
       return NextResponse.json({
         message: "Transação de criação de pool gerada com sucesso.",
-        data: result,
+        data: {
+          ...result,
+          theoreticalPrice,
+          binStep: usedBinStep,
+        },
       });
     }
 
@@ -109,7 +157,6 @@ export async function POST(request: Request) {
       { error: "Ação inválida. Use 'create' ou 'add'." },
       { status: 400 }
     );
-
   } catch (error: any) {
     console.error("❌ ERRO DETALHADO NA API create-liquidity-pool:");
     console.error("Mensagem:", error.message);
