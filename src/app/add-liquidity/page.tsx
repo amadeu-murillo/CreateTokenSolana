@@ -45,6 +45,8 @@ export default function AddLiquidityPage() {
   const [selectedTokenMint, setSelectedTokenMint] = useState("");
   const [tokenAmount, setTokenAmount] = useState("");
   const [solAmount, setSolAmount] = useState("");
+  // CORREÇÃO: Padrão para 25 BPS (0.25%), uma taxa comum e válida.
+  const [feeBps, setFeeBps] = useState("25");
 
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -61,29 +63,20 @@ export default function AddLiquidityPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    console.log("🚀 handleSubmit iniciado.");
+    setFeedback(null);
 
     if (Number(tokenAmount) <= 0 || Number(solAmount) <= 0) {
-      setFeedback({
-        type: "error",
-        message: "As quantidades de token e SOL devem ser maiores que zero.",
-      });
+      setFeedback({ type: "error", message: "As quantidades de token e SOL devem ser maiores que zero." });
       return;
     }
-
-    if (!publicKey || !signTransaction || !selectedToken) {
-      setFeedback({
-        type: "error",
-        message: "Conecte sua carteira e preencha todos os campos.",
-      });
+     if (!publicKey || !signTransaction || !selectedToken) {
+      setFeedback({ type: "error", message: "Conecte sua carteira e preencha todos os campos." });
       return;
     }
 
     setIsLoading(true);
-    setFeedback(null);
 
     try {
-      // --- Monta payload para criação ---
       const payload = {
         action: "create",
         userWalletAddress: publicKey.toBase58(),
@@ -91,21 +84,20 @@ export default function AddLiquidityPage() {
         baseTokenDecimals: selectedToken.decimals,
         initialBaseTokenAmount: Number(tokenAmount),
         initialSolAmount: Number(solAmount),
+        feeBps: Number(feeBps),
       };
-
-      console.log("📤 Enviando payload:", payload);
 
       const response = await fetch("/api/create-liquidity-pool", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
-      console.log("📩 Resposta da API:", response.status);
+      
       const json = await response.json();
-      console.log("📦 Dados retornados da API:", json);
 
-      if (!response.ok) throw new Error(json.error || "Falha na criação da pool.");
+      if (!response.ok) {
+        throw new Error(json.error || "Falha na criação da pool.");
+      }
 
       const txBase64 = json.data?.serializedCreateTxBase64;
       if (!txBase64) throw new Error("Transação inválida retornada pela API.");
@@ -114,62 +106,44 @@ export default function AddLiquidityPage() {
         Buffer.from(txBase64, "base64")
       );
 
-      console.log("Tipo da transação:", transaction.constructor.name);
-      console.log("✅ Transação desserializada com sucesso.");
-
-      // --- Assina ---
       const signedTx = await signTransaction(transaction);
-      console.log("✍️ Transação assinada com sucesso.");
-
-      // --- Envia ---
+      
       const txSignature = await connection.sendRawTransaction(
         signedTx.serialize(),
         { skipPreflight: false }
       );
-      console.log("🚀 Transação enviada:", txSignature);
 
-      setFeedback({
-        type: "info",
-        message: "Aguardando confirmação na blockchain...",
-      });
+      setFeedback({ type: "info", message: "Aguardando confirmação na blockchain..." });
 
       await connection.confirmTransaction(txSignature, "confirmed");
-      console.log("✅ Transação confirmada!");
 
       setFeedback({
         type: "success",
         message: "Pool de liquidez criada com sucesso na Meteora!",
         txId: txSignature,
       });
-    } catch (error: any) {
-      console.error("❌ ERRO DETALHADO NO CLIENTE:");
-      console.error("Mensagem:", error.message);
-      console.error("Stack:", error.stack);
-      console.error("Erro completo:", error);
 
+    } catch (error: any) {
+      console.error("❌ ERRO DETALHADO NO CLIENTE:", error);
       setFeedback({
         type: "error",
         message: `Erro ao criar pool: ${error.message || "Erro desconhecido."}`,
       });
     } finally {
       setIsLoading(false);
-      console.log("🏁 handleSubmit finalizado.");
     }
   };
 
-  const isButtonDisabled =
-    !publicKey || isLoading || !selectedToken || !tokenAmount || !solAmount;
+  const isButtonDisabled = !publicKey || isLoading || !selectedToken || !tokenAmount || !solAmount;
 
   return (
     <div className={styles.pageContainer}>
       <header className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Criar Pool de Liquidez</h1>
         <p className={styles.pageDescription}>
-          Crie um pool de liquidez (Token/SOL) na Meteora para permitir
-          negociações do seu token.
+          Crie um pool de liquidez (Token/SOL) na Meteora para permitir negociações do seu token.
         </p>
       </header>
-
       <div className={styles.container}>
         <Card className={styles.actionCard}>
           <form onSubmit={handleSubmit}>
@@ -211,7 +185,7 @@ export default function AddLiquidityPage() {
                     type="number"
                     value={tokenAmount}
                     onChange={(e) => setTokenAmount(e.target.value)}
-                    placeholder="Ex: 1000000"
+                    placeholder="Ex: 1000"
                     required
                     disabled={!selectedToken || isLoading}
                     min="0.000000001"
@@ -244,8 +218,26 @@ export default function AddLiquidityPage() {
                   step="any"
                 />
               </div>
-            </CardContent>
 
+              <div className={styles.inputGroup}>
+                <Label htmlFor="fee-tier">Taxa da Pool (Fee Tier)</Label>
+                 {/* CORREÇÃO: Valores e textos do seletor foram ajustados para refletir BPS reais e porcentagens corretas. */}
+                 <select 
+                  id="fee-tier" 
+                  value={feeBps} 
+                  onChange={(e) => setFeeBps(e.target.value)}
+                  className={styles.selectInput}
+                  disabled={isLoading}
+                >
+                  <option value="1">0.01% (Ideal para stablecoins)</option>
+                  <option value="5">0.05% (Pares comuns)</option>
+                  <option value="25">0.25% (Recomendado)</option>
+                  <option value="100">1.00% (Tokens exóticos/voláteis)</option>
+                </select>
+                <p className={styles.feeDescription}>Esta é a taxa que os traders pagam, que se torna sua recompensa.</p>
+              </div>
+
+            </CardContent>
             <CardFooter className={styles.cardFooter}>
               <Button type="submit" disabled={isButtonDisabled} className="w-full">
                 {isLoading
@@ -255,7 +247,6 @@ export default function AddLiquidityPage() {
             </CardFooter>
           </form>
         </Card>
-
         <aside className={styles.infoCard}>
           <Card>
             <CardHeader>
@@ -265,8 +256,7 @@ export default function AddLiquidityPage() {
               <div className={styles.infoBox}>
                 <IconInfo />
                 <span>
-                  Este processo criará um pool DLMM na Meteora. A proporção entre
-                  Token e SOL define o preço inicial.
+                  Este processo criará um pool DLMM na Meteora. A proporção entre Token e SOL define o preço inicial.
                 </span>
               </div>
             </CardContent>
@@ -276,3 +266,4 @@ export default function AddLiquidityPage() {
     </div>
   );
 }
+

@@ -3,19 +3,6 @@ import { buildCreatePairTx, buildAddLiquidityTx } from "@/lib/services/meteoraSe
 
 /**
  * API endpoint para criar par DLMM e/ou adicionar liquidez.
- *
- * Body esperado (JSON):
- * {
- *   action: "create" | "add",
- *   userWalletAddress: string,
- *   baseTokenMint: string,
- *   baseTokenDecimals: number,
- *   initialBaseTokenAmount?: number, // ATOMS, não normalizado
- *   initialSolAmount?: number,       // LAMPORTS, não normalizado
- *   pairAddress?: string,
- *   addBaseAmount?: number,
- *   addSolAmount?: number
- * }
  */
 export async function POST(request: Request) {
   console.log("🟦 [API] /api/create-liquidity-pool chamada");
@@ -56,70 +43,27 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
+      
+      console.log("🔎 Construindo transação de criação de pool...");
 
-      console.log("🔎 Debug criação pool:");
-      console.log(" - BaseTokenDecimals:", baseTokenDecimals);
-      console.log(" - initialBaseTokenAmount (atoms):", initialBaseTokenAmount);
-      console.log(" - initialSolAmount (lamports):", initialSolAmount);
-
-      // Tentar múltiplos binSteps até achar válido
-      const candidateBinSteps = [1, 5, 10, 25];
-      let result: any = null;
-      let usedBinStep: number | undefined;
-
-      for (const step of candidateBinSteps) {
-        try {
-          console.log(`➡️ Tentando criar pool com binStep = ${step}...`);
-
-          result = await buildCreatePairTx({
-            baseTokenMint,
-            baseTokenDecimals,
-            initialBaseTokenAmount, // já em atoms
-            initialSolAmount,       // já em lamports
-            userWalletAddress,
-            binStep: step,
-          });
-
-          usedBinStep = step;
-
-          console.log("✅ Sucesso com binStep:", step);
-          break;
-        } catch (err: any) {
-          console.error(`❌ Erro com binStep=${step}:`, err.message);
-        }
-      }
-
-      if (!result || !usedBinStep) {
-        return NextResponse.json(
-          { error: "Não foi possível encontrar um binStep válido para criação do pool." },
-          { status: 500 }
-        );
-      }
-
-      // --- Cálculo do preço teórico (pode falhar se binId for extremo)
-      let theoreticalPrice: number | undefined = undefined;
-      try {
-        const step = result.binStep / 10_000;
-        theoreticalPrice = Math.pow(1 + step, Number(result.activeBinId));
-      } catch (e) {
-        console.warn("⚠️ Erro ao calcular preço teórico:", e);
-      }
-
-      console.log("✅ Transação de criação construída com sucesso:", {
-        activeBinId: result.activeBinId,
-        binStep: result.binStep,
-        amountA: result.amountA,
-        amountB: result.amountB,
-        theoreticalPrice,
+      // --- CORREÇÃO ---
+      // Removemos o loop que tentava múltiplos binSteps.
+      // Fazemos uma chamada única e direta para o serviço, permitindo que ele
+      // use o binStep padrão (100), que é mais robusto para faixas de preço amplas
+      // e evita o erro de "Índice extremo".
+      const result = await buildCreatePairTx({
+        baseTokenMint,
+        baseTokenDecimals,
+        initialBaseTokenAmount,
+        initialSolAmount,
+        userWalletAddress,
       });
+
+      console.log("✅ Transação de criação construída com sucesso.");
 
       return NextResponse.json({
         message: "Transação de criação de pool gerada com sucesso.",
-        data: {
-          ...result,
-          theoreticalPrice,
-          binStep: usedBinStep,
-        },
+        data: result,
       });
     }
 
@@ -142,9 +86,7 @@ export async function POST(request: Request) {
         userWalletAddress,
       });
 
-      console.log("✅ Transação de adição de liquidez construída com sucesso:", {
-        positionPubKey: result.positionKeypair.publicKey,
-      });
+      console.log("✅ Transação de adição de liquidez construída com sucesso.");
 
       return NextResponse.json({
         message: "Transação de adição de liquidez gerada com sucesso.",
@@ -159,9 +101,7 @@ export async function POST(request: Request) {
     );
   } catch (error: any) {
     console.error("❌ ERRO DETALHADO NA API create-liquidity-pool:");
-    console.error("Mensagem:", error.message);
-    console.error("Stack Trace:", error.stack);
-    console.error("Objeto de erro completo:", error);
+    console.error(error); // Loga o objeto de erro completo para mais detalhes
 
     return NextResponse.json(
       { error: error.message || "Erro interno desconhecido." },
@@ -169,3 +109,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
