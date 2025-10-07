@@ -242,7 +242,7 @@ export default function AddLiquidityPage() {
               <Button type="submit" disabled={isButtonDisabled} className="w-full">
                 {isLoading
                   ? "Criando pool..."
-                  : `Criar Pool (Taxa: ${SERVICE_FEE_CREATE_LP_SOL} SOL + Rede)`}
+                  : `Criar Pool (Taxa: ${SERVICE_FEE_CREATE_LP_SOL})`}
               </Button>
             </CardFooter>
           </form>

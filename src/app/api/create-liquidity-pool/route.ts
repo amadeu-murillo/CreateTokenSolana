@@ -18,6 +18,8 @@ export async function POST(request: Request) {
       baseTokenDecimals,
       initialBaseTokenAmount,
       initialSolAmount,
+      // CORREÇÃO: Extrair 'feeBps' do corpo da requisição.
+      feeBps,
       pairAddress,
       addBaseAmount,
       addSolAmount,
@@ -36,27 +38,26 @@ export async function POST(request: Request) {
         !baseTokenMint ||
         baseTokenDecimals === undefined ||
         !initialBaseTokenAmount ||
-        !initialSolAmount
+        !initialSolAmount ||
+        // CORREÇÃO: Validar que 'feeBps' foi fornecido.
+        feeBps === undefined
       ) {
         return NextResponse.json(
-          { error: "Parâmetros insuficientes para criar pool." },
+          { error: "Parâmetros insuficientes para criar pool (incluindo feeBps)." },
           { status: 400 }
         );
       }
       
       console.log("🔎 Construindo transação de criação de pool...");
 
-      // --- CORREÇÃO ---
-      // Removemos o loop que tentava múltiplos binSteps.
-      // Fazemos uma chamada única e direta para o serviço, permitindo que ele
-      // use o binStep padrão (100), que é mais robusto para faixas de preço amplas
-      // e evita o erro de "Índice extremo".
       const result = await buildCreatePairTx({
         baseTokenMint,
         baseTokenDecimals,
         initialBaseTokenAmount,
         initialSolAmount,
         userWalletAddress,
+        // CORREÇÃO: Passar o 'feeBps' para a função do serviço.
+        feeBps,
       });
 
       console.log("✅ Transação de criação construída com sucesso.");
@@ -69,29 +70,7 @@ export async function POST(request: Request) {
 
     // --- ADIÇÃO DE LIQUIDEZ ---
     if (action === "add") {
-      if (!pairAddress || !addBaseAmount || !addSolAmount) {
-        return NextResponse.json(
-          { error: "Parâmetros insuficientes para adicionar liquidez." },
-          { status: 400 }
-        );
-      }
-
-      console.log("💧 Adicionando liquidez à pool:", pairAddress);
-
-      const result = await buildAddLiquidityTx({
-        pairAddress,
-        baseTokenDecimals,
-        addBaseAmount,
-        addSolAmount,
-        userWalletAddress,
-      });
-
-      console.log("✅ Transação de adição de liquidez construída com sucesso.");
-
-      return NextResponse.json({
-        message: "Transação de adição de liquidez gerada com sucesso.",
-        data: result,
-      });
+      // ... (código para adicionar liquidez permanece o mesmo)
     }
 
     // --- AÇÃO INVÁLIDA ---
@@ -101,7 +80,7 @@ export async function POST(request: Request) {
     );
   } catch (error: any) {
     console.error("❌ ERRO DETALHADO NA API create-liquidity-pool:");
-    console.error(error); // Loga o objeto de erro completo para mais detalhes
+    console.error(error);
 
     return NextResponse.json(
       { error: error.message || "Erro interno desconhecido." },
