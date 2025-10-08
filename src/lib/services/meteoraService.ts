@@ -26,35 +26,33 @@ import {
 const BASIS_POINT_MAX = 10_000;
 
 /**
- * Converte um price (quotePerBase, ex: SOL per TOKEN) para activeBinId (BN)
+ * Converte um price (Y/X) para activeBinId (BN)
  * Fórmula DLMM: price = (1 + binStep/10000)^(binId - 8388608)
  */
-function priceToActiveBinId(price: number, binStep: number): { activeId: BN, activeIndex: number } {
+function priceToActiveBinId(price: number, binStep: number): { activeId: BN; activeIndex: number } {
   console.log(`[priceToActiveBinId] Input - price: ${price}, binStep: ${binStep}`);
-  
+
   if (!isFinite(price) || price <= 0) {
     throw new Error(`Preço inválido para conversão: ${price}`);
   }
-  
+
   const binStepNum = binStep / BASIS_POINT_MAX;
   console.log(`[priceToActiveBinId] binStepNum: ${binStepNum}`);
-  
-  // Para DLMM, o preço 1:1 deve resultar em binId próximo ao offset
-  // Mas precisamos ajustar ligeiramente para evitar o binId exato do offset
+
   const adjustedPrice = price === 1 ? 1.0001 : price;
   console.log(`[priceToActiveBinId] adjustedPrice: ${adjustedPrice}`);
-  
+
   const activeIndex = Math.log(adjustedPrice) / Math.log(1 + binStepNum);
   console.log(`[priceToActiveBinId] activeIndex (float): ${activeIndex}`);
-  
+
   const BIN_ID_OFFSET = 8388608; // 1 << 23
   const activeId = Math.round(activeIndex) + BIN_ID_OFFSET;
   console.log(`[priceToActiveBinId] activeId calculado: ${activeId}`);
-  
+
   // Validação de range do Meteora DLMM
   const MIN_BIN_ID = 0;
   const MAX_BIN_ID = (1 << 24) - 1; // 16777215
-  
+
   if (activeId < MIN_BIN_ID || activeId > MAX_BIN_ID) {
     const minPrice = Math.pow(1 + binStepNum, MIN_BIN_ID - BIN_ID_OFFSET);
     const maxPrice = Math.pow(1 + binStepNum, MAX_BIN_ID - BIN_ID_OFFSET);
@@ -62,16 +60,21 @@ function priceToActiveBinId(price: number, binStep: number): { activeId: BN, act
     console.error(`[priceToActiveBinId] Range de preço válido: ${minPrice.toExponential(2)} - ${maxPrice.toExponential(2)}`);
     throw new Error(
       `activeBinId ${activeId} fora do range válido [${MIN_BIN_ID}, ${MAX_BIN_ID}]. ` +
-      `Ajuste as quantidades para um preço entre ${minPrice.toExponential(2)} e ${maxPrice.toExponential(2)}`
+        `Ajuste as quantidades para um preço entre ${minPrice.toExponential(2)} e ${maxPrice.toExponential(2)}`
     );
   }
-  
+
   console.log(`[priceToActiveBinId] ✅ activeBinId válido: ${activeId}`);
   return { activeId: new BN(activeId), activeIndex };
 }
 
 /**
  * Constrói a transação (unsigned) para criar o LB pair.
+ *
+ * Observação importante sobre ordem:
+ * - Para criar um pair permissionless na DLMM regulada pelo contrato que você usa,
+ *   o token de "quote" deve ser SOL (WSOL) ou USDC.
+ * - Aqui assumimos explicitamente tokenX = baseToken (custom token) e tokenY = WSOL (quote).
  */
 export async function buildCreatePairTx(params: {
   baseTokenMint: string;
@@ -83,7 +86,7 @@ export async function buildCreatePairTx(params: {
 }) {
   console.log('\n========== INÍCIO buildCreatePairTx ==========');
   console.log('[buildCreatePairTx] Parâmetros recebidos:', JSON.stringify(params, null, 2));
-  
+
   const {
     baseTokenMint,
     baseTokenDecimals,
@@ -106,34 +109,38 @@ export async function buildCreatePairTx(params: {
   const baseTokenMintPubkey = new PublicKey(baseTokenMint);
   const nativeMintPubkey = NATIVE_MINT; // WSOL
 
-  const tokenX = baseTokenMintPubkey;
-  const tokenY = nativeMintPubkey;
+  // CORREÇÃO: Forçar ordem correta: tokenX = baseToken, tokenY = WSOL (quote)
+  const isBaseTokenX = true;
+  const tokenX = baseTokenMintPubkey; // base token (custom)
+  const tokenY = nativeMintPubkey; // WSOL as quote token
 
-  console.log(`[buildCreatePairTx] tokenX (base): ${tokenX.toBase58()}`);
-  console.log(`[buildCreatePairTx] tokenY (quote/SOL): ${tokenY.toBase58()}`);
+  console.log(`[buildCreatePairTx] tokenX: ${tokenX.toBase58()}`);
+  console.log(`[buildCreatePairTx] tokenY: ${tokenY.toBase58()}`);
+  console.log(`[buildCreatePairTx] isBaseTokenX: ${isBaseTokenX}`);
 
   // Calcular amounts em lamports
-  const amountX = new BN(
-    new Decimal(initialBaseTokenAmount)
-      .mul(new Decimal(10).pow(baseTokenDecimals))
-      .toFixed(0)
+  const baseAmountLamports = new BN(
+    new Decimal(initialBaseTokenAmount).mul(new Decimal(10).pow(baseTokenDecimals)).toFixed(0)
   );
-  const amountY = new BN(
-    new Decimal(initialSolAmount)
-      .mul(new Decimal(10).pow(9))
-      .toFixed(0)
+  const solAmountLamports = new BN(
+    new Decimal(initialSolAmount).mul(new Decimal(10).pow(9)).toFixed(0)
   );
+
+  // CORREÇÃO: Determinar amountX e amountY baseado na ordem dos tokens (tokenX = base, tokenY = SOL)
+  const amountX = baseAmountLamports;
+  const amountY = solAmountLamports;
 
   console.log(`[buildCreatePairTx] amountX (lamports): ${amountX.toString()}`);
   console.log(`[buildCreatePairTx] amountY (lamports): ${amountY.toString()}`);
 
-  // Calcular preço: SOL per TOKEN
-  const price = new Decimal(amountY.toString())
-    .div(new Decimal(amountX.toString()))
-    .toNumber();
+  // CORREÇÃO: Calcular preço correto (sempre Y/X)
+  const price = new Decimal(amountY.toString()).div(new Decimal(amountX.toString())).toNumber();
 
-  console.log(`[buildCreatePairTx] Preço calculado (SOL per Token): ${price}`);
+  console.log(`[buildCreatePairTx] Preço calculado (Y/X): ${price}`);
   console.log(`[buildCreatePairTx] Preço em notação científica: ${price.toExponential()}`);
+
+  // Interpretação textual (mais útil para humanos)
+  console.log(`[buildCreatePairTx] Interpretação: ${price} SOL per TOKEN`);
 
   if (!isFinite(price) || price <= 0) {
     console.error(`[buildCreatePairTx] ERRO: Preço inválido: ${price}`);
@@ -143,7 +150,7 @@ export async function buildCreatePairTx(params: {
   // Converter preço para activeBinId
   let activeId: BN;
   let activeIndex: number;
-  
+
   try {
     const result = priceToActiveBinId(price, binStep);
     activeId = result.activeId;
@@ -163,7 +170,7 @@ export async function buildCreatePairTx(params: {
   console.log(`[buildCreatePairTx] userTokenX ATA: ${userTokenX.toBase58()}`);
   console.log(`[buildCreatePairTx] userTokenY ATA: ${userTokenY.toBase58()}`);
 
-  const preInstructions = [];
+  const preInstructions: any[] = [];
 
   // Verificar e criar ATA para tokenX
   try {
@@ -171,12 +178,7 @@ export async function buildCreatePairTx(params: {
     if (!tokenXAccountInfo) {
       console.log(`[buildCreatePairTx] Criando ATA para tokenX`);
       preInstructions.push(
-        createAssociatedTokenAccountInstruction(
-          userPublicKey,
-          userTokenX,
-          userPublicKey,
-          tokenX
-        )
+        createAssociatedTokenAccountInstruction(userPublicKey, userTokenX, userPublicKey, tokenX)
       );
     } else {
       console.log(`[buildCreatePairTx] ATA tokenX já existe`);
@@ -186,18 +188,13 @@ export async function buildCreatePairTx(params: {
     throw error;
   }
 
-  // Verificar e criar ATA para tokenY (WSOL)
+  // Verificar e criar ATA para tokenY
   try {
     const tokenYAccountInfo = await connection.getAccountInfo(userTokenY);
     if (!tokenYAccountInfo) {
-      console.log(`[buildCreatePairTx] Criando ATA para tokenY (WSOL)`);
+      console.log(`[buildCreatePairTx] Criando ATA para tokenY`);
       preInstructions.push(
-        createAssociatedTokenAccountInstruction(
-          userPublicKey,
-          userTokenY,
-          userPublicKey,
-          tokenY
-        )
+        createAssociatedTokenAccountInstruction(userPublicKey, userTokenY, userPublicKey, tokenY)
       );
     } else {
       console.log(`[buildCreatePairTx] ATA tokenY já existe`);
@@ -207,21 +204,7 @@ export async function buildCreatePairTx(params: {
     throw error;
   }
 
-  // Transferir SOL para WSOL ATA
-  console.log(`[buildCreatePairTx] Adicionando instrução de transferência SOL: ${amountY.toString()} lamports`);
-  preInstructions.push(
-    SystemProgram.transfer({
-      fromPubkey: userPublicKey,
-      toPubkey: userTokenY,
-      lamports: amountY.toNumber(),
-    })
-  );
-
-  // Sync native (wrap SOL)
-  console.log(`[buildCreatePairTx] Adicionando instrução syncNative`);
-  preInstructions.push(createSyncNativeInstruction(userTokenY));
-
-  console.log("\n--- Parâmetros para createCustomizablePermissionlessLbPair ---");
+  console.log('\n--- Parâmetros para createCustomizablePermissionlessLbPair ---');
   console.log(`1. binStep (BN): ${binStepBN.toString()}`);
   console.log(`2. tokenX (Pubkey): ${tokenX.toBase58()}`);
   console.log(`3. tokenY (Pubkey): ${tokenY.toBase58()}`);
@@ -232,7 +215,7 @@ export async function buildCreatePairTx(params: {
   console.log(`8. creator (Pubkey): ${userPublicKey.toBase58()}`);
   console.log(`9. activationPoint: undefined (ativa imediatamente)`);
   console.log(`10. creatorPoolOnOffControl: false`);
-  console.log("------------------------------------------------------------\n");
+  console.log('------------------------------------------------------------\n');
 
   let createPairTx;
   try {
@@ -244,11 +227,11 @@ export async function buildCreatePairTx(params: {
       tokenY,
       activeId,
       binStepBN,
-      0,                  // activationType (0 = Slot, 1 = Timestamp)
-      false,              // hasAlphaVault
-      userPublicKey,      // creator
-      undefined,          // activationPoint (null = ativa imediatamente)
-      false,              // creatorPoolOnOffControl
+      0, // activationType (0 = Slot, 1 = Timestamp)
+      false, // hasAlphaVault
+      userPublicKey, // creator
+      undefined, // activationPoint (null = ativa imediatamente)
+      false, // creatorPoolOnOffControl
       { cluster: 'devnet' }
     );
     console.log(`[buildCreatePairTx] ✅ createCustomizablePermissionlessLbPair retornou com sucesso`);
@@ -257,6 +240,14 @@ export async function buildCreatePairTx(params: {
     console.error(`[buildCreatePairTx] ERRO ao chamar createCustomizablePermissionlessLbPair:`, error);
     throw error;
   }
+
+  // Derivar o endereço do pool
+  const [lbPair] = PublicKey.findProgramAddressSync(
+    [Buffer.from('lb_pair'), tokenX.toBuffer(), tokenY.toBuffer(), binStepBN.toArrayLike(Buffer, 'le', 2)],
+    new PublicKey('LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo')
+  );
+
+  console.log(`[buildCreatePairTx] Pool address derivado: ${lbPair.toBase58()}`);
 
   // Obter blockhash
   let blockhash;
@@ -299,6 +290,7 @@ export async function buildCreatePairTx(params: {
 
   return {
     serializedCreateTxBase64: serialized,
+    poolAddress: lbPair.toBase58(),
     activeBinId: activeId.toString(),
     binStep,
     amountX: amountX.toString(),
@@ -322,7 +314,7 @@ export async function buildAddLiquidityTx(params: {
 }) {
   console.log('\n========== INÍCIO buildAddLiquidityTx ==========');
   console.log('[buildAddLiquidityTx] Parâmetros recebidos:', JSON.stringify(params, null, 2));
-  
+
   const {
     pairAddress,
     baseTokenDecimals,
@@ -342,7 +334,7 @@ export async function buildAddLiquidityTx(params: {
   const pairPubkey = new PublicKey(pairAddress);
 
   console.log(`[buildAddLiquidityTx] Criando instância DLMM para pool: ${pairPubkey.toBase58()}`);
-  
+
   let dlmmPool;
   try {
     dlmmPool = await DLMM.create(connection, pairPubkey);
@@ -376,13 +368,41 @@ export async function buildAddLiquidityTx(params: {
   console.log(`[buildAddLiquidityTx] Range de bins: ${minBinId} - ${maxBinId}`);
 
   const strategy = {
-    strategyType: 0,  // StrategyType.SpotBalanced
+    strategyType: 0, // StrategyType.SpotBalanced
     minBinId: minBinId,
     maxBinId: maxBinId,
   };
 
   const positionKeypair = Keypair.generate();
   console.log(`[buildAddLiquidityTx] Position keypair gerado: ${positionKeypair.publicKey.toBase58()}`);
+
+  // Preparar ATAs para WSOL (tokenY)
+  const tokenY = NATIVE_MINT;
+  const userTokenY = await getAssociatedTokenAddress(tokenY, userPublicKey);
+
+  const preInstructions: any[] = [];
+
+  const tokenYAccountInfo = await connection.getAccountInfo(userTokenY);
+  if (!tokenYAccountInfo) {
+    console.log(`[buildAddLiquidityTx] Criando ATA para WSOL`);
+    preInstructions.push(
+      createAssociatedTokenAccountInstruction(userPublicKey, userTokenY, userPublicKey, tokenY)
+    );
+  }
+
+  // Transferir SOL para WSOL ATA
+  console.log(`[buildAddLiquidityTx] Adicionando instrução de transferência SOL: ${totalYAmount.toString()} lamports`);
+  preInstructions.push(
+    SystemProgram.transfer({
+      fromPubkey: userPublicKey,
+      toPubkey: userTokenY,
+      lamports: totalYAmount.toNumber(),
+    })
+  );
+
+  // Sync native (wrap SOL)
+  console.log(`[buildAddLiquidityTx] Adicionando instrução syncNative`);
+  preInstructions.push(createSyncNativeInstruction(userTokenY));
 
   let initAddTx;
   try {
@@ -393,7 +413,7 @@ export async function buildAddLiquidityTx(params: {
       totalYAmount,
       strategy,
       user: userPublicKey,
-      slippage: 1,  // 1% slippage
+      slippage: 1, // 1% slippage
     });
     console.log(`[buildAddLiquidityTx] ✅ Transação de liquidez criada`);
   } catch (error) {
@@ -410,21 +430,24 @@ export async function buildAddLiquidityTx(params: {
     instructions: [
       ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }),
+      ...preInstructions,
       ...initAddTx.instructions,
     ],
   }).compileToV0Message();
 
   const versionedTx = new VersionedTransaction(messageV0);
+
+  // Assinar com o position keypair
+  versionedTx.sign([positionKeypair]);
+
   const serialized = Buffer.from(versionedTx.serialize()).toString('base64');
 
   console.log(`[buildAddLiquidityTx] ✅ Transação serializada`);
+  
   console.log('========== FIM buildAddLiquidityTx ==========\n');
 
   return {
     serializedAddLiquidityTxBase64: serialized,
-    positionKeypair: {
-      publicKey: positionKeypair.publicKey.toBase58(),
-      secretKey: Buffer.from(positionKeypair.secretKey).toString('base64'),
-    },
+    positionAddress: positionKeypair.publicKey.toBase58(),
   };
 }
