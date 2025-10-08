@@ -26,9 +26,9 @@ export default function ConfirmationPage() {
             />
             <div className={styles.ctaContainer}>
                 <p>Parabéns! Seu token está na blockchain. O próximo passo é criar um pool de liquidez para que ele possa ser negociado.</p>
-                <Link href={`/add-liquidity?mint=${tokenAddress}`}>
+                <Link href={`/add-liquidity`}>
                     <Button className={styles.ctaButton}>
-                        Criar Pool de Liquidez Agora
+                        Adicionar Liquidez
                     </Button>
                 </Link>
             </div>

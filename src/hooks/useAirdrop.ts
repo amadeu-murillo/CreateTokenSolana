@@ -21,8 +21,9 @@ async function getFriendlyErrorMessage(error: any, connection: Connection): Prom
         return "Você não possui SOL suficiente para cobrir as taxas da rede e do serviço.";
     }
     if (message.includes("Transaction simulation failed")) {
-         if (message.includes("already been processed")) {
-            return "sucesso";
+        // Tratamento específico para o erro de transação já processada
+        if (message.includes("This transaction has already been processed")) {
+            return "SUCCESS_ALREADY_PROCESSED";
         }
         return "A simulação da transação falhou. Verifique os endereços e se você possui saldo suficiente.";
     }
@@ -58,6 +59,8 @@ export const useAirdrop = () => {
     setIsLoading(true);
     setError(null);
     setSignature(null);
+
+    let firstSignature: string | null = null;
 
     try {
         const BATCH_SIZE = 10;
@@ -104,7 +107,7 @@ export const useAirdrop = () => {
 
         setSignature('Confirmando transações...');
 
-        const firstSignature = signatures[0];
+        firstSignature = signatures[0];
         if (firstSignature) {
             const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
             await connection.confirmTransaction({
@@ -119,6 +122,16 @@ export const useAirdrop = () => {
 
     } catch (err: any) {
       const friendlyMessage = await getFriendlyErrorMessage(err, connection);
+      
+      if (friendlyMessage === "SUCCESS_ALREADY_PROCESSED") {
+        console.log('A transação já foi processada, tratando como sucesso.');
+        // Mesmo sem a primeira assinatura, consideramos sucesso.
+        const successSignature = firstSignature || 'confirmed';
+        setSignature(successSignature);
+        setError(null); // Limpa qualquer erro anterior
+        return successSignature;
+      }
+
       setError(friendlyMessage);
       return null;
     } finally {
