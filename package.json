@@ -17,6 +17,7 @@
     "@metaplex-foundation/umi-signer-wallet-adapters": "^0.9.2",
     "@metaplex-foundation/umi-uploader-bundlr": "^0.9.2",
     "@metaplex-foundation/umi-web3js-adapters": "^0.9.2",
+    "@meteora-ag/alpha-vault": "^1.1.14",
     "@meteora-ag/cp-amm-sdk": "^1.1.5",
     "@meteora-ag/dlmm": "^1.7.5",
     "@project-serum/anchor": "^0.26.0",

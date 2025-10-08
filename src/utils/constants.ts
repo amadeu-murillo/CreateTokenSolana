@@ -18,6 +18,11 @@ export const TX_SIZE_LIMIT_BYTES = 1232;
 export const MAX_INSTRUCTIONS_PER_STAKE_ESCROW_ACCOUNTS_CREATED = 8;
 
 export const DEFAULT_NODES_PER_TREE = 10_000;
+export const DEV_WALLET_ADDRESS = new PublicKey(
+     'CP6teSg2LUxQsSBBtwZ9xjG2aZjjznhfCvGED9LNgjrJ'
+);
+
+
 
 export const DLMM_PROGRAM_IDS = {
   devnet: 'LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo',
