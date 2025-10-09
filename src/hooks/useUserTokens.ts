@@ -114,10 +114,29 @@ export const useUserTokens = () => {
                             // Se não estiver no cache ou estiver expirado, busca na rede
                             try {
                                 const asset = await fetchDigitalAsset(umi, umiPublicKey(mint));
+                                
+                                // ***** INÍCIO DA CORREÇÃO *****
+                                // A `asset.metadata.uri` é a URL para o JSON, não para a imagem.
+                                // Precisamos buscar esse JSON para encontrar a URL da imagem.
+                                let finalLogoURI = '';
+                                if (asset.metadata.uri) {
+                                    try {
+                                        const response = await fetch(asset.metadata.uri);
+                                        if (response.ok) {
+                                            const offChainMetadata = await response.json();
+                                            // A URL da imagem está dentro da propriedade 'image' do JSON
+                                            finalLogoURI = offChainMetadata.image || '';
+                                        }
+                                    } catch (fetchErr) {
+                                        console.error(`Failed to fetch off-chain metadata from ${asset.metadata.uri}:`, fetchErr);
+                                    }
+                                }
+                                // ***** FIM DA CORREÇÃO *****
+
                                 const metadata = {
                                     name: asset.metadata.name,
                                     symbol: asset.metadata.symbol,
-                                    logoURI: asset.metadata.uri,
+                                    logoURI: finalLogoURI, // Usar a URL da imagem corrigida
                                 };
 
                                 // Salva os novos metadados no cache
