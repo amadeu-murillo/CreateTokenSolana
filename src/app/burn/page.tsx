@@ -11,20 +11,20 @@ import { TokenSelector } from '../../components/TokenSelector';
 import Notification from '../../components/ui/Notification';
 import styles from './Burn.module.css';
 
-// Ícones SVG
-const TokenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /></svg>;
+// SVG Icons
+const TokenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /></svg>;
 const FlameIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>;
 
 const tutorialSteps = [
     {
         icon: <TokenIcon />,
-        title: "Selecione o Token",
-        description: "Escolha o token que você deseja queimar diretamente da sua carteira. A queima removerá tokens permanentemente da circulação."
+        title: "Select the Token",
+        description: "Choose the token you want to burn directly from your wallet. Burning will permanently remove tokens from circulation."
     },
     {
         icon: <FlameIcon />,
-        title: "Quantidade a Queimar",
-        description: "Defina a quantidade de tokens a ser removida. Você pode usar o botão 'MAX' para queimar todo o saldo ou inserir um valor manualmente."
+        title: "Amount to Burn",
+        description: "Set the number of tokens to be removed. You can use the 'MAX' button to burn your entire balance or enter a value manually."
     }
 ];
 
@@ -50,7 +50,7 @@ export default function BurnPage() {
     }, [error]);
 
     useEffect(() => {
-        // Limpa o estado do hook ao desmontar o componente
+        // Clear hook state when unmounting the component
         return () => {
             reset();
         }
@@ -68,12 +68,12 @@ export default function BurnPage() {
         reset();
         
         if (selectedToken) {
-            // CORREÇÃO: Passa o programId do token selecionado para a função de queima
+            // FIX: Pass the selected token’s programId to the burn function
             const signature = await burnToken(selectedToken.mint, Number(amount), selectedToken.programId);
             if (signature) {
                 setNotification({
                     type: 'success',
-                    message: `Sucesso! ${amount} ${selectedToken.symbol || 'tokens'} foram queimados.`,
+                    message: `Success! ${amount} ${selectedToken.symbol || 'tokens'} have been burned.`,
                     txId: signature
                 });
                 setSelectedTokenMint('');
@@ -93,9 +93,9 @@ export default function BurnPage() {
             <div className={styles.formContainer}>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Queimar Tokens (Burn)</CardTitle>
+                        <CardTitle>Burn Tokens</CardTitle>
                         <CardDescription>
-                            Remova permanentemente uma quantidade de tokens de circulação. Esta ação é irreversível.
+                            Permanently remove a certain amount of tokens from circulation. This action is irreversible.
                         </CardDescription>
                     </CardHeader>
                     <form onSubmit={handleSubmit}>
@@ -110,13 +110,13 @@ export default function BurnPage() {
                             )}
                             
                             <div className={styles.field}>
-                                <Label htmlFor="token-select">Selecione o Token</Label>
+                                <Label htmlFor="token-select">Select Token</Label>
                                 <TokenSelector
                                     tokens={userTokens}
                                     selectedTokenMint={selectedTokenMint}
                                     onSelectToken={(mint) => {
                                         setSelectedTokenMint(mint);
-                                        setAmount(''); // Limpa a quantidade ao trocar
+                                        setAmount(''); // Clear amount when switching
                                     }}
                                     isLoading={isLoadingUserTokens}
                                     disabled={isLoading}
@@ -126,14 +126,14 @@ export default function BurnPage() {
                             {selectedToken && (
                                 <div className={styles.field}>
                                     <div className={styles.amountHeader}>
-                                        <Label htmlFor="amount">Quantidade a Queimar</Label>
-                                        <span className={styles.balance}>Saldo: {parseFloat(selectedToken.amount).toLocaleString()} {selectedToken.symbol}</span>
+                                        <Label htmlFor="amount">Amount to Burn</Label>
+                                        <span className={styles.balance}>Balance: {parseFloat(selectedToken.amount).toLocaleString()} {selectedToken.symbol}</span>
                                     </div>
                                     <div className={styles.amountInputContainer}>
                                         <Input 
                                             id="amount" 
                                             type="number" 
-                                            placeholder="Ex: 1000" 
+                                            placeholder="E.g.: 1000" 
                                             value={amount} 
                                             onChange={(e) => setAmount(e.target.value)} 
                                             required 
@@ -150,14 +150,14 @@ export default function BurnPage() {
                         </CardContent>
                         <CardFooter>
                             <Button type="submit" disabled={isLoading || !selectedToken || !amount} className="w-full">
-                                {isLoading ? 'Queimando...' : `Queimar Tokens (Custo: ~0.05 SOL + taxas)`}
+                                {isLoading ? 'Burning...' : `Burn Tokens (Cost: ~0.05 SOL + fees)`}
                             </Button>
                         </CardFooter>
                     </form>
                 </Card>
             </div>
             <div className={styles.sidebar}>
-                <h3 className={styles.sidebarTitle}>Como Funciona</h3>
+                <h3 className={styles.sidebarTitle}>How It Works</h3>
                  {tutorialSteps.map((step, index) => (
                     <Card key={index} className={styles.tutorialCard}>
                         <CardContent className={styles.tutorialCardContent}>

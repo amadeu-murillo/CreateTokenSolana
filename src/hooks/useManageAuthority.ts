@@ -8,18 +8,18 @@ function getFriendlyErrorMessage(error: any): string {
     console.error("Manage authority error:", error);
 
     if (message.includes("User rejected the request")) {
-        return "Transação rejeitada pelo usuário na carteira.";
+        return "Transaction rejected by the user in the wallet.";
     }
     if (message.includes("not enough SOL")) {
-        return "Falha na transação. Verifique se você possui SOL suficiente para as taxas.";
+        return "Transaction failed. Please check if you have enough SOL for the fees.";
     }
     if (message.includes("Transaction simulation failed")) {
-        return "A simulação da transação falhou. Verifique se você ainda possui a autoridade sobre este token.";
+        return "Transaction simulation failed. Please check if you still have authority over this token.";
     }
     if (message.includes("blockhash")) {
-        return "O blockhash da transação expirou. Por favor, tente novamente.";
+        return "The transaction blockhash has expired. Please try again.";
     }
-    return "Ocorreu um erro ao remover a autoridade. Verifique o console para mais detalhes.";
+    return "An error occurred while removing the authority. Check the console for more details.";
 }
 
 export const useManageAuthority = () => {
@@ -30,11 +30,11 @@ export const useManageAuthority = () => {
 
   const manageAuthority = async (mint: string, authorityType: 'mint' | 'freeze', programId: string) => {
     if (!publicKey || !sendTransaction) {
-      setError("Carteira não conectada.");
+      setError("Wallet not connected.");
       return null;
     }
     if (!connection) {
-        setError("A conexão com a rede Solana não foi estabelecida.");
+        setError("Connection to the Solana network was not established.");
         return null;
     }
 

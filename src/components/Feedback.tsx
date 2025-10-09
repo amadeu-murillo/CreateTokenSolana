@@ -29,11 +29,11 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
         <CardHeader>
           <div className={styles.header}>
             <CheckCircle />
-            <CardTitle>Token criado com sucesso!</CardTitle>
+            <CardTitle>Token created successfully!</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
-          <p>Endereço do token:</p>
+          <p>Token address:</p>
           <p className={styles.address}>{tokenAddress}</p>
           <a
             href={explorerLink}
@@ -41,7 +41,7 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
             rel="noopener noreferrer"
             className={styles.link}
           >
-            {txId ? 'Ver transação no Solscan' : 'Ver token no Solscan'}
+            {txId ? 'View transaction on Solscan' : 'View token on Solscan'}
           </a>
         </CardContent>
       </Card>
@@ -57,7 +57,7 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
         </div>
       </CardHeader>
       <CardContent>
-        <p className={styles.errorMessage}>{decodeURIComponent(errorMessage || "Algo deu errado durante a criação do token.")}</p>
+        <p className={styles.errorMessage}>{decodeURIComponent(errorMessage || "Something went wrong while creating the token.")}</p>
       </CardContent>
     </Card>
   );

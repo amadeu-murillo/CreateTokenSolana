@@ -24,27 +24,27 @@ function getFriendlyErrorMessage(error: any): string {
     console.error("Create token error:", error);
 
     if (message.includes("User rejected the request")) {
-        return "Transação rejeitada pelo utilizador na carteira.";
+        return "Transaction rejected by the user in the wallet.";
     }
     // Erro de saldo insuficiente para rent
     if (message.includes("insufficient lamports")) {
-        return "Você não possui SOL suficiente para cobrir as taxas da rede.";
+        return "You don't have enough SOL to cover the network fees.";
     }
     if (message.includes("not enough SOL")) {
-        return "Falha na transação. Verifique se possui SOL suficiente para os custos.";
+        return "Transaction failed. Please check if you have enough SOL for the costs.";
     }
     // Exemplo de erro de símbolo (simulado, a lógica real pode estar no backend)
     if (message.includes("Token symbol already in use")) {
-        return "Este símbolo já foi utilizado. Por favor, escolha outro.";
+        return "This symbol is already in use. Please choose another one.";
     }
     if (message.includes("Transaction simulation failed")) {
-        return "A simulação da transação falhou. Isto pode ser um problema temporário na rede ou dados inválidos.";
+        return "Transaction simulation failed. This may be a temporary network issue or invalid data.";
     }
      if (message.includes("blockhash")) {
-        return "O blockhash da transação expirou. Por favor, tente novamente.";
+        return "The transaction blockhash has expired. Please try again.";
     }
 
-    return "Ocorreu um erro ao criar o token. Verifique o console para mais detalhes.";
+    return "An error occurred while creating the token. Check the console for more details.";
 }
 
 export const useCreateToken = () => {
@@ -56,14 +56,14 @@ export const useCreateToken = () => {
 
   const createToken = async (tokenData: TokenData) => {
     if (!publicKey || !sendTransaction) {
-      const errorMessage = "Carteira não conectada. Por favor, conecte a sua carteira para continuar.";
+      const errorMessage = "Wallet not connected. Please connect your wallet to continue.";
       setError(errorMessage);
       alert(errorMessage);
       return null;
     }
 
     if (!connection) {
-        const errorMessage = "A conexão com a rede Solana não foi estabelecida.";
+        const errorMessage = "Connection to the Solana network was not established.";
         setError(errorMessage);
         alert(errorMessage);
         return null;
@@ -88,14 +88,14 @@ export const useCreateToken = () => {
 
       const result = await response.json();
       if (!response.ok) {
-        throw new Error(result.error || 'Falha ao preparar a transação no servidor.');
+        throw new Error(result.error || 'Failed to prepare the transaction on the server.');
       }
       
       const transactionBuffer = Buffer.from(result.transaction, 'base64');
       const transaction = VersionedTransaction.deserialize(transactionBuffer);
       
       const signature = await sendTransaction(transaction, connection);
-      console.log(`Transação enviada com a assinatura: ${signature}`);
+      console.log(`Transaction sent with signature: ${signature}`);
 
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
       await connection.confirmTransaction({
@@ -103,7 +103,7 @@ export const useCreateToken = () => {
         blockhash,
         lastValidBlockHeight
       }, 'confirmed');
-      console.log('Transação confirmada!');
+      console.log('Transaction confirmed!');
 
       router.push(`/confirmation?status=success&tokenAddress=${result.mintAddress}&txId=${signature}`);
       return { signature, mintAddress: result.mintAddress };

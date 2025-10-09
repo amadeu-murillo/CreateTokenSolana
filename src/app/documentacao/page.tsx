@@ -15,106 +15,106 @@ const IconLayers = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" heig
 const documentationSections = [
     {
         icon: <IconPlusCircle />,
-        title: "Criação de Tokens (SPL e Token-2022)",
+        title: "Token Creation (SPL and Token-2022)",
         id: "criar-token",
-        summary: "Aprenda a criar seu próprio token fungível na Solana, definindo suas propriedades essenciais e metadados.",
+        summary: "Learn how to create your own fungible token on Solana by defining its essential properties and metadata.",
         details: [
-            "O processo de criação de token permite que você lance um ativo digital na blockchain da Solana. Nossa plataforma simplifica este processo em algumas etapas:",
+            "The token creation process allows you to launch a digital asset on the Solana blockchain. Our platform simplifies this process into a few steps:",
             {
                 type: 'list',
                 items: [
-                    "<strong>Detalhes do Token:</strong> Você define o <strong>Nome</strong> (ex: 'Moeda Lua'), <strong>Símbolo</strong> (ex: 'LUA'), <strong>Decimais</strong> (geralmente 9, para fracionamento), e o <strong>Fornecimento Total</strong> (a quantidade total de tokens que existirão).",
-                    "<strong>Metadados (Imagem):</strong> A imagem do seu token é crucial para a identidade visual. Nós fazemos o upload para um serviço descentralizado e vinculamos ao seu token usando o padrão Metaplex, garantindo que ele apareça corretamente em carteiras e exploradores.",
-                    "<strong>Padrão do Token:</strong> Você pode escolher entre o <strong>SPL Padrão</strong> (ideal para a maioria dos casos) e o <strong>Token-2022</strong>, que oferece funcionalidades avançadas como taxas de transferência (tax on transfer).",
-                    "<strong>Autoridades:</strong> As 'Opções de Autoridade' são vitais para a confiança e descentralização. Ao desmarcar a 'Autoridade de Mint', você torna o fornecimento do seu token fixo e imutável. Desmarcar a 'Autoridade de Freeze' impede que qualquer pessoa congele tokens em carteiras, uma prática comum para projetos descentralizados.",
-                    "<strong>Confirmação:</strong> Após preencher tudo, você aprova uma única transação na sua carteira. Nós cuidamos de toda a complexidade técnica na blockchain."
+                    "<strong>Token Details:</strong> Define the <strong>Name</strong> (e.g., 'Moon Coin'), <strong>Symbol</strong> (e.g., 'MOON'), <strong>Decimals</strong> (usually 9 for fractional amounts), and the <strong>Total Supply</strong> (the total number of tokens that will exist).",
+                    "<strong>Metadata (Image):</strong> The image of your token is crucial for its visual identity. We upload it to a decentralized service and link it to your token using the Metaplex standard, ensuring it appears correctly in wallets and explorers.",
+                    "<strong>Token Standard:</strong> You can choose between the <strong>Standard SPL</strong> (ideal for most cases) and <strong>Token-2022</strong>, which offers advanced features like transfer fees (tax on transfer).",
+                    "<strong>Authorities:</strong> The 'Authority Options' are vital for trust and decentralization. By unchecking the 'Mint Authority', your token supply becomes fixed and immutable. Unchecking the 'Freeze Authority' prevents anyone from freezing tokens in wallets — a common practice for decentralized projects.",
+                    "<strong>Confirmation:</strong> After filling everything out, approve a single transaction in your wallet. We handle all the blockchain technical complexity for you."
                 ]
             }
         ]
     },
     {
         icon: <IconLayers />,
-        title: "Criação de Pool de Liquidez",
+        title: "Liquidity Pool Creation",
         id: "criar-liquidez",
-        summary: "Permita que seu token seja negociado publicamente criando um mercado em uma exchange descentralizada (DEX).",
+        summary: "Allow your token to be publicly traded by creating a market on a decentralized exchange (DEX).",
         details: [
-            "Um token sem liquidez não pode ser comprado ou vendido. Criar um pool de liquidez é o passo essencial para dar valor e utilidade ao seu ativo.",
+            "A token without liquidity cannot be bought or sold. Creating a liquidity pool is an essential step to give your asset value and utility.",
             {
                 type: 'list',
                 items: [
-                  "<strong>O que é um Pool?:</strong> É um par de dois ativos (no nosso caso, o seu token e SOL) trancados em um contrato inteligente em uma DEX como a Meteora. Isso cria um mercado onde as pessoas podem trocar um pelo outro.",
-                  "<strong>Definindo o Preço Inicial:</strong> A proporção de tokens e SOL que você deposita inicialmente define o preço de lançamento. Por exemplo, se você depositar 1.000.000 do seu token e 10 SOL, o preço inicial de cada token será 0.00001 SOL.",
-                  "<strong>Nossa Ferramenta:</strong> Na página 'Liquidez', você seleciona seu token, a quantidade que deseja depositar e a quantidade correspondente de SOL. Nós criamos e inicializamos o pool na Meteora para você de forma automatizada.",
-                  "<strong>Taxas:</strong> Este processo envolve múltiplas transações na blockchain e, por isso, tem um custo de rede maior, além da nossa taxa de serviço."
+                  "<strong>What is a Pool?:</strong> It’s a pair of two assets (in this case, your token and SOL) locked in a smart contract on a DEX such as Meteora. This creates a market where people can swap one for the other.",
+                  "<strong>Setting the Initial Price:</strong> The ratio of tokens and SOL you initially deposit defines the launch price. For example, if you deposit 1,000,000 of your token and 10 SOL, each token’s starting price will be 0.00001 SOL.",
+                  "<strong>Our Tool:</strong> On the 'Liquidity' page, select your token, the amount you want to deposit, and the corresponding amount of SOL. We automatically create and initialize the pool on Meteora for you.",
+                  "<strong>Fees:</strong> This process involves multiple blockchain transactions, so it has a higher network cost plus our service fee."
                 ]
             }
         ]
     },
     {
         icon: <IconFlame />,
-        title: "Queima de Tokens (Burn)",
+        title: "Token Burning",
         id: "queimar-tokens",
-        summary: "Reduza o fornecimento total do seu token, removendo-o permanentemente de circulação.",
+        summary: "Reduce your token’s total supply by permanently removing it from circulation.",
         details: [
-            "A queima de tokens é uma estratégia deflacionária. Ao diminuir a quantidade total de tokens existentes, você pode, teoricamente, aumentar a escassez e o valor dos tokens restantes.",
+            "Token burning is a deflationary strategy. By reducing the total number of existing tokens, you can theoretically increase the scarcity and value of the remaining ones.",
              {
                 type: 'list',
                 items: [
-                    "<strong>Ação Irreversível:</strong> Uma vez que um token é queimado, ele é destruído para sempre e não pode ser recuperado.",
-                    "<strong>Como Fazer:</strong> Na página 'Queimar', basta selecionar o token da sua carteira, inserir a quantidade a ser queimada e aprovar a transação. O fornecimento total refletido na blockchain será atualizado."
+                    "<strong>Irreversible Action:</strong> Once a token is burned, it’s destroyed forever and cannot be recovered.",
+                    "<strong>How to Do It:</strong> On the 'Burn' page, simply select the token from your wallet, enter the amount to burn, and approve the transaction. The total supply reflected on the blockchain will be updated."
                 ]
             }
         ]
     },
     {
         icon: <IconSend />,
-        title: "Distribuição em Massa (Airdrop)",
+        title: "Mass Distribution (Airdrop)",
         id: "airdrop",
-        summary: "Envie seu token para centenas ou milhares de carteiras em uma única transação.",
+        summary: "Send your token to hundreds or thousands of wallets in a single transaction.",
         details: [
-            "Airdrops são uma ferramenta poderosa para marketing, engajamento de comunidade e distribuição inicial do seu token.",
+            "Airdrops are a powerful tool for marketing, community engagement, and initial token distribution.",
             {
                 type: 'list',
                 items: [
-                    "<strong>Formato da Lista:</strong> Prepare uma lista simples de texto onde cada linha contém o endereço da carteira do destinatário e a quantidade, separados por vírgula, espaço ou ponto e vírgula.",
-                    "<strong>Validação Inteligente:</strong> Nossa ferramenta valida sua lista para garantir que os endereços são válidos e as quantidades são números corretos, evitando erros e perda de fundos.",
-                    "<strong>Criação de Contas (ATA):</strong> Uma grande vantagem da nossa plataforma é que, se um destinatário ainda não tiver uma conta para o seu token, nós a criamos automaticamente para ele dentro da mesma transação, garantindo que o airdrop seja bem-sucedido.",
-                    "<strong>Eficiência:</strong> Todas as transferências são agrupadas em uma única transação, economizando tempo e taxas de rede."
+                    "<strong>List Format:</strong> Prepare a simple text list where each line contains the recipient’s wallet address and amount, separated by a comma, space, or semicolon.",
+                    "<strong>Smart Validation:</strong> Our tool validates your list to ensure all addresses are valid and amounts are correct, preventing errors and fund loss.",
+                    "<strong>Account Creation (ATA):</strong> A major advantage of our platform is that if a recipient doesn’t yet have an account for your token, we automatically create it for them within the same transaction — ensuring a successful airdrop.",
+                    "<strong>Efficiency:</strong> All transfers are grouped into a single transaction, saving time and network fees."
                 ]
             }
         ]
     },
     {
         icon: <IconSettings />,
-        title: "Gerenciamento de Autoridades",
+        title: "Authority Management",
         id: "gerenciar-tokens",
-        summary: "Visualize os tokens que você criou e renuncie às autoridades de Mint e Freeze para aumentar a descentralização.",
+        summary: "View the tokens you’ve created and renounce Mint and Freeze authorities to increase decentralization.",
         details: [
-            "O Dashboard de Gerenciamento é o seu centro de controle para os tokens criados através da nossa plataforma.",
+            "The Management Dashboard is your control center for tokens created through our platform.",
             {
                 type: 'list',
                 items: [
-                    "<strong>Visualização:</strong> A página lista todos os tokens onde sua carteira conectada ainda possui autoridade de Mint ou Freeze.",
-                    "<strong>Renunciar Autoridade:</strong> Renunciar a essas autoridades é uma ação permanente e um sinal forte de confiança para a sua comunidade. Significa que você não pode mais criar novos tokens (se renunciar ao Mint) ou congelar fundos (se renunciar ao Freeze).",
-                    "<strong>Como Fazer:</strong> Basta selecionar o token e clicar no botão correspondente para remover a autoridade. Você precisará aprovar uma transação na sua carteira para confirmar a ação."
+                    "<strong>Visualization:</strong> The page lists all tokens where your connected wallet still holds Mint or Freeze authority.",
+                    "<strong>Renounce Authority:</strong> Renouncing these authorities is a permanent action and a strong sign of trust for your community. It means you can no longer mint new tokens (if you renounce Mint) or freeze funds (if you renounce Freeze).",
+                    "<strong>How to Do It:</strong> Simply select the token and click the corresponding button to remove the authority. You’ll need to approve a wallet transaction to confirm the action."
                 ]
             }
         ]
     },
     {
         icon: <IconDollarSign />,
-        title: "Programa de Afiliados",
+        title: "Affiliate Program",
         id: "afiliados",
-        summary: "Ganhe comissões em SOL ao indicar novos usuários para a nossa plataforma.",
+        summary: "Earn SOL commissions by referring new users to our platform.",
         details: [
-            "Nosso programa de afiliados foi projetado para ser simples, transparente e lucrativo.",
+            "Our affiliate program is designed to be simple, transparent, and profitable.",
             {
                 type: 'list',
                 items: [
-                    "<strong>Link Exclusivo:</strong> Ao conectar sua carteira na página 'Afiliados', um link de referência é gerado usando sua chave pública como identificador (`?ref=SUA_CARTEIRA`).",
-                    "<strong>Comissão de 10%:</strong> Você recebe 10% da nossa taxa de serviço (0.01 SOL) por cada token criado por um usuário que veio do seu link.",
-                    "<strong>Pagamento Atômico:</strong> A comissão é transferida para sua carteira na mesma transação em que o token do seu indicado é criado. Isso é feito de forma segura e automática na blockchain, garantindo que você receba seus ganhos instantaneamente.",
-                    "<strong>Painel de Ganhos:</strong> Você pode acompanhar seu total de ganhos, o número de indicações e ver o histórico das suas últimas comissões, com links diretos para as transações no Solscan."
+                    "<strong>Exclusive Link:</strong> When you connect your wallet on the 'Affiliates' page, a referral link is generated using your public key as an identifier (`?ref=YOUR_WALLET`).",
+                    "<strong>10% Commission:</strong> You receive 10% of our service fee (0.01 SOL) for every token created by a user who came through your link.",
+                    "<strong>Atomic Payment:</strong> The commission is transferred to your wallet in the same transaction in which the referred user’s token is created. This happens securely and automatically on-chain, ensuring you receive your earnings instantly.",
+                    "<strong>Earnings Dashboard:</strong> You can track your total earnings, number of referrals, and view your latest commissions with direct links to transactions on Solscan."
                 ]
             }
         ]
@@ -126,16 +126,16 @@ export default function DocumentationPage() {
     <div className={styles.container}>
       <header className={styles.header}>
         <IconBookOpen />
-        <h1 className={styles.title}>Documentação da Plataforma</h1>
+        <h1 className={styles.title}>Platform Documentation</h1>
         <p className={styles.subtitle}>
-          Um guia completo para utilizar todas as funcionalidades da CreateTokenSolana.
+          A complete guide to using all CreateTokenSolana features.
         </p>
       </header>
 
       <div className={styles.grid}>
         <aside className={styles.sidebar}>
           <nav className={styles.toc}>
-            <h3 className={styles.tocTitle}>Navegação</h3>
+            <h3 className={styles.tocTitle}>Navigation</h3>
             <ul>
               {documentationSections.map(section => (
                 <li key={section.id}>

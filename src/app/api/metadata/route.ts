@@ -10,20 +10,20 @@ export async function GET(request: NextRequest) {
     const imageUrl = searchParams.get('imageUrl');
 
     if (!name || !symbol || !imageUrl) {
-      return NextResponse.json({ error: 'Parâmetros de metadados ausentes.' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing metadata parameters.' }, { status: 400 });
     }
 
-    // Retorna o JSON no formato padrão da Metaplex, usando os dados da URL
+    // Returns the JSON in the standard Metaplex format using the URL data
     return NextResponse.json({
       name: name,
       symbol: symbol,
-      image: imageUrl, // Agora usamos a URL da imagem correta
-      description: `Token ${name} - Símbolo ${symbol}`,
+      image: imageUrl, // Now using the correct image URL
+      description: `Token ${name} - Symbol ${symbol}`,
       attributes: [],
     });
 
   } catch (error) {
-    console.error("Erro ao gerar metadados:", error);
-    return NextResponse.json({ error: 'Falha ao gerar metadados.' }, { status: 500 });
+    console.error("Error generating metadata:", error);
+    return NextResponse.json({ error: 'Failed to generate metadata.' }, { status: 500 });
   }
 }

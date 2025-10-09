@@ -1,37 +1,35 @@
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { NextResponse } from 'next/server';
 
-
 cloudinary.config({
   cloud_name: 'dgurmzcht',
   api_key: '376481879818689',
   api_secret: 'YfZk9mhp8eVA6xaZOZzHbF2H_qM',
 });
 
-
 export async function POST(request: Request) {
   const formData = await request.formData();
   const file = formData.get('file') as File;
 
   if (!file) {
-    return NextResponse.json({ error: "Nenhum arquivo enviado." }, { status: 400 });
+    return NextResponse.json({ error: "No file uploaded." }, { status: 400 });
   }
 
   try {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Usando uma Promise para encapsular o upload_stream
+    // Using a Promise to wrap the upload_stream
     const result = await new Promise<UploadApiResponse>((resolve, reject) => {
       cloudinary.uploader.upload_stream({
-        // Opções opcionais, como a pasta para salvar
+        // Optional options, such as the folder to save in
         folder: 'token_images', 
       }, (error, result) => {
         if (error) {
-          console.error("Erro no Upload para Cloudinary:", error);
+          console.error("Error uploading to Cloudinary:", error);
           reject(error);
         }
-        // 'result' pode ser undefined em caso de erro, mas o 'error' seria lançado primeiro
+        // 'result' can be undefined in case of an error, but 'error' would be thrown first
         resolve(result!);
       }).end(buffer);
     });
@@ -39,8 +37,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ secure_url: result.secure_url });
 
   } catch (error) {
-    console.error("Erro no endpoint /api/upload-image:", error);
-    // Retornando uma mensagem de erro mais genérica para o cliente
-    return NextResponse.json({ error: "Falha ao fazer upload da imagem." }, { status: 500 });
+    console.error("Error in /api/upload-image endpoint:", error);
+    // Returning a more generic error message to the client
+    return NextResponse.json({ error: "Failed to upload image." }, { status: 500 });
   }
 }

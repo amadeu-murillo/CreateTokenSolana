@@ -1,26 +1,26 @@
 import { NextResponse } from "next/server";
 import { SERVICE_FEE_CREATE_TOKEN_SOL } from "@/lib/constants";
 
-// RF05: Gestão de Custos
-// Este endpoint calcula e retorna os custos estimados para a criação de um token.
+// RF05: Cost Management
+// This endpoint calculates and returns the estimated costs for creating a token.
 export async function GET() {
   try {
-    // Valores ajustados para refletir a nova estrutura de custos solicitada.
+    // Values adjusted to reflect the new cost structure requested.
     const networkCostInSol = 0.01;
     const serviceFee = SERVICE_FEE_CREATE_TOKEN_SOL;
     const totalCost = networkCostInSol + serviceFee;
 
     const costs = {
-      networkCost: networkCostInSol.toFixed(4), // Custo estimado da rede
-      serviceFee: serviceFee.toFixed(4),       // Taxa de serviço da plataforma
-      totalCost: totalCost.toFixed(4),         // Custo total
+      networkCost: networkCostInSol.toFixed(4), // Estimated network cost
+      serviceFee: serviceFee.toFixed(4),        // Platform service fee
+      totalCost: totalCost.toFixed(4),          // Total cost
     };
 
     return NextResponse.json(costs);
   } catch (error) {
-    console.error("Erro ao calcular custos:", error);
+    console.error("Error calculating costs:", error);
     return NextResponse.json(
-      { error: "Erro interno do servidor ao calcular custos." },
+      { error: "Internal server error while calculating costs." },
       { status: 500 }
     );
   }

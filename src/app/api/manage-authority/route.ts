@@ -8,11 +8,11 @@ export async function POST(request: Request) {
     const { mint, authorityType, wallet, programId } = await request.json();
 
     if (!mint || !authorityType || !wallet || !programId) {
-      return NextResponse.json({ error: 'Dados incompletos.' }, { status: 400 });
+      return NextResponse.json({ error: 'Incomplete data.' }, { status: 400 });
     }
     
     if (programId !== TOKEN_PROGRAM_ID.toBase58() && programId !== TOKEN_2022_PROGRAM_ID.toBase58()) {
-        return NextResponse.json({ error: 'Program ID inválido.' }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid Program ID.' }, { status: 400 });
     }
 
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     } else if (authorityType === 'freeze') {
         type = AuthorityType.FreezeAccount;
     } else {
-        return NextResponse.json({ error: 'Tipo de autoridade inválido.' }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid authority type.' }, { status: 400 });
     }
     
     const instructions = [
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
             mintPublicKey,
             userPublicKey,
             type,
-            null, // Definir a nova autoridade como nula para removê-la
+            null, // Set new authority to null to remove it
             [],
             tokenProgramId
         )
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 
     const { blockhash } = await connection.getLatestBlockhash('confirmed');
     
-    // MODIFICAÇÃO: Construindo e serializando uma VersionedTransaction
+    // MODIFICATION: Building and serializing a VersionedTransaction
     const messageV0 = new TransactionMessage({
         payerKey: userPublicKey,
         recentBlockhash: blockhash,
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
-    console.error('Erro ao gerenciar autoridade:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor.' }, { status: 500 });
+    console.error('Error managing authority:', error);
+    return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
   }
 }

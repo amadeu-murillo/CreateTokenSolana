@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT } from "@/lib/constants";
 
-// RF06: Configuração de Rede e Taxa de Serviço
-// Este endpoint retorna a URL de RPC e a carteira para a taxa de serviço.
+// RF06: Network Configuration and Service Fee
+// This endpoint returns the RPC URL and the wallet address for the service fee.
 export async function GET() {
   try {
     const config = {
@@ -12,9 +12,9 @@ export async function GET() {
 
     return NextResponse.json(config);
   } catch (error) {
-    console.error("Erro ao buscar configuração:", error);
+    console.error("Error fetching configuration:", error);
     return NextResponse.json(
-      { error: "Erro interno do servidor ao buscar configuração." },
+      { error: "Internal server error while fetching configuration." },
       { status: 500 }
     );
   }

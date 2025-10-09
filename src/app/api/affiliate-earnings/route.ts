@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { Connection, PublicKey, LAMPORTS_PER_SOL, ParsedInstruction, SystemProgram } from '@solana/web3.js';
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_TOKEN_SOL } from '@/lib/constants';
 
-// A comissão de afiliado é 10% da taxa de serviço
+// The affiliate commission is 10% of the service fee
 const AFFILIATE_COMMISSION_SOL = SERVICE_FEE_CREATE_TOKEN_SOL * 0.10;
 const AFFILIATE_COMMISSION_LAMPORTS = AFFILIATE_COMMISSION_SOL * LAMPORTS_PER_SOL;
 
@@ -11,21 +11,21 @@ export async function GET(request: Request) {
   const wallet = searchParams.get('wallet');
 
   if (!wallet) {
-    return NextResponse.json({ error: 'Endereço da carteira é obrigatório.' }, { status: 400 });
+    return NextResponse.json({ error: 'Wallet address is required.' }, { status: 400 });
   }
 
   try {
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
     const affiliatePublicKey = new PublicKey(wallet);
 
-    // Busca as últimas 100 assinaturas para o endereço do afiliado
+    // Fetch the last 100 signatures for the affiliate address
     const signatures = await connection.getSignaturesForAddress(affiliatePublicKey, { limit: 100 });
 
     let totalEarnings = 0;
     let referralCount = 0;
     const transactions = [];
 
-    // Processa as 100 transações mais recentes
+    // Process the 100 most recent transactions
     for (const sigInfo of signatures) {
       if (sigInfo.err) continue;
 
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
         ) {
           const { destination, lamports } = instruction.parsed.info;
           
-          // Verifica se é uma transferência de comissão para o afiliado (com uma pequena tolerância)
+          // Check if it is a commission transfer to the affiliate (with a small tolerance)
           if (
             destination === affiliatePublicKey.toBase58() &&
             Math.abs(lamports - AFFILIATE_COMMISSION_LAMPORTS) < 1000 
@@ -72,18 +72,18 @@ export async function GET(request: Request) {
       }
     }
     
-    // Ordena as transações da mais recente para a mais antiga
+    // Sort transactions from newest to oldest
     transactions.sort((a, b) => b.blockTime - a.blockTime);
 
     return NextResponse.json({
       totalEarningsSol: totalEarnings / LAMPORTS_PER_SOL,
       referralCount,
-      transactions: transactions.slice(0, 10) // Retorna apenas as 10 últimas transações
+      transactions: transactions.slice(0, 10) // Return only the last 10 transactions
     });
 
   } catch (error) {
-    console.error('Erro ao buscar ganhos de afiliado:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Erro interno do servidor.';
+    console.error('Error fetching affiliate earnings:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error.';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

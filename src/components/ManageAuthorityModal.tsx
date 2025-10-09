@@ -21,10 +21,10 @@ const ManageAuthorityModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tit
                 <p className={styles.description}>{description}</p>
                 <div className={styles.actions}>
                     <Button onClick={onClose} className={styles.cancelButton} disabled={isLoading}>
-                        Cancelar
+                        Cancel
                     </Button>
                     <Button onClick={onConfirm} className={styles.confirmButton} disabled={isLoading}>
-                        {isLoading ? 'Confirmando...' : 'Confirmar e Remover'}
+                        {isLoading ? 'Confirming...' : 'Confirm and Remove'}
                     </Button>
                 </div>
             </div>

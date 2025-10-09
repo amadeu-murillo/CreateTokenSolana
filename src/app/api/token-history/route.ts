@@ -6,7 +6,7 @@ import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { fetchDigitalAsset, mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata';
 import { publicKey as umiPublicKey } from '@metaplex-foundation/umi';
 
-// Cache simples para metadados para evitar buscas repetidas na mesma requisição
+// Simple cache for metadata to avoid repeated lookups in the same request
 const metadataCache = new Map<string, any>();
 
 async function getTokenMetadata(umi: any, mint: string) {
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     const wallet = searchParams.get('wallet');
 
     if (!wallet) {
-        return NextResponse.json({ error: 'Endereço da carteira é obrigatório.' }, { status: 400 });
+        return NextResponse.json({ error: 'Wallet address is required.' }, { status: 400 });
     }
 
     try {
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
         
         metadataCache.clear();
 
-        // Busca todas as contas de token (SPL e Token-2022) que o usuário possui
+        // Fetch all token accounts (SPL and Token-2022) owned by the user
         const [tokenAccounts, token2022Accounts] = await Promise.all([
             connection.getParsedTokenAccountsByOwner(publicKey, { programId: TOKEN_PROGRAM_ID }),
             connection.getParsedTokenAccountsByOwner(publicKey, { programId: TOKEN_2022_PROGRAM_ID })
@@ -60,11 +60,11 @@ export async function GET(request: Request) {
             ...token2022Accounts.value
         ];
 
-        // Filtra para encontrar os tokens onde o usuário é a autoridade de mint
-        // Isso é muito mais eficiente do que verificar o histórico de transações
+        // Filter tokens where the user is the mint authority
+        // This is much more efficient than checking transaction history
         const mintAddresses = allAccounts
             .map(acc => acc.account.data.parsed.info.mint)
-            .filter((mint, index, self) => self.indexOf(mint) === index); // Remove duplicados
+            .filter((mint, index, self) => self.indexOf(mint) === index); // Remove duplicates
 
         const managedTokens = [];
 
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
                 const mintPublicKey = new PublicKey(mintAddress);
                 const mintInfo = await getMint(connection, mintPublicKey, 'confirmed', mintPublicKey.equals(TOKEN_2022_PROGRAM_ID) ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID);
 
-                // Verifica se o usuário ainda é a autoridade de mint ou freeze
+                // Check if the user is still the mint or freeze authority
                 const isMintAuthority = mintInfo.mintAuthority && mintInfo.mintAuthority.equals(publicKey);
                 const isFreezeAuthority = mintInfo.freezeAuthority && mintInfo.freezeAuthority.equals(publicKey);
                 
@@ -87,15 +87,15 @@ export async function GET(request: Request) {
                     });
                 }
             } catch (error) {
-                 console.error(`Falha ao processar o mint ${mintAddress}:`, error);
+                 console.error(`Failed to process mint ${mintAddress}:`, error);
             }
         }
         
         return NextResponse.json({ tokens: managedTokens });
 
     } catch (error) {
-        console.error('Erro ao buscar tokens gerenciáveis:', error);
-        let errorMessage = 'Erro interno do servidor ao buscar o histórico.';
+        console.error('Error fetching manageable tokens:', error);
+        let errorMessage = 'Internal server error while fetching history.';
         if (error instanceof Error) {
             errorMessage = error.message;
         }

@@ -16,20 +16,20 @@ const TokenPreview = ({ name, symbol, imageUrl, supply, tokenStandard }: TokenPr
     return (
         <Card className={styles.previewCard}>
             <CardHeader>
-                <CardTitle>Pré-visualização do Token</CardTitle>
-                <CardDescription>É assim que seu token aparecerá.</CardDescription>
+                <CardTitle>Token Preview</CardTitle>
+                <CardDescription>This is how your token will appear.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className={styles.tokenDisplay}>
                     <img
                         src={imageUrl || 'https://placehold.co/80x80/24293E/FFFFFF?text=?'}
-                        alt="Pré-visualização do token"
+                        alt="Token Preview"
                         className={styles.tokenImage}
                         onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/24293E/FFFFFF?text=?'; }}
                     />
                     <div className={styles.tokenInfo}>
                         <div className={styles.nameAndBadge}>
-                            <p className={styles.tokenName}>{name || 'Meu Token'}</p>
+                            <p className={styles.tokenName}>{name || 'My Token'}</p>
                             {tokenStandard === 'token-2022' && (
                                 <span className={styles.tokenBadge}>Token-2022</span>
                             )}
@@ -38,7 +38,7 @@ const TokenPreview = ({ name, symbol, imageUrl, supply, tokenStandard }: TokenPr
                     </div>
                     <div className={styles.tokenSupply}>
                        <p className={styles.supplyValue}>{formattedSupply}</p>
-                       <p className={styles.supplyLabel}>Fornecimento Total</p>
+                       <p className={styles.supplyLabel}>Total Supply</p>
                     </div>
                 </div>
             </CardContent>

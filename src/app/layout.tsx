@@ -11,7 +11,7 @@ import { useEffect, Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 
-// Ícones SVG
+// SVG Icons
 const IconPlusCircle = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>
 );
@@ -45,19 +45,19 @@ function AffiliateTracker() {
     }
   }, [searchParams]);
 
-  return null; // Este componente não renderiza nada
+  return null; // This component does not render anything
 }
 
 function NavLinks() {
   const pathname = usePathname();
   const navLinks = [
-    { href: "/create", icon: <IconPlusCircle className={styles.navIcon} />, label: "Criar" },
-    { href: "/add-liquidity", icon: <IconLayers className={styles.navIcon} />, label: "Liquidez" },
-    { href: "/burn", icon: <IconFlame className={styles.navIcon} />, label: "Queimar" },
+    { href: "/create", icon: <IconPlusCircle className={styles.navIcon} />, label: "Create" },
+    { href: "/add-liquidity", icon: <IconLayers className={styles.navIcon} />, label: "Liquidity" },
+    { href: "/burn", icon: <IconFlame className={styles.navIcon} />, label: "Burn" },
     { href: "/airdrop", icon: <IconSend className={styles.navIcon} />, label: "Airdrop" },
-    { href: "/dashboard", icon: <IconSettings className={styles.navIcon} />, label: "Gerenciar" },
-    { href: "/afiliates", icon: <IconDollarSign className={styles.navIcon} />, label: "Receber" },
-    { href: "/documentacao", icon: <IconBookOpen className={styles.navIcon} />, label: "Documentação" },
+    { href: "/dashboard", icon: <IconSettings className={styles.navIcon} />, label: "Manage" },
+    { href: "/afiliates", icon: <IconDollarSign className={styles.navIcon} />, label: "Earn" },
+    { href: "/documentacao", icon: <IconBookOpen className={styles.navIcon} />, label: "Documentation" },
   ];
 
   return (
@@ -74,7 +74,7 @@ function NavLinks() {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <title>Create Token Solana</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -97,7 +97,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </div>
                 <div className={styles.walletContainer}>
                   <ThemeSwitcher />
-                  {/* O botão da carteira foi movido para o container flutuante abaixo */}
+                  {/* The wallet button has been moved to the floating container below */}
                 </div>
               </div>
             </header>
@@ -116,36 +116,36 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                       <span className={styles.logoText}>🚀 CreateToken</span>
                     </Link>
                     <p className={styles.footerTagline}>
-                      A forma mais fácil e segura de lançar e gerenciar tokens na rede Solana.
+                      The easiest and safest way to launch and manage tokens on the Solana network.
                     </p>
                     
                   </div>
                   <div className={styles.footerColumn}>
-                    <h4 className={styles.footerColumnTitle}>Ferramentas</h4>
-                    <Link href="/create" className={styles.footerLink}>Criar Token</Link>
-                    <Link href="/add-liquidity" className={styles.footerLink}>Adicionar Liquidez</Link>
-                    <Link href="/burn" className={styles.footerLink}>Queimar Tokens</Link>
+                    <h4 className={styles.footerColumnTitle}>Tools</h4>
+                    <Link href="/create" className={styles.footerLink}>Create Token</Link>
+                    <Link href="/add-liquidity" className={styles.footerLink}>Add Liquidity</Link>
+                    <Link href="/burn" className={styles.footerLink}>Burn Tokens</Link>
                     <Link href="/airdrop" className={styles.footerLink}>Airdrop</Link>
-                    <Link href="/dashboard" className={styles.footerLink}>Gerenciar</Link>
+                    <Link href="/dashboard" className={styles.footerLink}>Manage</Link>
                   </div>
                   <div className={styles.footerColumn}>
-                    <h4 className={styles.footerColumnTitle}>Recursos</h4>
+                    <h4 className={styles.footerColumnTitle}>Resources</h4>
                     <a href="/#faq" className={styles.footerLink}>FAQ</a>
-                    <Link href="/costs" className={styles.footerLink}>Custos</Link>
-                    <Link href="/afiliates" className={styles.footerLink}>Programa de Afiliados</Link>
-                    <Link href="/documentacao" className={styles.footerLink}>Documentação</Link>
+                    <Link href="/costs" className={styles.footerLink}>Costs</Link>
+                    <Link href="/afiliates" className={styles.footerLink}>Affiliate Program</Link>
+                    <Link href="/documentacao" className={styles.footerLink}>Documentation</Link>
                   </div>
                   <div className={styles.footerColumn}>
-                    <h4 className={styles.footerColumnTitle}>Entrar em contato</h4>
+                    <h4 className={styles.footerColumnTitle}>Contact</h4>
                     <a href="mailto:createtokensol@gmail.com" className={styles.footerLink}>createtokensol@gmail.com</a>
                   </div>
                 </div>
                 <div className={styles.footerBottom}>
                   <p className={styles.footerText}>
-                    © {new Date().getFullYear()} CreateTokenSolana. Todos os direitos reservados.
+                    © {new Date().getFullYear()} CreateTokenSolana. All rights reserved.
                   </p>
                   <p className={styles.footerDisclaimer}>
-                      Sempre verifique as transações em sua carteira.
+                      Always verify transactions in your wallet.
                   </p>
                 </div>
               </div>

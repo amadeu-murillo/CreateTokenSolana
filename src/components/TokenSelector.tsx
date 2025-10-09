@@ -57,14 +57,14 @@ export const TokenSelector = ({ tokens, selectedTokenMint, onSelectToken, isLoad
             {/* O botão volta para o estilo mais simples */}
             <button className={styles.selectorButton} onClick={() => setIsOpen(!isOpen)} disabled={disabled || isLoading}>
                 {isLoading ? (
-                    <span>Carregando Tokens...</span>
+                    <span>Loading Tokens...</span>
                 ) : selectedToken ? (
                     <div className={styles.tokenDisplay}>
                         <Image src={selectedToken.logoURI || '/favicon.ico'} alt={selectedToken.name || 'token'} width={24} height={24} className={styles.tokenIcon} />
                         <span>{selectedToken.symbol || 'TOKEN'}</span>
                     </div>
                 ) : (
-                    <span>Selecione um Token em sua carteira</span>
+                    <span>Select a Token in your wallet</span>
                 )}
                 <span className={`${styles.arrow} ${isOpen ? styles.arrowOpen : ''}`}>▼</span>
             </button>
@@ -96,7 +96,7 @@ export const TokenSelector = ({ tokens, selectedTokenMint, onSelectToken, isLoad
                                 <span className={styles.tokenBalance}>{parseFloat(token.amount).toFixed(4)}</span>
                             </li>
                         )) : (
-                            <li className={styles.noResult}>Nenhum token encontrado.</li>
+                            <li className={styles.noResult}>No tokens found.</li>
                         )}
                     </ul>
                 </div>

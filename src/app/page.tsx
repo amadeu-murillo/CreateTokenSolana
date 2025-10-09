@@ -23,19 +23,19 @@ const HeroSection = () => (
   <div className={styles.heroWrapper}>
     <div className={styles.container}>
       <div className={styles.heroContent}>
-        <h1 className={styles.title}>Lance o seu Token na Solana em Minutos</h1>
+        <h1 className={styles.title}>Launch Your Token on Solana in Minutes</h1>
         <p className={styles.description}>
-          Crie o seu token SPL sem complicações. Conecte a sua carteira, defina os detalhes e faça o lançamento de forma segura e transparente. Ideal para comunidades, projetos e programadores.
+          Create your SPL token without complications. Connect your wallet, set up the details, and launch it safely and transparently. Perfect for communities, projects, and developers.
         </p>
         <div className={styles.buttonContainer}>
           <Link href="/create">
             <Button>
-              Criar o Meu Token Agora
+              Create My Token Now
             </Button>
           </Link>
           <Link href="/documentacao">
             <Button className={styles.secondaryButton}>
-              Ver Documentação
+              View Documentation
             </Button>
           </Link>
         </div>
@@ -59,15 +59,15 @@ const FeatureCard = ({ icon, title, description, href }: { icon: JSX.Element; ti
 // --- Componente: FeaturesSection ---
 const FeaturesSection = () => (
   <section className={styles.featuresSection}>
-    <h2 className={styles.sectionTitle}>Funcionalidades Abrangentes</h2>
-    <p className={styles.sectionDescription}>Tudo o que precisa para gerir o seu token SPL num só lugar.</p>
+    <h2 className={styles.sectionTitle}>Comprehensive Features</h2>
+    <p className={styles.sectionDescription}>Everything you need to manage your SPL token in one place.</p>
     <div className={styles.featuresGrid}>
-        <FeatureCard icon={<IconPlusCircle />} title="Criação de Tokens" description="Lance o seu próprio token SPL na rede Solana com metadados completos, incluindo nome, símbolo e imagem." href="/create"/>
-        <FeatureCard icon={<IconLayers />} title="Criar Pool de Liquidez" href="/add-liquidity" description="Crie um pool de liquidez na Raydium para que o seu token possa ser negociado por outros utilizadores." />
-        <FeatureCard icon={<IconFlame />} title="Queima de Tokens (Burn)" description="Remova tokens de circulação de forma permanente para controlar a oferta e aumentar a escassez." href="/burn" />
-        <FeatureCard icon={<IconSend />} title="Distribuição (Airdrop)" description="Distribua os seus tokens para múltiplos endereços de uma só vez, ideal para campanhas de marketing e recompensas." href="/airdrop" />
-        <FeatureCard icon={<IconSettings />} title="Gestão de Autoridade" description="Tenha controlo total sobre o seu token, com a opção de renunciar às autoridades de 'mint' e 'freeze'." href="/dashboard"/>
-        <FeatureCard icon={<IconDollarSign />} title="Programa de Afiliados" href="/afiliates" description="Ganhe SOL indicando novos usuários. Gere seu link de afiliado e receba comissões por cada token criado." />
+        <FeatureCard icon={<IconPlusCircle />} title="Token Creation" description="Launch your own SPL token on the Solana network with complete metadata, including name, symbol, and image." href="/create"/>
+        <FeatureCard icon={<IconLayers />} title="Create Liquidity Pool" href="/add-liquidity" description="Create a liquidity pool on Raydium so your token can be traded by other users." />
+        <FeatureCard icon={<IconFlame />} title="Token Burn" description="Permanently remove tokens from circulation to control supply and increase scarcity." href="/burn" />
+        <FeatureCard icon={<IconSend />} title="Airdrop Distribution" description="Distribute your tokens to multiple addresses at once — ideal for marketing campaigns and rewards." href="/airdrop" />
+        <FeatureCard icon={<IconSettings />} title="Authority Management" description="Have full control over your token with the option to renounce 'mint' and 'freeze' authorities." href="/dashboard"/>
+        <FeatureCard icon={<IconDollarSign />} title="Affiliate Program" href="/afiliates" description="Earn SOL by referring new users. Generate your affiliate link and receive commissions for each token created." />
     </div>
   </section>
 );
@@ -75,27 +75,27 @@ const FeaturesSection = () => (
 // --- Componente: HowItWorksSection ---
 const HowItWorksSection = () => (
   <section className={styles.howItWorksSection}>
-    <h2 className={styles.sectionTitle}>Como Funciona</h2>
+    <h2 className={styles.sectionTitle}>How It Works</h2>
     <div className={styles.stepsGrid}>
       <div className={styles.step}>
         <div className={styles.stepIcon}><IconWallet /></div>
-        <h3>1. Conecte a Carteira</h3>
-        <p>Conecte a sua carteira Solana de preferência (Phantom, Solflare, etc.).</p>
+        <h3>1. Connect Your Wallet</h3>
+        <p>Connect your preferred Solana wallet (Phantom, Solflare, etc.).</p>
       </div>
       <div className={styles.step}>
         <div className={styles.stepIcon}><IconFileText /></div>
-        <h3>2. Preencha os Detalhes</h3>
-        <p>Defina nome, símbolo, imagem e o fornecimento total do seu token.</p>
+        <h3>2. Fill in the Details</h3>
+        <p>Set the name, symbol, image, and total supply of your token.</p>
       </div>
       <div className={styles.step}>
         <div className={styles.stepIcon}><IconCheckSquare /></div>
-        <h3>3. Confirme a Transação</h3>
-        <p>Aprove a transação na sua carteira para criar o token na blockchain.</p>
+        <h3>3. Confirm the Transaction</h3>
+        <p>Approve the transaction in your wallet to create the token on the blockchain.</p>
       </div>
       <div className={styles.step}>
         <div className={styles.stepIcon}><IconGift /></div>
-        <h3>4. Receba os seus Tokens</h3>
-        <p>Os seus novos tokens são enviados instantaneamente para a sua carteira.</p>
+        <h3>4. Receive Your Tokens</h3>
+        <p>Your new tokens are instantly sent to your wallet.</p>
       </div>
     </div>
   </section>
@@ -104,20 +104,20 @@ const HowItWorksSection = () => (
 // --- Componente: SocialProofSection ---
 const SocialProofSection = () => (
     <section className={styles.socialProofSection}>
-        <h2 className={styles.sectionTitle}>Junte-se a Centenas de Criadores</h2>
-        <p className={styles.sectionDescription}>A nossa plataforma já foi usada para lançar projetos incríveis. Seja o próximo!</p>
+        <h2 className={styles.sectionTitle}>Join Hundreds of Creators</h2>
+        <p className={styles.sectionDescription}>Our platform has already been used to launch amazing projects. Be the next one!</p>
         <div className={styles.statsGrid}>
             <div className={styles.statCard}>
                 <p className={styles.statValue}>+250</p>
-                <p className={styles.statLabel}>Tokens Criados</p>
+                <p className={styles.statLabel}>Tokens Created</p>
             </div>
             <div className={styles.statCard}>
                 <p className={styles.statValue}>+150</p>
-                <p className={styles.statLabel}>Projetos Lançados</p>
+                <p className={styles.statLabel}>Projects Launched</p>
             </div>
             <div className={styles.statCard}>
                 <p className={styles.statValue}>+600</p>
-                <p className={styles.statLabel}>Transações Realizadas</p>
+                <p className={styles.statLabel}>Transactions Completed</p>
             </div>
         </div>
     </section>
@@ -126,23 +126,23 @@ const SocialProofSection = () => (
 // --- Componente: FaqSection ---
 const FaqSection = () => (
   <section className={styles.faqSection} id="faq">
-    <h2 className={styles.sectionTitle}>Perguntas Frequentes</h2>
+    <h2 className={styles.sectionTitle}>Frequently Asked Questions</h2>
     <div className={styles.faqGrid}>
       <details className={styles.faqItem}>
-        <summary><h3>Eu realmente sou o dono do token?</h3></summary>
-        <p>Com certeza. A autoridade de "mint" (criar novos tokens) e "freeze" (congelar contas) é sua. Você tem controlo total sobre o token criado e pode renunciar a essas autoridades a qualquer momento.</p>
+        <summary><h3>Do I really own the token?</h3></summary>
+        <p>Absolutely. The "mint" (create new tokens) and "freeze" (freeze accounts) authorities are yours. You have full control over the created token and can renounce these authorities at any time.</p>
       </details>
       <details className={styles.faqItem}>
-        <summary><h3>A plataforma guarda alguma chave privada?</h3></summary>
-        <p>Não. Jamais. Todas as transações são assinadas com segurança dentro da sua própria carteira. Nós nunca temos acesso às suas chaves ou aos seus fundos.</p>
+        <summary><h3>Does the platform store any private keys?</h3></summary>
+        <p>No. Never. All transactions are securely signed within your own wallet. We never have access to your keys or funds.</p>
       </details>
       <details className={styles.faqItem}>
-        <summary><h3>O que compõe o custo total?</h3></summary>
-        <p>O custo total é a soma da taxa de aluguel da rede Solana (para tornar a conta do token permanente), uma pequena taxa de transação e a nossa taxa de serviço. <Link href="/costs" className={styles.faqLink}>Veja os detalhes</Link>.</p>
+        <summary><h3>What makes up the total cost?</h3></summary>
+        <p>The total cost includes the Solana network rent fee (to make the token account permanent), a small transaction fee, and our service fee. <Link href="/costs" className={styles.faqLink}>See details</Link>.</p>
       </details>
       <details className={styles.faqItem}>
-        <summary><h3>Posso criar um token para a minha comunidade?</h3></summary>
-        <p>Sim! Tokens SPL são perfeitos para comunidades, projetos de jogos, DAOs, programas de fidelidade e muito mais. Use a sua criatividade!</p>
+        <summary><h3>Can I create a token for my community?</h3></summary>
+        <p>Yes! SPL tokens are perfect for communities, game projects, DAOs, loyalty programs, and much more. Use your creativity!</p>
       </details>
     </div>
   </section>

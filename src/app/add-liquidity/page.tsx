@@ -15,9 +15,9 @@ export default function AddLiquidityPage() {
     return (
         <div className={styles.pageContainer}>
             <header className={styles.pageHeader}>
-                <h1 className={styles.pageTitle}>Adicionar Liquidez ao seu Token</h1>
+                <h1 className={styles.pageTitle}>Add Liquidity to Your Token</h1>
                 <p className={styles.pageDescription}>
-                    Funcionalidade em desenvolvimento. Em breve, você poderá criar pools de liquidez diretamente aqui.
+                    Feature under development. Soon, you’ll be able to create liquidity pools directly here.
                 </p>
             </header>
 
@@ -27,19 +27,19 @@ export default function AddLiquidityPage() {
                         <CardHeader>
                             <CardTitle className={styles.cardTitle}>
                                 <IconExternalLink />
-                                Use a Meteora por enquanto
+                                Use Meteora for now
                             </CardTitle>
                             <CardDescription>
-                                A criação de pools de liquidez nativa está sendo finalizada. Enquanto isso, você pode utilizar a criação de liquidez da Meteora, uma das principais plataformas de liquidez da Solana.
+                                The native liquidity pool creation is being finalized. Meanwhile, you can use Meteora’s liquidity creation, one of the main liquidity platforms on Solana.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                             <p className={styles.infoText}>Clique no botão abaixo para ser redirecionado para a página de criação de pools da Meteora. Você precisará conectar sua carteira lá e seguir as instruções.</p>
+                             <p className={styles.infoText}>Click the button below to be redirected to Meteora’s pool creation page. You’ll need to connect your wallet there and follow the instructions.</p>
                         </CardContent>
                         <div className={styles.cardFooter}>
                             <a href="https://www.meteora.ag/pools/create" target="_blank" rel="noopener noreferrer" className={styles.meteoraButtonLink}>
                                 <Button className="w-full">
-                                    Criar Pool de Liquidez na Meteora
+                                    Create Liquidity Pool on Meteora
                                 </Button>
                             </a>
                         </div>
@@ -50,15 +50,15 @@ export default function AddLiquidityPage() {
                         <CardHeader>
                             <CardTitle className={styles.cardTitle}>
                                 <IconInfo />
-                                O que é Liquidez?
+                                What is Liquidity?
                             </CardTitle>
                         </CardHeader>
                         <CardContent className={styles.infoContent}>
                             <p className={styles.infoText}>
-                                Liquidez é a capacidade de um ativo ser comprado ou vendido facilmente sem causar uma mudança drástica em seu preço. Em DeFi, um "pool de liquidez" é um par de tokens (por exemplo, seu token e SOL) trancado em um contrato inteligente em uma exchange descentralizada (DEX).
+                                Liquidity is the ability of an asset to be easily bought or sold without causing a drastic change in its price. In DeFi, a “liquidity pool” is a pair of tokens (for example, your token and SOL) locked in a smart contract on a decentralized exchange (DEX).
                             </p>
                             <p className={styles.infoText}>
-                                Ao fornecer liquidez, você permite que outras pessoas negociem seu token, o que é essencial para que ele tenha valor e utilidade no mercado.
+                                By providing liquidity, you enable others to trade your token, which is essential for it to have value and utility in the market.
                             </p>
                         </CardContent>
                     </Card>
@@ -66,19 +66,19 @@ export default function AddLiquidityPage() {
                         <CardHeader>
                             <CardTitle className={styles.cardTitle}>
                                 <IconLayers />
-                                Tipos de Tokens para Liquidez
+                                Token Types for Liquidity
                             </CardTitle>
                         </CardHeader>
                         <CardContent className={styles.infoContent}>
                             <p className={styles.infoText}>
-                                Normalmente, um pool é formado pelo seu token e um token de alta liquidez, como:
+                                Typically, a pool is formed by your token and a high-liquidity token such as:
                             </p>
                             <ul className={styles.tokenList}>
-                                <li><strong>SOL:</strong> A criptomoeda nativa da Solana. A maioria dos novos tokens começa com um par TOKEN/SOL.</li>
-                                <li><strong>USDC:</strong> Uma stablecoin atrelada ao dólar americano, oferecendo um par de negociação estável.</li>
+                                <li><strong>SOL:</strong> The native cryptocurrency of Solana. Most new tokens start with a TOKEN/SOL pair.</li>
+                                <li><strong>USDC:</strong> A stablecoin pegged to the US dollar, offering a stable trading pair.</li>
                             </ul>
                              <p className={styles.infoText}>
-                                A proporção inicial de tokens que você deposita no pool definirá o preço de lançamento do seu ativo.
+                                The initial ratio of tokens you deposit in the pool will define the launch price of your asset.
                             </p>
                         </CardContent>
                     </Card>

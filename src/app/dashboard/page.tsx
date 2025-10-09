@@ -14,13 +14,12 @@ import { TokenSelector } from "@/components/TokenSelector";
 import { getMint, Mint, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 
-// Ícones SVG
+// SVG Icons
 const IconLock = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
 const IconCheckCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
 const IconAlertTriangle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>;
 
-
-// Tipagem para o estado do modal de confirmação
+// Typing for modal state
 type AuthorityModalState = {
     isOpen: boolean;
     mint: string | null;
@@ -28,7 +27,7 @@ type AuthorityModalState = {
     programId: string | null;
 };
 
-// Tipagem para o estado da notificação
+// Typing for notification state
 type NotificationState = {
     type: 'success' | 'error';
     message: string;
@@ -38,22 +37,22 @@ type NotificationState = {
 const guideSections = [
     {
         icon: <IconLock />,
-        title: "O que são Autoridades?",
-        description: "As autoridades de 'Mint' e 'Freeze' são chaves especiais que dão controle sobre o token. A autoridade de Mint pode criar novos tokens, enquanto a de Freeze pode congelar tokens em uma carteira específica, impedindo transferências."
+        title: "What Are Authorities?",
+        description: "'Mint' and 'Freeze' authorities are special keys that grant control over a token. The Mint authority can create new tokens, while the Freeze authority can freeze tokens in a specific wallet, preventing transfers."
     },
     {
         icon: <IconCheckCircle />,
-        title: "Por que Remover as Autoridades?",
-        description: "Remover a autoridade de Mint ('renunciar ao mint') torna o fornecimento do token fixo e imutável. Remover a de Freeze garante que ninguém poderá ter seus tokens bloqueados. Ambas as ações aumentam a descentralização e a confiança da sua comunidade no projeto."
+        title: "Why Remove Authorities?",
+        description: "Removing the Mint authority ('renouncing mint') makes the token’s supply fixed and immutable. Removing the Freeze authority ensures that no one can freeze tokens. Both actions increase decentralization and your community’s trust in the project."
     },
     {
         icon: <IconAlertTriangle />,
-        title: "Ação Irreversível",
-        description: "Tenha atenção: remover uma autoridade é uma ação permanente na blockchain. Uma vez removida, ela nunca mais poderá ser recuperada. Pense com cuidado antes de confirmar a transação."
+        title: "Irreversible Action",
+        description: "Be careful: removing an authority is a permanent action on the blockchain. Once removed, it can never be recovered. Think carefully before confirming the transaction."
     }
 ];
 
-// Componente para o estado vazio ou de carregamento inicial
+// Component for empty or loading state
 const InfoState = ({ message, showSpinner = false }: { message: string, showSpinner?: boolean }) => (
     <div className={styles.infoStateContainer}>
         {showSpinner && <div className={styles.spinner}></div>}
@@ -61,7 +60,7 @@ const InfoState = ({ message, showSpinner = false }: { message: string, showSpin
     </div>
 );
 
-// Componente para o card de gestão de um token específico
+// Component for managing a specific token
 const TokenManagementCard = ({ token, mintInfo, onManageClick }: { token: any, mintInfo: Mint, onManageClick: (mint: string, type: 'mint' | 'freeze', programId: string) => void }) => {
     const { publicKey } = useWallet();
 
@@ -94,23 +93,22 @@ const TokenManagementCard = ({ token, mintInfo, onManageClick }: { token: any, m
             </div>
             <div className={styles.authorityInfo}>
                 <div className={styles.authorityStatus}>
-                    <span>Autoridade de Mint</span>
-                    {isMintAuthority ? <span className={styles.statusActive}>Ativa</span> : <span className={styles.statusRevoked}>Removida</span>}
+                    <span>Mint Authority</span>
+                    {isMintAuthority ? <span className={styles.statusActive}>Active</span> : <span className={styles.statusRevoked}>Removed</span>}
                 </div>
                 <div className={styles.authorityStatus}>
-                    <span>Autoridade de Freeze</span>
-                    {isFreezeAuthority ? <span className={styles.statusActive}>Ativa</span> : <span className={styles.statusRevoked}>Removida</span>}
+                    <span>Freeze Authority</span>
+                    {isFreezeAuthority ? <span className={styles.statusActive}>Active</span> : <span className={styles.statusRevoked}>Removed</span>}
                 </div>
             </div>
             <div className={styles.actions}>
-                {isMintAuthority && <Button className="secondary" onClick={() => onManageClick(token.mint, 'mint', token.programId)}>Remover Mint</Button>}
-                {isFreezeAuthority && <Button className="secondary" onClick={() => onManageClick(token.mint, 'freeze', token.programId)}>Remover Freeze</Button>}
-                {!isMintAuthority && !isFreezeAuthority && <p className={styles.noActionsText}>Nenhuma ação disponível.</p>}
+                {isMintAuthority && <Button className="secondary" onClick={() => onManageClick(token.mint, 'mint', token.programId)}>Remove Mint</Button>}
+                {isFreezeAuthority && <Button className="secondary" onClick={() => onManageClick(token.mint, 'freeze', token.programId)}>Remove Freeze</Button>}
+                {!isMintAuthority && !isFreezeAuthority && <p className={styles.noActionsText}>No actions available.</p>}
             </div>
         </div>
     )
 };
-
 
 export default function DashboardPage() {
     const { publicKey } = useWallet();
@@ -135,19 +133,18 @@ export default function DashboardPage() {
             setMintInfo(null);
             try {
                 const mintPublicKey = new PublicKey(selectedTokenMint);
-                // CORREÇÃO: O programId pode não estar disponível imediatamente, então buscamos a informação do mint primeiro para determinar o programId.
                 const accountInfo = await connection.getAccountInfo(mintPublicKey);
                 const programId = accountInfo?.owner;
 
                 if (!programId || (programId.toBase58() !== TOKEN_PROGRAM_ID.toBase58() && programId.toBase58() !== TOKEN_2022_PROGRAM_ID.toBase58())) {
-                     throw new Error("Programa de token desconhecido.");
+                     throw new Error("Unknown token program.");
                 }
 
                 const info = await getMint(connection, mintPublicKey, 'confirmed', programId);
                 setMintInfo(info);
             } catch (err) {
                 console.error("Failed to fetch mint info:", err);
-                setNotification({ type: 'error', message: 'Falha ao buscar informações do token.' });
+                setNotification({ type: 'error', message: 'Failed to fetch token information.' });
             } finally {
                 setIsFetchingInfo(false);
             }
@@ -169,26 +166,25 @@ export default function DashboardPage() {
         const signature = await manageAuthority(modalState.mint, modalState.type, modalState.programId);
 
         if (signature) {
-             setNotification({type: 'success', message: `Autoridade removida com sucesso!`, txId: signature});
-             // Re-fetch mint info to update UI
+             setNotification({type: 'success', message: `Authority removed successfully!`, txId: signature});
              const mintPublicKey = new PublicKey(modalState.mint);
              const programId = new PublicKey(modalState.programId);
              const info = await getMint(connection, mintPublicKey, 'confirmed', programId);
              setMintInfo(info);
         } else {
-             setNotification({type: 'error', message: manageAuthorityError || "Falha ao remover autoridade."});
+             setNotification({type: 'error', message: manageAuthorityError || "Failed to remove authority."});
         }
         setModalState({ isOpen: false, mint: null, type: null, programId: null });
     };
     
     const renderContent = () => {
-        if (!publicKey) return <InfoState message="Conecte a sua carteira para gerir os seus tokens." />;
-        if (isLoadingUserTokens) return <InfoState message="A carregar os seus tokens..." showSpinner />;
+        if (!publicKey) return <InfoState message="Connect your wallet to manage your tokens." />;
+        if (isLoadingUserTokens) return <InfoState message="Loading your tokens..." showSpinner />;
 
         return (
             <div className={styles.managementContainer}>
                 <div className={styles.field}>
-                    <label htmlFor="token-select">Selecione um Token da sua Carteira</label>
+                    <label htmlFor="token-select">Select a Token from Your Wallet</label>
                     <TokenSelector
                         tokens={userTokens}
                         selectedTokenMint={selectedTokenMint}
@@ -198,7 +194,7 @@ export default function DashboardPage() {
                     />
                 </div>
 
-                {isFetchingInfo && <InfoState message="A buscar informações do token..." showSpinner />}
+                {isFetchingInfo && <InfoState message="Fetching token information..." showSpinner />}
 
                 {mintInfo && selectedToken && (
                     <TokenManagementCard 
@@ -223,9 +219,9 @@ export default function DashboardPage() {
             )}
 
             <header className={styles.pageHeader}>
-                <h1 className={styles.pageTitle}>Gerenciar Autoridades do Token</h1>
+                <h1 className={styles.pageTitle}>Manage Token Authorities</h1>
                 <p className={styles.pageDescription}>
-                    Revogue as autoridades de Mint (criação) e Freeze (congelamento) dos seus tokens para aumentar a segurança e a confiança do seu projeto.
+                    Revoke the Mint (creation) and Freeze (lock) authorities of your tokens to increase the security and trust of your project.
                 </p>
             </header>
 
@@ -233,9 +229,9 @@ export default function DashboardPage() {
                  <main className={styles.mainContent}>
                     <Card>
                         <CardHeader>
-                            <CardTitle>Painel de Gerenciamento</CardTitle>
+                            <CardTitle>Management Panel</CardTitle>
                             <CardDescription>
-                                Selecione um token da sua carteira para visualizar e gerenciar suas autoridades.
+                                Select a token from your wallet to view and manage its authorities.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -259,13 +255,12 @@ export default function DashboardPage() {
                 </aside>
             </div>
 
-
             <ManageAuthorityModal
                 isOpen={modalState.isOpen}
                 onClose={() => setModalState({ isOpen: false, mint: null, type: null, programId: null })}
                 onConfirm={handleConfirmManageAuthority}
-                title={`Confirmar Remoção de Autoridade de ${modalState.type === 'mint' ? 'Mint' : 'Freeze'}`}
-                description="Esta ação é irreversível. Após a remoção, não poderá mais usar esta funcionalidade. Tem a certeza de que deseja continuar?"
+                title={`Confirm Removal of ${modalState.type === 'mint' ? 'Mint' : 'Freeze'} Authority`}
+                description="This action is irreversible. Once removed, you will no longer be able to use this functionality. Are you sure you want to continue?"
                 isLoading={isManagingAuthority}
             />
         </div>

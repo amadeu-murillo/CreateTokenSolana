@@ -56,7 +56,7 @@ export default function ConnectWallet() {
     <div className={styles.container} ref={dropdownRef}>
       {!connected || !publicKey ? (
          <WalletMultiButton className={styles.connectButton}>
-           {connecting ? 'Aguardando conexão...' : 'Conectar Carteira'}
+           {connecting ? 'Waiting for connection...' : 'Connect Wallet'}
          </WalletMultiButton>
       ) : (
         <>
@@ -77,13 +77,13 @@ export default function ConnectWallet() {
                 </div>
                 <div className={styles.dropdownAddress}>
                     <p>{publicKey.toBase58()}</p>
-                    <button onClick={handleCopy} title="Copiar Endereço">
-                        {copySuccess ? 'Copiado!' : <CopyIcon />}
+                    <button onClick={handleCopy} title="Copy Address">
+                        {copySuccess ? 'Copied!' : <CopyIcon />}
                     </button>
                 </div>
                 <button onClick={disconnect} className={styles.disconnectButton}>
                     <DisconnectIcon />
-                    <span>Desconectar</span>
+                    <span>Disconnect</span>
                 </button>
             </div>
           )}
@@ -92,4 +92,3 @@ export default function ConnectWallet() {
     </div>
   );
 }
-

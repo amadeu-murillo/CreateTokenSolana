@@ -55,7 +55,7 @@ export default function AfiliatesPage() {
             const response = await fetch(`/api/affiliate-earnings?wallet=${publicKey.toBase58()}`);
             if (!response.ok) {
                 const data = await response.json();
-                throw new Error(data.error || 'Falha ao buscar ganhos.');
+                throw new Error(data.error || 'Failed to fetch earnings.');
             }
             const data: AffiliateEarnings = await response.json();
             setEarnings(data);
@@ -84,9 +84,9 @@ export default function AfiliatesPage() {
   return (
     <div className={styles.pageContainer}>
       <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Programa de Afiliados: Ganhe SOL por Indicar</h1>
+        <h1 className={styles.pageTitle}>Affiliate Program: Earn SOL by Referring</h1>
         <p className={styles.pageDescription}>
-            Participe do nosso programa de afiliados e ganhe <span className={styles.highlight}>10% de comissão</span> em SOL por cada token criado através do seu link. O pagamento é automático e transparente, direto na sua carteira.
+            Join our affiliate program and earn <span className={styles.highlight}>10% commission</span> in SOL for every token created through your link. Payments are automatic and transparent, directly to your wallet.
         </p>
       </header>
 
@@ -95,22 +95,22 @@ export default function AfiliatesPage() {
               <div className={styles.contentStack}>
                   <Card>
                       <CardHeader>
-                          <CardTitle>O seu Link de Afiliado Pessoal</CardTitle>
+                          <CardTitle>Your Personal Affiliate Link</CardTitle>
                       </CardHeader>
                       <CardContent>
                           {connected && publicKey ? (
                               <div className={styles.linkContainer}>
-                                  <p className={styles.linkExplanation}>Este é o seu link exclusivo. O parâmetro `ref` contém a sua chave pública, que nos permite rastrear as suas indicações.</p>
+                                  <p className={styles.linkExplanation}>This is your exclusive link. The `ref` parameter contains your public key, which allows us to track your referrals.</p>
                                   <div className={styles.inputWrapper}>
                                       <Input id="affiliate-link" type="text" value={affiliateLink} readOnly />
                                       <Button onClick={handleCopy} className={styles.copyButto}>
-                                          {copySuccess ? 'Copiado!' : 'Copiar'}
+                                          {copySuccess ? 'Copied!' : 'Copy'}
                                       </Button>
                                   </div>
                               </div>
                           ) : (
                               <div className={styles.connectWalletPrompt}>
-                                  <p>Conecte a sua carteira para gerar o seu link de afiliado.</p>
+                                  <p>Connect your wallet to generate your affiliate link.</p>
                               </div>
                           )}
                       </CardContent>
@@ -119,42 +119,42 @@ export default function AfiliatesPage() {
                   {connected && publicKey && (
                     <>
                         <Button onClick={handleToggleEarnings} className="w-full">
-                            {showEarnings ? 'Ocultar Painel de Ganhos' : 'Consultar Meus Ganhos'}
+                            {showEarnings ? 'Hide Earnings Panel' : 'View My Earnings'}
                         </Button>
                       {showEarnings && (
                           <Card>
                               <CardHeader>
-                                  <CardTitle>Painel de Ganhos</CardTitle>
-                                  <CardDescription>Acompanhe o seu desempenho e comissões recebidas.</CardDescription>
+                                  <CardTitle>Earnings Panel</CardTitle>
+                                  <CardDescription>Track your performance and commissions received.</CardDescription>
                               </CardHeader>
                               <CardContent>
                                   {isLoading ? (
                                       <div className={styles.loadingContainer}>
                                           <div className={styles.spinner}></div>
-                                          <p>A carregar os seus ganhos...</p>
+                                          <p>Loading your earnings...</p>
                                       </div>
                                   ) : error ? (
-                                      <p className={styles.errorText}>Erro ao carregar ganhos: {error}</p>
+                                      <p className={styles.errorText}>Error loading earnings: {error}</p>
                                   ) : earnings ? (
                                       <div className={styles.earningsDashboard}>
                                           <div className={styles.earningsGrid}>
                                               <div className={styles.earningStat}>
-                                                  <div className={styles.statHeader}><IconTrendingUp /><span>Ganhos Totais</span></div>
+                                                  <div className={styles.statHeader}><IconTrendingUp /><span>Total Earnings</span></div>
                                                   <p className={styles.statValue}>{earnings.totalEarningsSol.toFixed(4)} SOL</p>
                                               </div>
                                               <div className={styles.earningStat}>
-                                                  <div className={styles.statHeader}><IconUsers /><span>Indicações</span></div>
+                                                  <div className={styles.statHeader}><IconUsers /><span>Referrals</span></div>
                                                   <p className={styles.statValue}>{earnings.referralCount}</p>
                                               </div>
                                           </div>
                                           
-                                          <h4 className={styles.historyTitle}>Últimas 10 Comissões</h4>
+                                          <h4 className={styles.historyTitle}>Last 10 Commissions</h4>
                                           {earnings.transactions.length > 0 ? (
                                               <div className={styles.historyTable}>
                                                   <div className={styles.historyTableHeader}>
-                                                      <div>Data</div>
-                                                      <div className={styles.amountHeader}>Valor</div>
-                                                      <div className={styles.txHeader}>Transação</div>
+                                                      <div>Date</div>
+                                                      <div className={styles.amountHeader}>Amount</div>
+                                                      <div className={styles.txHeader}>Transaction</div>
                                                   </div>
                                                   {earnings.transactions.map(tx => (
                                                       <div key={tx.signature} className={styles.historyRow}>
@@ -165,13 +165,13 @@ export default function AfiliatesPage() {
                                                               +{tx.amount.toFixed(4)} SOL
                                                           </div>
                                                           <a href={`https://solscan.io/tx/${tx.signature}`} target="_blank" rel="noopener noreferrer" className={styles.historyLink}>
-                                                              Ver no Solscan
+                                                              View on Solscan
                                                           </a>
                                                       </div>
                                                   ))}
                                               </div>
                                           ) : (
-                                              <p className={styles.noHistoryText}>Ainda não há transações de comissão.</p>
+                                              <p className={styles.noHistoryText}>No commission transactions yet.</p>
                                           )}
                                       </div>
                                   ) : null}
@@ -185,39 +185,39 @@ export default function AfiliatesPage() {
           <aside className={styles.sidebar}>
                 <Card className={styles.sidebarCard}>
                     <CardHeader>
-                        <CardTitle className={styles.sidebarCardTitle}><IconZap /> Como Funciona?</CardTitle>
+                        <CardTitle className={styles.sidebarCardTitle}><IconZap /> How It Works</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <ol className={styles.stepList}>
                             <li className={styles.stepItem}>
-                                <strong>1. Conecte a sua Carteira:</strong> O endereço público da sua carteira é usado como seu código de referência exclusivo.
+                                <strong>1. Connect Your Wallet:</strong> Your wallet’s public address is used as your unique referral code.
                             </li>
                             <li className={styles.stepItem}>
-                                <strong>2. Copie o seu Link:</strong> O seu link de afiliado é gerado automaticamente. Ele contém `?ref=SUA_CARTEIRA`.
+                                <strong>2. Copy Your Link:</strong> Your affiliate link is generated automatically. It includes `?ref=YOUR_WALLET`.
                             </li>
                              <li className={styles.stepItem}>
-                                <strong>3. Partilhe e Indique:</strong> Divulgue o link. Qualquer pessoa que o utilize para criar um token será sua indicação.
+                                <strong>3. Share and Refer:</strong> Share the link. Anyone who uses it to create a token becomes your referral.
                             </li>
                              <li className={styles.stepItem}>
-                                <strong>4. Receba Comissões:</strong> Por cada token criado, 10% da nossa taxa é enviada para a sua carteira na mesma transação.
+                                <strong>4. Receive Commissions:</strong> For each created token, 10% of our fee is sent to your wallet in the same transaction.
                             </li>
                         </ol>
                     </CardContent>
                 </Card>
                  <Card className={styles.sidebarCard}>
                     <CardHeader>
-                        <CardTitle className={styles.sidebarCardTitle}><IconPercent /> A sua Comissão</CardTitle>
+                        <CardTitle className={styles.sidebarCardTitle}><IconPercent /> Your Commission</CardTitle>
                     </CardHeader>
                     <CardContent>
-                       <p className={styles.sidebarText}>Você recebe <strong className={styles.highlight}>10%</strong> da nossa taxa de serviço de 0.1 SOL, o que equivale a <strong className={styles.highlight}>0.01 SOL</strong> por cada token criado com sucesso através do seu link.</p>
+                       <p className={styles.sidebarText}>You receive <strong className={styles.highlight}>10%</strong> of our 0.1 SOL service fee, which equals <strong className={styles.highlight}>0.01 SOL</strong> for every successfully created token through your link.</p>
                     </CardContent>
                 </Card>
                 <Card className={styles.sidebarCard}>
                     <CardHeader>
-                        <CardTitle className={styles.sidebarCardTitle}><IconShieldCheck /> Pagamentos Transparentes</CardTitle>
+                        <CardTitle className={styles.sidebarCardTitle}><IconShieldCheck /> Transparent Payments</CardTitle>
                     </CardHeader>
                     <CardContent>
-                       <p className={styles.sidebarText}>As comissões são pagas de forma atómica (na mesma transação) através de um System Program da Solana. Isto garante que o pagamento é instantâneo e à prova de falhas. Pode verificar todas as suas comissões na blockchain.</p>
+                       <p className={styles.sidebarText}>Commissions are paid atomically (in the same transaction) via Solana’s System Program. This ensures payments are instant and fail-proof. You can verify all your commissions on the blockchain.</p>
                     </CardContent>
                 </Card>
           </aside>

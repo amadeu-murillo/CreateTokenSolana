@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     } = await request.json();
 
     if (!name || !symbol || !imageUrl || decimals === undefined || !supply || !wallet) {
-      return NextResponse.json({ error: 'Dados incompletos fornecidos.' }, { status: 400 });
+      return NextResponse.json({ error: 'Incomplete data provided.' }, { status: 400 });
     }
 
     const numericSupply = typeof supply === 'string'
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
         : Number(supply);
 
     if (isNaN(numericSupply) || numericSupply <= 0) {
-        return NextResponse.json({ error: 'Fornecimento inválido.' }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid supply.' }, { status: 400 });
     }
 
     let result;
@@ -67,12 +67,11 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
 
   } catch (error) {
-    console.error('Erro detalhado ao criar transação:', error);
-    let errorMessage = 'Erro interno do servidor ao criar a transação.';
+    console.error('Detailed error when creating transaction:', error);
+    let errorMessage = 'Internal server error while creating the transaction.';
     if (error instanceof Error) {
         errorMessage = error.message;
     }
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-

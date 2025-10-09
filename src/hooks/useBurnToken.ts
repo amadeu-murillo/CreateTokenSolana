@@ -8,21 +8,21 @@ function getFriendlyErrorMessage(error: any): string {
     console.error("Burn token error:", error);
 
     if (message.includes("User rejected the request")) {
-        return "Transação rejeitada pelo usuário na carteira.";
+        return "Transaction rejected by the user in the wallet.";
     }
     if (message.includes("insufficient lamports")) {
-        return "Você não possui SOL suficiente para cobrir as taxas da rede.";
+        return "You don't have enough SOL to cover the network fees.";
     }
     if (message.includes("not enough SOL")) {
-        return "Falha na transação. Verifique se você possui SOL suficiente para as taxas.";
+        return "Transaction failed. Please check if you have enough SOL for fees.";
     }
     if (message.includes("Transaction simulation failed")) {
-        return "A simulação da transação falhou. Verifique se o endereço do token está correto e se você possui a quantidade a ser queimada.";
+        return "Transaction simulation failed. Check if the token address is correct and if you have the amount to burn.";
     }
     if (message.includes("blockhash")) {
-        return "O blockhash da transação expirou. Por favor, tente novamente.";
+        return "The transaction blockhash has expired. Please try again.";
     }
-    return "Ocorreu um erro ao queimar os tokens. Verifique o console para mais detalhes.";
+    return "An error occurred while burning tokens. Check the console for more details.";
 }
 
 export const useBurnToken = () => {
@@ -34,11 +34,11 @@ export const useBurnToken = () => {
 
   const burnToken = async (mint: string, amount: number, programId: string) => {
     if (!publicKey || !sendTransaction) {
-      setError("Carteira não conectada.");
+      setError("Wallet not connected.");
       return null;
     }
     if (!connection) {
-        setError("A conexão com a rede Solana não foi estabelecida.");
+        setError("Connection to the Solana network was not established.");
         return null;
     }
 

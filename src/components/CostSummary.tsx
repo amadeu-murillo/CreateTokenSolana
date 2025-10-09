@@ -39,8 +39,8 @@ export default function CostSummary() {
     return (
         <div className={styles.card}>
             <div className={`${styles.item} ${styles.total}`}>
-                <p>Custo Total Estimado:</p>
-                <p>Carregando...</p>
+                <p>Estimated Total Cost:</p>
+                <p>Loading...</p>
             </div>
         </div>
     );
@@ -49,8 +49,8 @@ export default function CostSummary() {
   return (
     <div className={styles.card}>
         <div className={`${styles.item} ${styles.total}`}>
-            <p>Custo Total Estimado:</p>
-            <p>~{costs?.totalCost ? parseFloat(costs.totalCost).toFixed(2) : '0.11'} SOL</p>
+            <p>Estimated Total Cost:</p>
+            <p>~{costs?.totalCost ? parseFloat(costs.totalCost).toFixed(2) : '0.12'} SOL</p>
         </div>
     </div>
   );

@@ -8,12 +8,12 @@ export async function POST(request: Request) {
     const { mint, amount, wallet, programId } = await request.json();
 
     if (!mint || !amount || !wallet || !programId) {
-      return NextResponse.json({ error: 'Dados incompletos: mint, amount, wallet e programId são obrigatórios.' }, { status: 400 });
+      return NextResponse.json({ error: 'Incomplete data: mint, amount, wallet, and programId are required.' }, { status: 400 });
     }
 
-    // Valida se o programId é um dos conhecidos
+    // Validate if the programId is one of the known ones
     if (programId !== TOKEN_PROGRAM_ID.toBase58() && programId !== TOKEN_2022_PROGRAM_ID.toBase58()) {
-        return NextResponse.json({ error: 'Program ID inválido.' }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid Program ID.' }, { status: 400 });
     }
 
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
@@ -21,14 +21,14 @@ export async function POST(request: Request) {
     const mintPublicKey = new PublicKey(mint);
     const tokenProgramId = new PublicKey(programId);
 
-    // Buscar as informações do mint para obter os decimais
+    // Fetch mint information to obtain decimals
     const mintInfo = await getMint(connection, mintPublicKey, 'confirmed', tokenProgramId);
 
     const associatedTokenAccount = await getAssociatedTokenAddress(
         mintPublicKey, 
         userPublicKey,
         false,
-        tokenProgramId // Usa o programId correto
+        tokenProgramId // Uses the correct programId
     );
 
     const instructions = [
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
             userPublicKey,
             BigInt(amount * Math.pow(10, mintInfo.decimals)),
             [],
-            tokenProgramId // Usa o programId correto
+            tokenProgramId // Uses the correct programId
         )
     ];
 
@@ -67,8 +67,8 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
-    console.error('Erro detalhado ao criar transação de queima:', error);
-    let errorMessage = 'Erro interno do servidor ao criar a transação de queima.';
+    console.error('Detailed error while creating burn transaction:', error);
+    let errorMessage = 'Internal server error while creating the burn transaction.';
     if (error instanceof Error) {
         errorMessage = error.message;
     }

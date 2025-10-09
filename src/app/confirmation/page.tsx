@@ -16,7 +16,7 @@ export default function ConfirmationPage() {
   return (
     <div className={styles.container}>
       <div className={styles.contentWrapper}>
-        <h2 className={styles.title}>Status da Criação</h2>
+        <h2 className={styles.title}>Creation Status</h2>
         {status === "success" && tokenAddress ? (
           <>
             <Feedback 
@@ -25,20 +25,20 @@ export default function ConfirmationPage() {
               txId={txId}
             />
             <div className={styles.ctaContainer}>
-                <p>Parabéns! Seu token está na blockchain. O próximo passo é criar um pool de liquidez para que ele possa ser negociado.</p>
+                <p>Congratulations! Your token is now on the blockchain. The next step is to create a liquidity pool so it can be traded.</p>
                 <Link href={`/add-liquidity`}>
                     <Button className={styles.ctaButton}>
-                        Adicionar Liquidez
+                        Add Liquidity
                     </Button>
                 </Link>
             </div>
           </>
         ) : (
-          <Feedback success={false} errorMessage={errorMessage || "Ocorreu um erro desconhecido."} />
+          <Feedback success={false} errorMessage={errorMessage || "An unknown error occurred."} />
         )}
         <div className={styles.linkContainer}>
           <Link href="/create" className={styles.link}>
-            Criar outro token
+            Create another token
           </Link>
         </div>
       </div>

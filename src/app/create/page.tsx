@@ -5,23 +5,23 @@ import CostSummary from '@/components/CostSummary';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import styles from '@/app/create/Create.module.css';
 
-// Ícones SVG como componentes para clareza
+// SVG icons as components for clarity
 const IconInfo = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
 const IconDollarSign = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>;
 
-// Conteúdo do guia lateral
+// Sidebar guide content
 const infoItems = [
     {
-        title: "O que é um Token SPL?",
-        description: "É o padrão fundamental para criar tokens fungíveis (moedas) na rede Solana. Ideal para a maioria dos projetos que precisam de um token simples e eficiente."
+        title: "What is an SPL Token?",
+        description: "It is the fundamental standard for creating fungible tokens (coins) on the Solana network. Ideal for most projects that need a simple and efficient token."
     },
     {
-        title: "O que é o Token-2022?",
-        description: "É uma extensão do padrão SPL que adiciona novas funcionalidades, como taxas de transferência, juros e muito mais, diretamente no nível do protocolo."
+        title: "What is Token-2022?",
+        description: "It is an extension of the SPL standard that adds new functionalities, such as transfer fees, interest, and much more — directly at the protocol level."
     },
     {
-        title: "Autoridades de Mint e Freeze",
-        description: "Manter a autoridade de 'Mint' permite criar mais tokens no futuro. A de 'Freeze' permite congelar tokens em carteiras específicas. Renunciar a elas torna o token mais descentralizado e seu fornecimento imutável."
+        title: "Mint and Freeze Authorities",
+        description: "Keeping the 'Mint' authority allows you to create more tokens in the future. The 'Freeze' authority allows freezing tokens in specific wallets. Renouncing them makes the token more decentralized and its supply immutable."
     }
 ];
 
@@ -29,8 +29,8 @@ export default function CreatePage() {
   return (
     <div className={styles.pageContainer}>
         <div className={styles.header}>
-            <h1 className={styles.title}>Crie seu Token na Solana</h1>
-            <p className={styles.description}>Preencha os detalhes abaixo para criar seu novo token SPL na rede Solana. Simples, rápido e seguro.</p>
+            <h1 className={styles.title}>Create Your Token on Solana</h1>
+            <p className={styles.description}>Fill in the details below to create your new SPL token on the Solana network. Simple, fast, and secure.</p>
         </div>
         <div className={styles.grid}>
           <div className={styles.formContainer}>
@@ -39,7 +39,7 @@ export default function CreatePage() {
           <aside className={styles.sidebar}>
             <div className={styles.infoContainer}>
                 <div className={styles.sidebarSection}>
-                    <h3 className={styles.sidebarTitle}><IconInfo /> Guia Rápido</h3>
+                    <h3 className={styles.sidebarTitle}><IconInfo /> Quick Guide</h3>
                     {infoItems.map((item, index) => (
                         <div key={index} className={styles.infoItem}>
                             <p className={styles.infoTitle}>{item.title}</p>
@@ -48,7 +48,7 @@ export default function CreatePage() {
                     ))}
                 </div>
                 <div className={styles.sidebarSection}>
-                     <h3 className={styles.sidebarTitle}><IconDollarSign /> Resumo de Custos</h3>
+                     <h3 className={styles.sidebarTitle}><IconDollarSign /> Cost Summary</h3>
                      <CostSummary />
                 </div>
             </div>

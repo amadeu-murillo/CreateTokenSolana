@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction, SendTransactionError, Connection } from "@solana/web3.js";
 
-// Função de tratamento de erro aprimorada
+// Enhanced error handling function
 async function getFriendlyErrorMessage(error: any, connection: Connection): Promise<string> {
     const message = error.message || String(error);
     console.error("Airdrop error:", error);
@@ -10,27 +10,27 @@ async function getFriendlyErrorMessage(error: any, connection: Connection): Prom
     if (error instanceof SendTransactionError) {
         const logs = error.logs;
         if (logs && logs.some(log => log.includes("insufficient lamports"))) {
-             return "Você não possui SOL suficiente para cobrir as taxas da rede e do serviço.";
+             return "You don't have enough SOL to cover the network and service fees.";
         }
     }
 
     if (message.includes("User rejected the request") || message.includes("Transações não assinadas pelo usuário")) {
-        return "Transação rejeitada pelo usuário na carteira.";
+        return "Transaction rejected by the user in the wallet.";
     }
     if (message.includes("insufficient lamports")) {
-        return "Você não possui SOL suficiente para cobrir as taxas da rede e do serviço.";
+        return "You don't have enough SOL to cover the network and service fees.";
     }
     if (message.includes("Transaction simulation failed")) {
-        // Tratamento específico para o erro de transação já processada
+        // Specific handling for already processed transaction error
         if (message.includes("This transaction has already been processed")) {
             return "SUCCESS_ALREADY_PROCESSED";
         }
-        return "A simulação da transação falhou. Verifique os endereços e se você possui saldo suficiente.";
+        return "Transaction simulation failed. Check the addresses and make sure you have enough balance.";
     }
     if (message.includes("blockhash")) {
-        return "O blockhash da transação expirou. Por favor, tente novamente.";
+        return "The transaction blockhash has expired. Please try again.";
     }
-    return "Ocorreu um erro durante o airdrop. Verifique o console para mais detalhes.";
+    return "An error occurred during the airdrop. Check the console for more details.";
 }
 
 
@@ -48,11 +48,11 @@ export const useAirdrop = () => {
 
   const performAirdrop = async (mint: string, recipients: Recipient[], programId: string) => {
     if (!publicKey || !sendTransaction || !signAllTransactions) {
-      setError("Carteira não conectada ou não suporta múltiplas transações.");
+      setError("Wallet not connected or does not support multiple transactions.");
       return;
     }
     if (!connection) {
-        setError("A conexão com a rede Solana não foi estabelecida.");
+        setError("Connection to the Solana network was not established.");
         return;
     }
 
@@ -70,14 +70,14 @@ export const useAirdrop = () => {
                 recipientChunks.push(recipients.slice(i, i + BATCH_SIZE));
             }
         } else {
-            throw new Error("A lista de destinatários está vazia ou é inválida.");
+            throw new Error("The recipient list is empty or invalid.");
         }
 
 
         const transactions: VersionedTransaction[] = [];
         
         for (let i = 0; i < recipientChunks.length; i++) {
-             setSignature(`Preparando transação ${i + 1} de ${recipientChunks.length}...`);
+             setSignature(`Preparing transaction ${i + 1} of ${recipientChunks.length}...`);
              const chunk = recipientChunks[i];
              const response = await fetch('/api/airdrop', {
                 method: 'POST',
@@ -86,26 +86,26 @@ export const useAirdrop = () => {
             });
 
             const result = await response.json();
-            if (!response.ok) throw new Error(result.error || `Falha na API para o lote ${i+1}.`);
+            if (!response.ok) throw new Error(result.error || `API request failed for batch ${i+1}.`);
             
             const transactionBuffer = Buffer.from(result.transaction, 'base64');
             transactions.push(VersionedTransaction.deserialize(transactionBuffer));
         }
 
-        setSignature(`Aguardando aprovação para ${transactions.length} transações...`);
+        setSignature(`Waiting for approval of ${transactions.length} transactions...`);
         const signedTransactions = await signAllTransactions(transactions);
 
         if (!signedTransactions) {
-            throw new Error("Transações não assinadas pelo usuário.");
+            throw new Error("Transactions not signed by the user.");
         }
 
-        setSignature(`Enviando ${signedTransactions.length} transações...`);
+        setSignature(`Sending ${signedTransactions.length} transactions...`);
 
         const signatures = await Promise.all(
             signedTransactions.map(tx => connection.sendRawTransaction(tx.serialize()))
         );
 
-        setSignature('Confirmando transações...');
+        setSignature('Confirming transactions...');
 
         firstSignature = signatures[0];
         if (firstSignature) {
@@ -124,11 +124,11 @@ export const useAirdrop = () => {
       const friendlyMessage = await getFriendlyErrorMessage(err, connection);
       
       if (friendlyMessage === "SUCCESS_ALREADY_PROCESSED") {
-        console.log('A transação já foi processada, tratando como sucesso.');
-        // Mesmo sem a primeira assinatura, consideramos sucesso.
+        console.log('The transaction has already been processed, treating as success.');
+        // Even without the first signature, treat as success.
         const successSignature = firstSignature || 'confirmed';
         setSignature(successSignature);
-        setError(null); // Limpa qualquer erro anterior
+        setError(null); // Clear any previous error
         return successSignature;
       }
 
@@ -146,4 +146,3 @@ export const useAirdrop = () => {
 
   return { performAirdrop, isLoading, error, signature, reset };
 };
-

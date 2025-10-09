@@ -8,7 +8,7 @@ import { fetchDigitalAsset, mplTokenMetadata } from '@metaplex-foundation/mpl-to
 import { publicKey as umiPublicKey } from '@metaplex-foundation/umi';
 import { RPC_ENDPOINT } from '@/lib/constants';
 
-// Interface para a lista de tokens da Solana
+// Interface for the Solana token list
 interface SolanaToken {
     chainId: number;
     address: string;
@@ -18,7 +18,7 @@ interface SolanaToken {
     logoURI: string;
 }
 
-// Interface para o token do usuário
+// Interface for the user's token
 export interface UserToken {
     mint: string;
     amount: string;
@@ -26,10 +26,10 @@ export interface UserToken {
     name?: string;
     symbol?: string;
     logoURI?: string;
-    programId: string; // Adicionado para identificar o tipo de token
+    programId: string; // Added to identify the token type
 }
 
-// Função para introduzir um pequeno atraso
+// Function to introduce a small delay
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const useUserTokens = () => {
@@ -49,7 +49,7 @@ export const useUserTokens = () => {
                 const tokenList: SolanaToken[] = data.tokens;
                 setTokenMap(new Map(tokenList.map(token => [token.address, token])));
             } catch (error) {
-                console.error("Falha ao buscar a lista de tokens da Solana:", error);
+                console.error("Failed to fetch Solana token list:", error);
             }
         };
         fetchTokenList();
@@ -69,7 +69,7 @@ export const useUserTokens = () => {
                     connection.getParsedTokenAccountsByOwner(publicKey, { programId: TOKEN_2022_PROGRAM_ID })
                 ]);
 
-                // Adiciona o programId a cada conta para posterior filtragem
+                // Adds the programId to each account for later filtering
                 const allAccounts = [
                     ...tokenAccounts.value.map(acc => ({ ...acc, programId: TOKEN_PROGRAM_ID.toBase58() })),
                     ...token2022Accounts.value.map(acc => ({ ...acc, programId: TOKEN_2022_PROGRAM_ID.toBase58() }))
@@ -77,8 +77,8 @@ export const useUserTokens = () => {
                     .filter(acc => acc.account.data.parsed.info.tokenAmount.uiAmount > 0);
 
                 const resolvedTokens: UserToken[] = [];
-                const BATCH_SIZE = 5; // Processar 5 tokens por vez
-                const DELAY_MS = 500; // Meio segundo de espera entre os lotes
+                const BATCH_SIZE = 5; // Process 5 tokens at a time
+                const DELAY_MS = 500; // Half a second delay between batches
 
                 for (let i = 0; i < allAccounts.length; i += BATCH_SIZE) {
                     const batch = allAccounts.slice(i, i + BATCH_SIZE);
@@ -109,12 +109,12 @@ export const useUserTokens = () => {
                                     programId: accountInfo.programId,
                                 };
                             } catch (e) {
-                                console.error(`Falha ao buscar metadados para o mint ${mint}:`, e);
+                                console.error(`Failed to fetch metadata for mint ${mint}:`, e);
                                 return {
                                     mint,
                                     amount: tokenAmount.uiAmountString,
                                     decimals: tokenAmount.decimals,
-                                    name: 'Token Desconhecido',
+                                    name: 'Unknown Token',
                                     symbol: mint.substring(0, 6),
                                     logoURI: '',
                                     programId: accountInfo.programId,
@@ -126,7 +126,7 @@ export const useUserTokens = () => {
                     const batchResults = await Promise.all(batchPromises);
                     resolvedTokens.push(...batchResults);
 
-                    // Adiciona um atraso se houver mais lotes para processar
+                    // Adds a delay if there are more batches to process
                     if (i + BATCH_SIZE < allAccounts.length) {
                         await sleep(DELAY_MS);
                     }
@@ -135,7 +135,7 @@ export const useUserTokens = () => {
                 setTokens(resolvedTokens);
 
             } catch (error) {
-                console.error("Falha ao buscar os tokens do usuário:", error);
+                console.error("Failed to fetch user's tokens:", error);
                 setTokens([]);
             } finally {
                 setIsLoading(false);
@@ -147,4 +147,3 @@ export const useUserTokens = () => {
 
     return { tokens, isLoading };
 };
-
