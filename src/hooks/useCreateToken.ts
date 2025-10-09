@@ -9,6 +9,10 @@ interface TokenData {
   decimals: number;
   supply: number;
   imageUrl: string;
+  description?: string;
+  website?: string;
+  twitter?: string;
+  instagram?: string;
   mintAuthority: boolean;
   freezeAuthority: boolean;
   tokenStandard: 'spl' | 'token-2022';
@@ -20,31 +24,40 @@ interface TokenData {
 }
 
 function getFriendlyErrorMessage(error: any): string {
+    // Log of the original and complete error for advanced debugging.
+    console.error("Original Error from Wallet:", error);
+    
+    // Extracts the main error message.
     const message = error.message || String(error);
-    console.error("Create token error:", error);
+
+    // Attempts to extract simulation logs, if available.
+    if (error.logs) {
+        console.error("Simulation Logs:", error.logs);
+        // Returns a more specific message if logs are available.
+        return `Transaction simulation failed. Check the browser console for technical details. Message: ${message}`;
+    }
 
     if (message.includes("User rejected the request")) {
         return "Transaction rejected by the user in the wallet.";
     }
-    // Erro de saldo insuficiente para rent
     if (message.includes("insufficient lamports")) {
-        return "You don't have enough SOL to cover the network fees.";
+        return "You do not have enough SOL to cover network fees.";
     }
     if (message.includes("not enough SOL")) {
-        return "Transaction failed. Please check if you have enough SOL for the costs.";
+        return "Transaction failed. Make sure you have enough SOL for costs.";
     }
-    // Exemplo de erro de símbolo (simulado, a lógica real pode estar no backend)
     if (message.includes("Token symbol already in use")) {
-        return "This symbol is already in use. Please choose another one.";
+        return "This symbol is already in use. Please choose another.";
     }
     if (message.includes("Transaction simulation failed")) {
-        return "Transaction simulation failed. This may be a temporary network issue or invalid data.";
+        return `Transaction simulation failed: ${message}. This may be an issue with token data or a temporary network problem.`;
     }
-     if (message.includes("blockhash")) {
+    if (message.includes("blockhash")) {
         return "The transaction blockhash has expired. Please try again.";
     }
 
-    return "An error occurred while creating the token. Check the console for more details.";
+    // Generic message if none of the above conditions are met.
+    return `An unexpected error occurred: ${message}. Check the console for more details.`;
 }
 
 export const useCreateToken = () => {
@@ -73,20 +86,25 @@ export const useCreateToken = () => {
     setError(null);
 
     try {
-      // Passo 3: Ler a referência do localStorage
       const affiliateRef = localStorage.getItem('affiliateRef');
+
+      const apiPayload = { 
+          ...tokenData, 
+          wallet: publicKey.toBase58(),
+          affiliate: affiliateRef
+      };
+
+      console.log("Sending to API /api/create-token:", apiPayload);
 
       const response = await fetch('/api/create-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ...tokenData, 
-          wallet: publicKey.toBase58(),
-          affiliate: affiliateRef // Enviar a referência para o backend
-        }),
+        body: JSON.stringify(apiPayload),
       });
 
       const result = await response.json();
+      console.log("Received from API /api/create-token:", result);
+
       if (!response.ok) {
         throw new Error(result.error || 'Failed to prepare the transaction on the server.');
       }
@@ -94,6 +112,17 @@ export const useCreateToken = () => {
       const transactionBuffer = Buffer.from(result.transaction, 'base64');
       const transaction = VersionedTransaction.deserialize(transactionBuffer);
       
+      console.log("Transaction deserialized. Starting simulation...", transaction);
+
+      // **Transaction simulation to obtain detailed error logs**
+      const simulationResult = await connection.simulateTransaction(transaction, { commitment: "confirmed" });
+      if (simulationResult.value.err) {
+        console.error("Transaction simulation failed:", simulationResult.value.err);
+        console.error("Simulation logs:", simulationResult.value.logs);
+        throw new Error(`Transaction simulation failed. Logs: ${JSON.stringify(simulationResult.value.logs)}`);
+      }
+      
+      console.log("Simulation successful. Sending transaction to wallet...");
       const signature = await sendTransaction(transaction, connection);
       console.log(`Transaction sent with signature: ${signature}`);
 
@@ -109,6 +138,7 @@ export const useCreateToken = () => {
       return { signature, mintAddress: result.mintAddress };
 
     } catch (err: any) {
+      console.error("Full create token error:", err);
       const friendlyMessage = getFriendlyErrorMessage(err);
       setError(friendlyMessage);
       router.push(`/confirmation?status=error&error=${encodeURIComponent(friendlyMessage)}`);

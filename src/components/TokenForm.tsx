@@ -12,12 +12,16 @@ import { Label } from "@/components/ui/label";
 import styles from "@/components/TokenForm.module.css";
 import TokenPreview from "@/components/TokenPreview";
 
-// --- Zod Schema with validation for formatted supply ---
+// --- Zod Schema with validation for formatted supply and new fields ---
 const tokenSchema = z.object({
   name: z.string().min(1, "Token name is required."),
   symbol: z.string()
     .min(1, "Symbol is required.")
     .max(10, "Symbol cannot exceed 10 characters."),
+  description: z.string().optional(),
+  website: z.string().optional(),
+  twitter: z.string().optional(),
+  instagram: z.string().optional(),
   decimals: z.number()
     .min(0, "Decimals must be at least 0.")
     .max(9, "Decimals cannot be greater than 9.")
@@ -77,6 +81,10 @@ export default function TokenForm() {
       decimals: 9,
       supply: "",
       imageUrl: "",
+      description: "",
+      website: "",
+      twitter: "",
+      instagram: "",
       mintAuthority: true,
       freezeAuthority: false,
       isMetadataMutable: true,
@@ -109,7 +117,7 @@ export default function TokenForm() {
         const data = await response.json();
         setValue('imageUrl', data.secure_url, { shouldValidate: true });
       } catch (error) {
-        setUploadError("Upload error. Please try again.");
+        setUploadError("Upload error. Please, try again.");
         setImageFile(null);
       } finally {
         setTimeout(() => setIsUploading(false), 500);
@@ -152,7 +160,6 @@ export default function TokenForm() {
     <div className={styles.formGrid}>
       <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
         
-        {/* --- Main Fields --- */}
         <div className={styles.fieldGrid}>
             <div className={styles.field}>
               <Label htmlFor="name">Token Name</Label>
@@ -165,6 +172,12 @@ export default function TokenForm() {
               <Controller name="symbol" control={control} render={({ field }) => <Input id="symbol" placeholder="Ex: MYTK" {...field} onChange={e => field.onChange(e.target.value.toUpperCase())} maxLength={10} />} />
               {errors.symbol && <p className={styles.error}>{errors.symbol.message}</p>}
             </div>
+        </div>
+        
+        <div className={styles.field}>
+            <Label htmlFor="description">Description (Optional)</Label>
+            <Controller name="description" control={control} render={({ field }) => <Input id="description" placeholder="A brief description of your token" {...field} />} />
+            {errors.description && <p className={styles.error}>{errors.description.message}</p>}
         </div>
 
         <div className={styles.fieldGrid}>
@@ -210,8 +223,22 @@ export default function TokenForm() {
             {uploadError && <p className={styles.error}>{uploadError}</p>}
             {errors.imageUrl && <p className={styles.error}>{errors.imageUrl.message}</p>}
         </div>
+
+         <div className={styles.fieldGrid}>
+            <div className={styles.field}>
+                <Label htmlFor="website">Website (Optional)</Label>
+                <Controller name="website" control={control} render={({ field }) => <Input id="website" placeholder="https://yourproject.com" {...field} />} />
+            </div>
+            <div className={styles.field}>
+                <Label htmlFor="twitter">X / Twitter (Optional)</Label>
+                <Controller name="twitter" control={control} render={({ field }) => <Input id="twitter" placeholder="@user" {...field} />} />
+            </div>
+             <div className={styles.field}>
+                <Label htmlFor="instagram">Instagram (Optional)</Label>
+                <Controller name="instagram" control={control} render={({ field }) => <Input id="instagram" placeholder="user" {...field} />} />
+            </div>
+        </div>
         
-        {/* --- Token Standard Selector --- */}
         <div className={styles.field}>
             <Label>Token Standard</Label>
             <Controller
@@ -226,13 +253,12 @@ export default function TokenForm() {
             />
         </div>
 
-        {/* --- Conditional Section for Token-2022 --- */}
         {watchedFields.tokenStandard === 'token-2022' && (
             <div className={styles.advancedContent}>
                 <div className={styles.field}>
                     <Label htmlFor="transferFeeBasisPoints">Transfer Fee (%)</Label>
                     <Controller name="transferFee.basisPoints" control={control} render={({ field }) => <Input type="number" placeholder="Ex: 100 for 1%" {...field} onChange={e => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))} min={0} max={10000} />} />
-                    <p className={styles.fieldDescription}>Value in basis points. 100 = 1%. Maximum 10000.</p>
+                    <p className={styles.fieldDescription}>Value in basis points. 100 = 1%. Max 10000.</p>
                 </div>
                 <div className={styles.field}>
                     <Label htmlFor="transferFeeMaxFee">Maximum Transfer Fee</Label>
@@ -242,14 +268,13 @@ export default function TokenForm() {
             </div>
         )}
         
-        {/* --- Authority Options --- */}
         <div className={styles.authoritySection}>
           <h3 className={styles.authorityTitle}>Authority Options</h3>
           <div className={styles.authorityOptionsGrid}>
             <div className={styles.authorityOption}>
               <div className={styles.authorityText}>
                 <Label htmlFor="mintAuthority">Mint Authority (Create more tokens)</Label>
-                <p>Allows increasing the total supply in the future. Disable for a fixed supply.</p>
+                <p>Allows increasing total supply in the future. Disable for fixed supply.</p>
               </div>
               <Controller 
                 name="mintAuthority" 
@@ -266,7 +291,7 @@ export default function TokenForm() {
             <div className={styles.authorityOption}>
               <div className={styles.authorityText}>
                 <Label htmlFor="isMetadataMutable">Mutable Metadata</Label>
-                <p>Allows changing the token name, symbol, and image in the future. Disable for permanent metadata.</p>
+                <p>Allows editing token name, symbol and image in the future. Disable for permanent metadata.</p>
               </div>
               <Controller 
                 name="isMetadataMutable" 

@@ -32,7 +32,7 @@ import { createNoopSigner, signerIdentity, percentAmount } from '@metaplex-found
 interface CreateToken2022Params {
     name: string;
     symbol: string;
-    imageUrl: string;
+    metadataUri: string; // Alterado de imageUrl para metadataUri
     decimals: number;
     supply: number;
     wallet: string;
@@ -82,7 +82,7 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     const {
         name,
         symbol,
-        imageUrl,
+        metadataUri, // Alterado de imageUrl para metadataUri
         decimals,
         supply,
         wallet,
@@ -167,7 +167,7 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
         authority: userUmiSigner,
         name: name,
         symbol: symbol,
-        uri: imageUrl,
+        uri: metadataUri, // Usando a URI dos metadados
         sellerFeeBasisPoints: percentAmount(0, 2),
         tokenStandard: TokenStandard.Fungible,
         isMutable: isMetadataMutable,
@@ -219,6 +219,4 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
         mintAddress: mintKeypair.publicKey.toBase58(),
     };
 }
-
-
 

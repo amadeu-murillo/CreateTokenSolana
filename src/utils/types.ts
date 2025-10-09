@@ -54,6 +54,7 @@ export interface TokenMetadata {
   website?: string;
   twitter?: string;
   telegram?: string;
+  instagram?: string;
 }
 
 export type MeteoraConfigBase = {

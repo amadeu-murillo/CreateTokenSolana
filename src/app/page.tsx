@@ -80,7 +80,7 @@ const HowItWorksSection = () => (
       <div className={styles.step}>
         <div className={styles.stepIcon}><IconWallet /></div>
         <h3>1. Connect Your Wallet</h3>
-        <p>Connect your preferred Solana wallet (Phantom, Solflare, etc.).</p>
+        <p>Connect your preferred Solana wallet (Phantom, Solflare,etc.).</p>
       </div>
       <div className={styles.step}>
         <div className={styles.stepIcon}><IconFileText /></div>
