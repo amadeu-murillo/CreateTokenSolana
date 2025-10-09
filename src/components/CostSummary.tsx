@@ -50,7 +50,7 @@ export default function CostSummary() {
     <div className={styles.card}>
         <div className={`${styles.item} ${styles.total}`}>
             <p>Estimated Total Cost:</p>
-            <p>~{costs?.totalCost ? parseFloat(costs.totalCost).toFixed(2) : '0.12'} SOL</p>
+            <p>~{'0.11'} SOL</p>
         </div>
     </div>
   );

@@ -34,7 +34,7 @@ const TokenPreview = ({ name, symbol, imageUrl, supply, tokenStandard }: TokenPr
                                 <span className={styles.tokenBadge}>Token-2022</span>
                             )}
                         </div>
-                        <p className={styles.tokenSymbol}>{symbol || 'MEU'}</p>
+                        <p className={styles.tokenSymbol}>{symbol || 'MT'}</p>
                     </div>
                     <div className={styles.tokenSupply}>
                        <p className={styles.supplyValue}>{formattedSupply}</p>

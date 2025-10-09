@@ -7,6 +7,7 @@ import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { fetchDigitalAsset, mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata';
 import { publicKey as umiPublicKey } from '@metaplex-foundation/umi';
 import { RPC_ENDPOINT } from '@/lib/constants';
+import { getMetadataCache, setMetadataCache, isCacheItemValid } from '@/lib/cache';
 
 // Interface for the Solana token list
 interface SolanaToken {
@@ -79,6 +80,7 @@ export const useUserTokens = () => {
                 const resolvedTokens: UserToken[] = [];
                 const BATCH_SIZE = 5; // Process 5 tokens at a time
                 const DELAY_MS = 500; // Half a second delay between batches
+                const metadataCache = getMetadataCache();
 
                 for (let i = 0; i < allAccounts.length; i += BATCH_SIZE) {
                     const batch = allAccounts.slice(i, i + BATCH_SIZE);
@@ -97,15 +99,35 @@ export const useUserTokens = () => {
                                 programId: accountInfo.programId,
                             };
                         } else {
-                            try {
-                                const asset = await fetchDigitalAsset(umi, umiPublicKey(mint));
+                            // --- OTIMIZAÇÃO: Lógica de Cache ---
+                            const cachedToken = metadataCache[mint];
+                            if (isCacheItemValid(cachedToken)) {
                                 return {
                                     mint,
                                     amount: tokenAmount.uiAmountString,
                                     decimals: tokenAmount.decimals,
+                                    ...cachedToken.data,
+                                    programId: accountInfo.programId,
+                                };
+                            }
+
+                            // Se não estiver no cache ou estiver expirado, busca na rede
+                            try {
+                                const asset = await fetchDigitalAsset(umi, umiPublicKey(mint));
+                                const metadata = {
                                     name: asset.metadata.name,
                                     symbol: asset.metadata.symbol,
                                     logoURI: asset.metadata.uri,
+                                };
+
+                                // Salva os novos metadados no cache
+                                metadataCache[mint] = { data: metadata, timestamp: Date.now() };
+
+                                return {
+                                    mint,
+                                    amount: tokenAmount.uiAmountString,
+                                    decimals: tokenAmount.decimals,
+                                    ...metadata,
                                     programId: accountInfo.programId,
                                 };
                             } catch (e) {
@@ -132,6 +154,8 @@ export const useUserTokens = () => {
                     }
                 }
                 
+                // Salva o cache atualizado no final do processo
+                setMetadataCache(metadataCache);
                 setTokens(resolvedTokens);
 
             } catch (error) {
