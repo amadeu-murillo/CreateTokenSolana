@@ -62,14 +62,15 @@ const FeaturesSection = () => (
     <h2 className={styles.sectionTitle}>Comprehensive Features</h2>
     <p className={styles.sectionDescription}>Everything you need to manage your SPL token in one place.</p>
     <div className={styles.featuresGrid}>
-        <FeatureCard icon={<IconPlusCircle />} title="Token Creation" description="Launch your own SPL token on the Solana network with complete metadata, including name, symbol, and image." href="/create"/>
+        <FeatureCard icon={<IconPlusCircle />} title="Token Creation" description="Launch your own SPL token on the Solana network with full metadata, including name, symbol, and image." href="/create"/>
         <FeatureCard icon={<IconLayers />} title="Create Liquidity Pool" href="/add-liquidity" description="Create a liquidity pool on Raydium so your token can be traded by other users." />
-        <FeatureCard icon={<IconFlame />} title="Token Burn" description="Permanently remove tokens from circulation to control supply and increase scarcity." href="/burn" />
+        <FeatureCard icon={<IconFlame />} title="Token Burning" description="Permanently remove tokens from circulation to control supply and increase scarcity." href="/burn" />
         <FeatureCard icon={<IconSend />} title="Airdrop Distribution" description="Distribute your tokens to multiple addresses at once — ideal for marketing campaigns and rewards." href="/airdrop" />
         <FeatureCard icon={<IconSettings />} title="Authority Management" description="Have full control over your token with the option to renounce 'mint' and 'freeze' authorities." href="/dashboard"/>
         <FeatureCard icon={<IconDollarSign />} title="Affiliate Program" href="/afiliates" description="Earn SOL by referring new users. Generate your affiliate link and receive commissions for each token created." />
     </div>
-  </section>
+</section>
+
 );
 
 // --- Componente: HowItWorksSection ---
