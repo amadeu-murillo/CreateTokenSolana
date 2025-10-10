@@ -55,6 +55,9 @@
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
   padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .sidebarSection {

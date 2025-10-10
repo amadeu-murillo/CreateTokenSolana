@@ -36,8 +36,23 @@
   border-top: 1px solid hsl(var(--border));
 }
 
+.total {
+  font-size: 1.1rem;
+}
+
 .total p {
     font-weight: 700;
-    font-size: 1rem;
     color: hsl(var(--foreground));
+}
+
+.total p:last-child {
+    font-size: 1.2rem;
+    color: hsl(var(--primary));
+}
+
+.disclaimer {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+  margin-top: 0.5rem;
 }
