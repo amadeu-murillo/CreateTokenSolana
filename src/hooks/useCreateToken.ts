@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
+import { SERVICE_FEE_CREATE_TOKEN_SOL } from "@/lib/constants";
 
 interface TokenData {
   name: string;
@@ -134,6 +135,38 @@ export const useCreateToken = () => {
       }, 'confirmed');
       console.log('Transaction confirmed!');
 
+      // Record commission in Firebase if an affiliate was involved
+      if (affiliateRef && affiliateRef !== publicKey.toBase58()) {
+        // We don't await this call, as it's a background task.
+        // The user should see the confirmation page immediately after the on-chain transaction is confirmed.
+        (async () => {
+          try {
+            const commissionResponse = await fetch('/api/record-commission', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                affiliateWallet: affiliateRef,
+                commissionAmountSOL: SERVICE_FEE_CREATE_TOKEN_SOL * 0.10,
+                transactionSignature: signature,
+                tokenCreatorWallet: publicKey.toBase58(),
+                mintAddress: result.mintAddress,
+              }),
+            });
+
+            if (!commissionResponse.ok) {
+              const errorData = await commissionResponse.json();
+              throw new Error(errorData.error || 'Unknown error recording commission');
+            }
+
+            const commissionResult = await commissionResponse.json();
+            console.log('Commission recorded successfully:', commissionResult);
+          } catch (firebaseError) {
+            // Log the error but don't block the user flow
+            console.error("Failed to record commission in Firebase:", firebaseError);
+          }
+        })();
+      }
+
       router.push(`/confirmation?status=success&tokenAddress=${result.mintAddress}&txId=${signature}`);
       return { signature, mintAddress: result.mintAddress };
 
@@ -150,3 +183,4 @@ export const useCreateToken = () => {
 
   return { createToken, isLoading, error };
 };
+

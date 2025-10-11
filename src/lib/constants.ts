@@ -10,7 +10,8 @@ export const DEV_WALLET_ADDRESS = new PublicKey(
 /**
  * RF-02: Endpoint RPC da Helius para a devnet.
  */
-export const RPC_ENDPOINT = 'https://devnet.helius-rpc.com/?api-key=2e9c5f4b-aacf-4903-a787-0c431a50ffff';
+
+export const RPC_ENDPOINT = process.env.NEXT_PUBLIC_HELIUS_RPC_URL || "";
 
 export const CLOUDINARY_URL='cloudinary://376481879818689:YfZk9mhp8eVA6xaZOZzHbF2H_qM@dgurmzcht';
  

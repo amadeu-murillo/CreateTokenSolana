@@ -63,7 +63,7 @@ export default function CostSummary({ operation }: CostSummaryProps) {
     <div className={styles.card}>
       <div className={`${styles.item} ${styles.total}`}>
         <p>Estimated Total Cost:</p>
-        <p>{isLoading ? 'Loading...' : `~${parseFloat(costValue).toFixed(3)} SOL`}</p>
+        <p>{isLoading ? 'Loading...' : `~${parseFloat(costValue).toFixed(1)} SOL`}</p>
       </div>
       <p className={styles.disclaimer}>
         The cost includes service fees and an estimate of Solana network fees, which may vary.

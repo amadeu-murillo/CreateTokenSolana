@@ -1,89 +1,64 @@
 import { NextResponse } from 'next/server';
-import { Connection, PublicKey, LAMPORTS_PER_SOL, ParsedInstruction, SystemProgram } from '@solana/web3.js';
-import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_CREATE_TOKEN_SOL } from '@/lib/constants';
+import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-// The affiliate commission is 10% of the service fee
-const AFFILIATE_COMMISSION_SOL = SERVICE_FEE_CREATE_TOKEN_SOL * 0.10;
-const AFFILIATE_COMMISSION_LAMPORTS = AFFILIATE_COMMISSION_SOL * LAMPORTS_PER_SOL;
+interface AffiliateTransaction {
+    signature: string;
+    blockTime: number; // Usaremos o createdAt do Firebase
+    amount: number;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const wallet = searchParams.get('wallet');
 
   if (!wallet) {
-    return NextResponse.json({ error: 'Wallet address is required.' }, { status: 400 });
+    return NextResponse.json({ error: 'Endereço da carteira é obrigatório.' }, { status: 400 });
   }
 
   try {
-    const connection = new Connection(RPC_ENDPOINT, 'confirmed');
-    const affiliatePublicKey = new PublicKey(wallet);
+    const commissionsCol = collection(db, 'affiliate_commissions');
+    // REMOVIDO: orderBy('createdAt', 'desc') para evitar a necessidade de um índice composto.
+    const q = query(
+        commissionsCol, 
+        where('affiliateWallet', '==', wallet),
+        limit(100) // Limita às últimas 100 comissões por performance
+    );
 
-    // Fetch the last 100 signatures for the affiliate address
-    const signatures = await connection.getSignaturesForAddress(affiliatePublicKey, { limit: 100 });
+    const querySnapshot = await getDocs(q);
 
     let totalEarnings = 0;
-    let referralCount = 0;
-    const transactions = [];
+    const transactions: AffiliateTransaction[] = [];
 
-    // Process the 100 most recent transactions
-    for (const sigInfo of signatures) {
-      if (sigInfo.err) continue;
+    querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        totalEarnings += data.commissionAmountSOL || 0;
+        
+        // O blockTime não está diretamente disponível, então usamos o timestamp do servidor do Firestore
+        const createdAtTimestamp = data.createdAt?.toDate();
 
-      const tx = await connection.getParsedTransaction(sigInfo.signature, { maxSupportedTransactionVersion: 0 });
-      if (!tx || !tx.meta || tx.meta.err) continue;
+        transactions.push({
+            signature: data.transactionSignature,
+            blockTime: createdAtTimestamp ? Math.floor(createdAtTimestamp.getTime() / 1000) : 0,
+            amount: data.commissionAmountSOL,
+        });
+    });
 
-      const instructions = tx.transaction.message.instructions as ParsedInstruction[];
-      
-      let isAffiliatePayment = false;
-      let hasDevFeePayment = false;
-
-      for (const instruction of instructions) {
-        if (
-          instruction.programId.equals(SystemProgram.programId) &&
-          'parsed' in instruction &&
-          instruction.parsed.type === 'transfer'
-        ) {
-          const { destination, lamports } = instruction.parsed.info;
-          
-          // Check if it is a commission transfer to the affiliate (with a small tolerance)
-          if (
-            destination === affiliatePublicKey.toBase58() &&
-            Math.abs(lamports - AFFILIATE_COMMISSION_LAMPORTS) < 1000 
-          ) {
-            isAffiliatePayment = true;
-          }
-
-          if (destination === DEV_WALLET_ADDRESS.toBase58()) {
-            hasDevFeePayment = true;
-          }
-        }
-      }
-
-      if (isAffiliatePayment && hasDevFeePayment) {
-        totalEarnings += AFFILIATE_COMMISSION_LAMPORTS;
-        referralCount++;
-        if (tx.blockTime) {
-            transactions.push({
-                signature: sigInfo.signature,
-                blockTime: tx.blockTime,
-                amount: AFFILIATE_COMMISSION_SOL
-            });
-        }
-      }
-    }
-    
-    // Sort transactions from newest to oldest
+    // ADICIONADO: Ordenação dos resultados no código após a busca.
     transactions.sort((a, b) => b.blockTime - a.blockTime);
 
+    const referralCount = querySnapshot.size;
+
     return NextResponse.json({
-      totalEarningsSol: totalEarnings / LAMPORTS_PER_SOL,
+      totalEarningsSol: totalEarnings,
       referralCount,
-      transactions: transactions.slice(0, 10) // Return only the last 10 transactions
+      transactions: transactions.slice(0, 10), // Retorna apenas as últimas 10 para a UI
     });
 
   } catch (error) {
-    console.error('Error fetching affiliate earnings:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error.';
+    console.error('Erro ao buscar ganhos de afiliado do Firebase:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Erro interno do servidor.';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+

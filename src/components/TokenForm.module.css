@@ -372,3 +372,20 @@
     background-color: hsl(var(--primary));
     transition: width 0.2s ease-in-out;
 }
+
+/* --- ESTILOS PARA O BOTÃO DE CARREGAMENTO --- */
+.buttonContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.buttonSpinner {
+  width: 1.25rem; /* 20px */
+  height: 1.25rem; /* 20px */
+  border: 3px solid hsla(var(--primary-foreground), 0.3);
+  border-top-color: hsl(var(--primary-foreground));
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}

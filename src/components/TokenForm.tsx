@@ -175,12 +175,6 @@ export default function TokenForm() {
     };
     await createToken(tokenDataForApi);
   };
-  
-  const getButtonText = () => {
-      if (isCreatingToken) return "Waiting for confirmation...";
-      if (isUploading) return "Uploading image...";
-      return `Create Token`;
-  }
 
   return (
     <div className={styles.formGrid}>
@@ -370,7 +364,20 @@ export default function TokenForm() {
         <div className={styles.navigationButtons}>
             {currentStep > 1 && <Button type="button" className="secondary" onClick={prevStep} disabled={isCreatingToken}>Back</Button>}
             {currentStep < STEPS.length && <Button type="button" onClick={nextStep} disabled={isCreatingToken}>Next</Button>}
-            {currentStep === STEPS.length && <Button type="submit" disabled={isCreatingToken || isUploading}>{getButtonText()}</Button>}
+            {currentStep === STEPS.length && (
+              <Button type="submit" disabled={isCreatingToken || isUploading}>
+                {isCreatingToken ? (
+                  <div className={styles.buttonContent}>
+                    <div className={styles.buttonSpinner} />
+                    <span>Waiting for confirmation...</span>
+                  </div>
+                ) : isUploading ? (
+                  'Uploading image...'
+                ) : (
+                  `Create Token`
+                )}
+              </Button>
+            )}
         </div>
       </form>
       </div>
