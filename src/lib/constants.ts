@@ -24,7 +24,7 @@ export const SERVICE_FEE_BURN_TOKEN_SOL = 0.059;
 export const SERVICE_FEE_AIRDROP_SOL = 0.059;
 export const SERVICE_FEE_MANAGE_AUTHORITY_SOL = 0.059;
 // MODIFICAÇÃO: Taxa de serviço para criação de pool de liquidez atualizada
-export const SERVICE_FEE_CREATE_LP_SOL = 0.25;
+export const SERVICE_FEE_CREATE_LP_SOL = 0.5;
 
 
 /**

@@ -22,11 +22,6 @@
     color: hsl(var(--muted-foreground));
     max-width: 600px;
     margin: 0 auto;
-    border: 1px solid hsl(var(--ring));
-    padding: 0.75rem;
-    border-radius: var(--radius);
-    background-color: hsla(var(--primary), 0.1);
-    color: hsl(var(--primary));
 }
 
 .grid {
@@ -44,6 +39,18 @@
 
 .mainContent {
     width: 100%;
+}
+
+.optionsGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .optionsGrid {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 .sidebar {
@@ -82,7 +89,7 @@
     padding: 0 1.5rem 1.5rem;
 }
 
-.meteoraButtonLink {
+.platformButtonLink {
     text-decoration: none;
     width: 100%;
 }
