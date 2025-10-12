@@ -11,10 +11,11 @@ require("@solana/wallet-adapter-react-ui/styles.css");
 
 export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   /**
-   * RF-04: Configurar a rede para mainnet-beta, conforme o endpoint RPC fornecido.
+   * RF-04: Configurar a rede para mainnet-beta.
+   * ALTERAÇÃO: A rede foi alterada de Devnet para Mainnet.
    * A aplicação agora irá interagir com a rede principal da Solana.
    */
-  const network = WalletAdapterNetwork.Devnet;
+  const network = WalletAdapterNetwork.Mainnet;
   
   // Utiliza o endpoint RPC da Helius para maior confiabilidade e performance.
   const endpoint = useMemo(() => RPC_ENDPOINT, []);

@@ -18,7 +18,7 @@ type FeedbackProps = {
 };
 
 export default function Feedback({ success, tokenAddress, errorMessage, txId }: FeedbackProps) {
-  // Constrói o link do explorador de blocos, priorizando o ID da transação para verificação imediata.
+  // ALTERAÇÃO: Remove o parâmetro `?cluster=devnet` para que os links apontem para a mainnet do Solscan.
   const explorerLink = txId 
     ? `https://solscan.io/tx/${txId}`
     : `https://solscan.io/token/${tokenAddress}`;
@@ -62,4 +62,3 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
     </Card>
   );
 }
-
