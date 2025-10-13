@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic'; // Add this line
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -54,4 +56,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Falha ao gerar metadados.' }, { status: 500 });
   }
 }
-
