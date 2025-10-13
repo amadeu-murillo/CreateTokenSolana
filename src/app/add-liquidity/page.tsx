@@ -15,32 +15,32 @@ export default function AddLiquidityPage() {
     return (
         <div className={styles.pageContainer}>
             <header className={styles.pageHeader}>
-                <h1 className={styles.pageTitle}>Adicionar Liquidez ao Seu Token</h1>
+                <h1 className={styles.pageTitle}>Add Liquidity to Your Token</h1>
                 <p className={styles.pageDescription}>
-                    Escolha uma plataforma para criar um pool de liquidez e permitir que seu token seja negociado.
+                    Choose a platform to create a liquidity pool and allow your token to be traded.
                 </p>
             </header>
 
-             <div className={styles.grid}>
+            <div className={styles.grid}>
                 <main className={styles.mainContent}>
                     <div className={styles.optionsGrid}>
                         <Card>
                             <CardHeader>
                                 <CardTitle className={styles.cardTitle}>
                                     <IconExternalLink />
-                                    Criar Pool na Raydium
+                                    Create Pool on Raydium
                                 </CardTitle>
                                 <CardDescription>
-                                    Use os pools CLMM da Raydium para liquidez concentrada, que pode ser mais eficiente em capital.
+                                    Use Raydium's CLMM pools for concentrated liquidity, which can be more capital-efficient.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <p className={styles.infoText}>Clique no botão abaixo para ser redirecionado para a página de criação de pool da Raydium. Você precisará conectar sua carteira e seguir as instruções.</p>
+                                <p className={styles.infoText}>Click the button below to be redirected to Raydium's pool creation page. You will need to connect your wallet and follow the instructions.</p>
                             </CardContent>
                             <div className={styles.cardFooter}>
                                 <a href="https://raydium.io/clmm/create-pool/" target="_blank" rel="noopener noreferrer" className={styles.platformButtonLink}>
                                     <Button className="w-full">
-                                        Criar na Raydium
+                                        Create on Raydium
                                     </Button>
                                 </a>
                             </div>
@@ -49,59 +49,59 @@ export default function AddLiquidityPage() {
                             <CardHeader>
                                 <CardTitle className={styles.cardTitle}>
                                     <IconExternalLink />
-                                    Criar Pool na Meteora
+                                    Create Pool on Meteora
                                 </CardTitle>
                                 <CardDescription>
-                                    A Meteora oferece pools dinâmicos que ajudam a gerenciar a liquidez de forma mais eficaz.
+                                    Meteora offers dynamic pools that help manage liquidity more effectively.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <p className={styles.infoText}>Clique no botão abaixo para ser redirecionado para a página de criação de pool da Meteora. Você precisará conectar sua carteira e seguir as instruções.</p>
+                                <p className={styles.infoText}>Click the button below to be redirected to Meteora's pool creation page. You will need to connect your wallet and follow the instructions.</p>
                             </CardContent>
                             <div className={styles.cardFooter}>
                                 <a href="https://www.meteora.ag/pools/create" target="_blank" rel="noopener noreferrer" className={styles.platformButtonLink}>
                                     <Button className="w-full secondary">
-                                        Criar na Meteora
+                                        Create on Meteora
                                     </Button>
                                 </a>
                             </div>
                         </Card>
                     </div>
                 </main>
-                 <aside className={styles.sidebar}>
-                     <Card>
+                <aside className={styles.sidebar}>
+                    <Card>
                         <CardHeader>
                             <CardTitle className={styles.cardTitle}>
                                 <IconInfo />
-                                O que é Liquidez?
+                                What is Liquidity?
                             </CardTitle>
                         </CardHeader>
                         <CardContent className={styles.infoContent}>
                             <p className={styles.infoText}>
-                                Liquidez é a capacidade de um ativo ser facilmente comprado ou vendido sem causar uma mudança drástica em seu preço. Em DeFi, um "pool de liquidez" é um par de tokens (por exemplo, seu token e SOL) bloqueado em um contrato inteligente em uma exchange descentralizada (DEX).
+                                Liquidity is the ability of an asset to be easily bought or sold without causing a drastic change in its price. In DeFi, a "liquidity pool" is a pair of tokens (for example, your token and SOL) locked in a smart contract on a decentralized exchange (DEX).
                             </p>
                             <p className={styles.infoText}>
-                                Ao fornecer liquidez, você permite que outros negociem seu token, o que é essencial para que ele tenha valor e utilidade no mercado.
+                                By providing liquidity, you enable others to trade your token, which is essential for it to have value and utility in the market.
                             </p>
                         </CardContent>
                     </Card>
-                     <Card>
+                    <Card>
                         <CardHeader>
                             <CardTitle className={styles.cardTitle}>
                                 <IconLayers />
-                                Tokens para Liquidez
+                                Tokens for Liquidity
                             </CardTitle>
                         </CardHeader>
                         <CardContent className={styles.infoContent}>
                             <p className={styles.infoText}>
-                                Normalmente, um pool é formado pelo seu token e um token de alta liquidez, como:
+                                Normally, a pool is formed by your token and a highly liquid token, such as:
                             </p>
                             <ul className={styles.tokenList}>
-                                <li><strong>SOL:</strong> A criptomoeda nativa da Solana. A maioria dos novos tokens começa com um par TOKEN/SOL.</li>
-                                <li><strong>USDC:</strong> Uma stablecoin atrelada ao dólar americano, oferecendo um par de negociação estável.</li>
+                                <li><strong>SOL:</strong> The native cryptocurrency of Solana. Most new tokens start with a TOKEN/SOL pair.</li>
+                                <li><strong>USDC:</strong> A stablecoin pegged to the US dollar, offering a stable trading pair.</li>
                             </ul>
-                             <p className={styles.infoText}>
-                                A proporção inicial de tokens que você deposita no pool definirá o preço de lançamento do seu ativo.
+                            <p className={styles.infoText}>
+                                The initial ratio of tokens you deposit into the pool will define the launch price of your asset.
                             </p>
                         </CardContent>
                     </Card>
