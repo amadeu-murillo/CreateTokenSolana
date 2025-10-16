@@ -92,6 +92,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             gtag('config', 'AW-17652797085');
           `}
         </Script>
+        <meta name="google-site-verification" content="KgtGmUrAXO4vF6RITCjOmdyXvH3Bh4zzf01pDYs2pbc" />
       </head>
       <body>
         <WalletProvider>
