@@ -24,17 +24,25 @@ interface TokenData {
   isMetadataMutable: boolean;
 }
 
+/**
+ * Translates technical blockchain errors into user-friendly messages.
+ * @param error The error object caught during the transaction process.
+ * @returns A user-friendly error string.
+ */
 function getFriendlyErrorMessage(error: any): string {
-    // Log of the original and complete error for advanced debugging.
+    // Log the original and complete error for advanced debugging.
     console.error("Original Error from Wallet:", error);
     
-    // Extracts the main error message.
     const message = error.message || String(error);
 
-    // Attempts to extract simulation logs, if available.
+    // Specifically check for "AccountNotFound" in simulation errors.
+    // This is the most common error and is usually due to insufficient SOL.
+    if (message.includes("AccountNotFound")) {
+        return "Transaction simulation failed. This is often caused by insufficient SOL in your wallet to pay for transaction fees and account rent. Please ensure you have at least 0.2 SOL and try again.";
+    }
+
     if (error.logs) {
         console.error("Simulation Logs:", error.logs);
-        // Returns a more specific message if logs are available.
         return `Transaction simulation failed. Check the browser console for technical details. Message: ${message}`;
     }
 
@@ -57,7 +65,6 @@ function getFriendlyErrorMessage(error: any): string {
         return "The transaction blockhash has expired. Please try again.";
     }
 
-    // Generic message if none of the above conditions are met.
     return `An unexpected error occurred: ${message}. Check the console for more details.`;
 }
 
@@ -72,7 +79,7 @@ export const useCreateToken = () => {
     if (!publicKey || !sendTransaction) {
       const errorMessage = "Wallet not connected. Please connect your wallet to continue.";
       setError(errorMessage);
-      alert(errorMessage);
+      alert(errorMessage); // Using alert as a fallback for critical connection issues.
       return null;
     }
 
@@ -120,7 +127,9 @@ export const useCreateToken = () => {
       if (simulationResult.value.err) {
         console.error("Transaction simulation failed:", simulationResult.value.err);
         console.error("Simulation logs:", simulationResult.value.logs);
-        throw new Error(`Transaction simulation failed. Logs: ${JSON.stringify(simulationResult.value.logs)}`);
+        // MODIFICATION: Pass the specific error from the simulation into the thrown Error.
+        const simulationError = simulationResult.value.err;
+        throw new Error(`Transaction simulation failed: ${JSON.stringify(simulationError)}. Logs: ${JSON.stringify(simulationResult.value.logs)}`);
       }
       
       console.log("Simulation successful. Sending transaction to wallet...");
@@ -137,8 +146,6 @@ export const useCreateToken = () => {
 
       // Record commission in Firebase if an affiliate was involved
       if (affiliateRef && affiliateRef !== publicKey.toBase58()) {
-        // We don't await this call, as it's a background task.
-        // The user should see the confirmation page immediately after the on-chain transaction is confirmed.
         (async () => {
           try {
             const commissionResponse = await fetch('/api/record-commission', {
@@ -161,7 +168,6 @@ export const useCreateToken = () => {
             const commissionResult = await commissionResponse.json();
             console.log('Commission recorded successfully:', commissionResult);
           } catch (firebaseError) {
-            // Log the error but don't block the user flow
             console.error("Failed to record commission in Firebase:", firebaseError);
           }
         })();
@@ -171,7 +177,6 @@ export const useCreateToken = () => {
       return { signature, mintAddress: result.mintAddress };
 
     } catch (err: any) {
-      console.error("Full create token error:", err);
       const friendlyMessage = getFriendlyErrorMessage(err);
       setError(friendlyMessage);
       router.push(`/confirmation?status=error&error=${encodeURIComponent(friendlyMessage)}`);
@@ -183,4 +188,3 @@ export const useCreateToken = () => {
 
   return { createToken, isLoading, error };
 };
-
