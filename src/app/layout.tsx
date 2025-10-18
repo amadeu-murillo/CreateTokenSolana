@@ -7,7 +7,7 @@ import { WalletProvider } from "../context/WalletContext";
 import ConnectWallet from "../components/ConnectWallet";
 import styles from './Layout.module.css';
 import ThemeSwitcher from "../components/ThemeSwitcher";
-import { useEffect, Suspense } from "react";
+import { useEffect, Suspense, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import Script from "next/script";
 
@@ -29,12 +29,17 @@ const IconLayers = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
 );
 const IconBookOpen = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
 );
 const IconDollarSign = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
 );
-
+const IconMenu = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+);
+const IconX = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+);
 
 function AffiliateTracker() {
   const searchParams = useSearchParams();
@@ -46,12 +51,10 @@ function AffiliateTracker() {
     }
   }, [searchParams]);
 
-  return null; // This component does not render anything
+  return null;
 }
 
-function NavLinks() {
-  const pathname = usePathname();
-  const navLinks = [
+const navLinks = [
     { href: "/create", icon: <IconPlusCircle className={styles.navIcon} />, label: "Create" },
     { href: "/add-liquidity", icon: <IconLayers className={styles.navIcon} />, label: "Liquidity" },
     { href: "/burn", icon: <IconFlame className={styles.navIcon} />, label: "Burn" },
@@ -59,12 +62,15 @@ function NavLinks() {
     { href: "/dashboard", icon: <IconSettings className={styles.navIcon} />, label: "Manage" },
     { href: "/afiliates", icon: <IconDollarSign className={styles.navIcon} />, label: "Earn" },
     { href: "/documentacao", icon: <IconBookOpen className={styles.navIcon} />, label: "Documentation" },
-  ];
+];
+
+function NavLinks({ onLinkClick }: { onLinkClick?: () => void }) {
+  const pathname = usePathname();
 
   return (
     <nav className={styles.nav}>
       {navLinks.map(link => (
-        <Link key={link.href} href={link.href} className={`${styles.navLink} ${pathname === link.href ? styles.active : ''}`}>
+        <Link key={link.href} href={link.href} className={`${styles.navLink} ${pathname === link.href ? styles.active : ''}`} onClick={onLinkClick}>
           {link.icon}
           <span>{link.label}</span>
         </Link>
@@ -74,6 +80,16 @@ function NavLinks() {
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+
+  const toggleMobileMenu = () => setIsMobileMenuOpen(prev => !prev);
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
+  
+  useEffect(() => {
+    closeMobileMenu();
+  }, [pathname]);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -104,17 +120,30 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <header className={styles.header}>
               <div className={`${styles.container} ${styles.headerContainer}`}>
                 <div className={styles.navContainer}>
-                  <Link href="/" className={styles.logoLink}>
+                  <Link href="/" className={styles.logoLink} onClick={closeMobileMenu}>
                     <span className={styles.logoText}>🚀 CreateToken</span>
                   </Link>
-                  <NavLinks />
+                  <NavLinks onLinkClick={closeMobileMenu} />
                 </div>
-                <div className={styles.walletContainer}>
+                <div className={styles.rightItemsContainer}>
                   <ThemeSwitcher />
-                  {/* The wallet button has been moved to the floating container below */}
+                  <button className={styles.mobileMenuButton} onClick={toggleMobileMenu} aria-label="Toggle Menu">
+                    {isMobileMenuOpen ? <IconX /> : <IconMenu />}
+                  </button>
                 </div>
               </div>
             </header>
+
+            {isMobileMenuOpen && (
+                <div className={styles.mobileNav}>
+                    {navLinks.map(link => (
+                        <Link key={link.href} href={link.href} className={`${styles.mobileNavLink} ${pathname === link.href ? styles.active : ''}`} onClick={closeMobileMenu}>
+                            {link.icon}
+                            <span>{link.label}</span>
+                        </Link>
+                    ))}
+                </div>
+            )}
 
             <div className={styles.floatingWalletContainer}>
               <ConnectWallet />
