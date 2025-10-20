@@ -1,13 +1,13 @@
 import { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const siteUrl = 'https://create-token-solana.vercel.app';
+  const siteUrl = 'https://www.createtoken.sbs/';
 
   return [
     {
       url: siteUrl,
       lastModified: new Date(),
-      changeFrequency: 'monthly', // Mais realista que 'yearly'
+      changeFrequency: 'monthly', 
       priority: 1,
     },
     {
@@ -19,26 +19,46 @@ export default function sitemap(): MetadataRoute.Sitemap {
     {
       url: `${siteUrl}/burn`,
       lastModified: new Date(),
-      changeFrequency: 'monthly', // Alinhado com outras ferramentas
+      changeFrequency: 'monthly', 
       priority: 0.8,
     },
     {
       url: `${siteUrl}/airdrop`,
       lastModified: new Date(),
-      changeFrequency: 'monthly', // Alinhado com outras ferramentas
+      changeFrequency: 'monthly', 
       priority: 0.8,
     },
     {
       url: `${siteUrl}/dashboard`,
       lastModified: new Date(),
-      changeFrequency: 'monthly', // Alinhado com outras ferramentas
+      changeFrequency: 'monthly', 
       priority: 0.8,
     },
      {
       url: `${siteUrl}/costs`,
       lastModified: new Date(),
-      changeFrequency: 'yearly', // Página raramente atualizada
+      changeFrequency: 'yearly', 
       priority: 0.7,
     },
+    // --- Páginas Adicionadas ---
+    {
+      url: `${siteUrl}/add-liquidity`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: `${siteUrl}/afiliates`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: `${siteUrl}/documentacao`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    // --- Fim das Páginas Adicionadas ---
   ];
 }
