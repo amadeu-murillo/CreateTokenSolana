@@ -1,0 +1,9 @@
+# Allow all user agents (crawlers)
+User-agent: *
+Allow: /
+
+# Disallow crawling of Next.js build internals
+Disallow: /_next/
+
+# Point Google (and other crawlers) to your sitemap
+Sitemap: https://www.createtoken.sbs/sitemap.xml

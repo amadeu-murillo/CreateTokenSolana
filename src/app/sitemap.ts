@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const siteUrl = 'https://www.createtoken.sbs/';
+  const siteUrl = 'https://www.createtoken.sbs';
 
   return [
     {
