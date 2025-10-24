@@ -209,7 +209,7 @@ export default function AfiliatesPage() {
                         <CardTitle className={styles.sidebarCardTitle}><IconPercent /> Your Commission</CardTitle>
                     </CardHeader>
                     <CardContent>
-                       <p className={styles.sidebarText}>You receive <strong className={styles.highlight}>10%</strong> of our 0.1 SOL service fee, which equals <strong className={styles.highlight}>0.01 SOL</strong> for every successfully created token through your link.</p>
+                       <p className={styles.sidebarText}>You receive <strong className={styles.highlight}>10%</strong> of our 0.02 SOL service fee, which equals <strong className={styles.highlight}>0.002 SOL</strong> for every successfully created token through your link.</p>
                     </CardContent>
                 </Card>
                 <Card className={styles.sidebarCard}>

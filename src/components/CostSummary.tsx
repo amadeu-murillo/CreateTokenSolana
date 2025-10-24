@@ -43,9 +43,9 @@ export default function CostSummary({ operation }: CostSummaryProps) {
         console.error(error);
         // Fallback para valores padrão em caso de erro na API
         setCosts({
-          createToken: '0.1320',
-          burnToken: '0.0690',
-          airdrop: '0.0690',
+          createToken: '0.025',
+          burnToken: '0.025',
+          airdrop: '0.025',
           manageAuthority: '0.0690',
           createLiquidityPool: '0.2600',
         });
@@ -63,7 +63,7 @@ export default function CostSummary({ operation }: CostSummaryProps) {
     <div className={styles.card}>
       <div className={`${styles.item} ${styles.total}`}>
         <p>Estimated Total Cost:</p>
-        <p>{isLoading ? 'Loading...' : `~${parseFloat(costValue).toFixed(1)} SOL`}</p>
+        <p>{isLoading ? 'Loading...' : `~${parseFloat(costValue).toFixed(2)} SOL`}</p>
       </div>
       <p className={styles.disclaimer}>
         The cost includes service fees and an estimate of Solana network fees, which may vary.

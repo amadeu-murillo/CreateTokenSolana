@@ -19,9 +19,9 @@ export const CLOUDINARY_URL='cloudinary://376481879818689:YfZk9mhp8eVA6xaZOZzHbF
 /**
  * RF-03: Taxas de serviço em SOL.
  */
-export const SERVICE_FEE_CREATE_TOKEN_SOL = 0.129;
-export const SERVICE_FEE_BURN_TOKEN_SOL = 0.059;
-export const SERVICE_FEE_AIRDROP_SOL = 0.059;
+export const SERVICE_FEE_CREATE_TOKEN_SOL = 0.025;
+export const SERVICE_FEE_BURN_TOKEN_SOL = 0.025;
+export const SERVICE_FEE_AIRDROP_SOL = 0.025;
 export const SERVICE_FEE_MANAGE_AUTHORITY_SOL = 0.059;
 // MODIFICAÇÃO: Taxa de serviço para criação de pool de liquidez atualizada
 export const SERVICE_FEE_CREATE_LP_SOL = 0.5;
