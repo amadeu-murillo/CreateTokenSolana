@@ -91,7 +91,10 @@ export const useCreateLiquidityPool = () => {
           );
         }
 
+        // Simulate unsigned VersionedTransaction with sigVerify: false & replaceRecentBlockhash: true
         const simulation = await connection.simulateTransaction(transaction, {
+          sigVerify: false,
+          replaceRecentBlockhash: true,
           commitment: "confirmed",
         });
 

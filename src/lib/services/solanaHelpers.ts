@@ -4,6 +4,7 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Umi, createNoopSigner, signerIdentity, percentAmount } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { createV1, TokenStandard } from "@metaplex-foundation/mpl-token-metadata";
@@ -85,6 +86,7 @@ export function buildServiceFeeInstructions(
 
 /**
  * Generates Metaplex Token Metadata v1 instructions converted to web3.js TransactionInstructions.
+ * Supports both classic SPL Token (TOKEN_PROGRAM_ID) and Token-2022 (TOKEN_2022_PROGRAM_ID) mints.
  */
 export function buildMetaplexMetadataInstructions(params: {
   userPublicKey: PublicKey;
@@ -94,6 +96,7 @@ export function buildMetaplexMetadataInstructions(params: {
   metadataUri: string;
   isMetadataMutable: boolean;
   cluster?: SolanaCluster;
+  splTokenProgram?: PublicKey;
 }): TransactionInstruction[] {
   const {
     userPublicKey,
@@ -103,6 +106,7 @@ export function buildMetaplexMetadataInstructions(params: {
     metadataUri,
     isMetadataMutable,
     cluster = "mainnet-beta",
+    splTokenProgram = TOKEN_PROGRAM_ID,
   } = params;
   const umi = getUmiInstance(userPublicKey, cluster);
   const userUmiSigner = umi.identity;
@@ -118,6 +122,7 @@ export function buildMetaplexMetadataInstructions(params: {
     isMutable: isMetadataMutable,
     payer: userUmiSigner,
     updateAuthority: userUmiSigner,
+    splTokenProgram: fromWeb3JsPublicKey(splTokenProgram),
   }).getInstructions();
 
   return createMetadataIx.map((ix) => ({

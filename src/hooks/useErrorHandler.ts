@@ -33,23 +33,23 @@ export function parseSolanaError(
   }
 
   if (message.includes("AccountNotFound")) {
-    return "Transaction simulation failed (AccountNotFound): please ensure you have at least 0.15 SOL in your wallet to cover network rent and fees.";
+    return "Transaction simulation failed (AccountNotFound): please ensure your wallet holds SOL on the selected network (Mainnet-Beta or Devnet).";
   }
 
-  if (message.includes("insufficient lamports") || message.includes("not enough SOL")) {
-    return "Insufficient SOL balance to cover network and service fees.";
+  if (
+    message.includes("insufficient lamports") ||
+    message.includes("not enough SOL") ||
+    message.includes('"Custom":1}')
+  ) {
+    return "Insufficient SOL balance in your wallet to cover the service fee, liquidity deposit, and Solana account rent.";
   }
 
   if (message.includes("insufficient funds")) {
     return "Insufficient token balance in your wallet to complete this operation.";
   }
 
-  if (message.includes("blockhash")) {
-    return "Transaction blockhash expired. Please try again.";
-  }
-
-  if (message.includes("Transaction simulation failed")) {
-    return "Transaction simulation failed: please verify your SOL/token balances and account permissions.";
+  if (message.includes("blockhash") || message.includes("BlockhashNotFound")) {
+    return "Transaction blockhash expired. Please click the button again to generate a fresh blockhash.";
   }
 
   return message || `An unexpected error occurred while trying to ${defaultContext}.`;

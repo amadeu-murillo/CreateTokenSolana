@@ -1,5 +1,6 @@
 import {
   Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   ComputeBudgetProgram,
@@ -10,7 +11,7 @@ import {
 import {
   TOKEN_2022_PROGRAM_ID,
   createInitializeMintInstruction,
-  createAssociatedTokenAccountInstruction,
+  createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   createMintToInstruction,
   createSetAuthorityInstruction,
@@ -20,7 +21,11 @@ import {
   createInitializeTransferFeeConfigInstruction,
   createInitializeMetadataPointerInstruction,
 } from "@solana/spl-token";
-import { SERVICE_FEE_CREATE_TOKEN_LAMPORTS, SolanaCluster } from "@/lib/constants";
+import {
+  SERVICE_FEE_CREATE_TOKEN_LAMPORTS,
+  STANDARD_SERVICE_FEE_LAMPORTS,
+  SolanaCluster,
+} from "@/lib/constants";
 import { toRawTokenAmount } from "@/lib/security";
 import {
   buildMetaplexMetadataInstructions,
@@ -48,13 +53,10 @@ export interface CreateToken2022Params {
   network?: SolanaCluster;
 }
 
-// SPL Token-2022 Metadata Interface discriminators
-// SHA256("spl_token_metadata_interface:initialize_account")[0..8]
 const INITIALIZE_TOKEN_METADATA_DISCRIMINATOR = Buffer.from([
   210, 225, 30, 162, 88, 184, 77, 141,
 ]);
 
-// SHA256("spl_token_metadata_interface:updating_field")[0..8]
 const UPDATE_TOKEN_METADATA_FIELD_DISCRIMINATOR = Buffer.from([
   221, 233, 49, 45, 181, 202, 220, 200,
 ]);
@@ -66,10 +68,6 @@ function serializeBorshString(value: string): Buffer {
   return Buffer.concat([lenBuf, strBuf]);
 }
 
-/**
- * Builds the native Token-2022 InitializeTokenMetadata instruction
- * which writes `name`, `symbol`, and `uri` directly inside the Token-2022 Mint account on-chain.
- */
 function createInitializeNativeTokenMetadataIx(params: {
   mint: PublicKey;
   updateAuthority: PublicKey;
@@ -97,17 +95,12 @@ function createInitializeNativeTokenMetadataIx(params: {
   });
 }
 
-/**
- * Builds the native Token-2022 UpdateField instruction to store custom key-value pairs
- * (such as description, website, twitter, storageProvider) directly inside the Mint account on-chain.
- */
 function createUpdateNativeMetadataFieldIx(params: {
   mint: PublicKey;
   updateAuthority: PublicKey;
   fieldKey: string;
   fieldValue: string;
 }): TransactionInstruction {
-  // Field::Key(String) enum variant index = 3 in spl-token-metadata interface
   const enumVariant = Buffer.from([3]);
   const data = Buffer.concat([
     UPDATE_TOKEN_METADATA_FIELD_DISCRIMINATOR,
@@ -126,17 +119,12 @@ function createUpdateNativeMetadataFieldIx(params: {
   });
 }
 
-/**
- * Calculates the exact byte size of the variable-length TokenMetadata TLV extension
- * so the Mint account is pre-funded with sufficient rent-exempt lamports before reallocation.
- */
 function calculateNativeMetadataTlvByteLength(
   name: string,
   symbol: string,
   uri: string,
   additionalMetadata: Array<[string, string]> = []
 ): number {
-  // TLV header (4 bytes) + updateAuthority (32 bytes) + mint (32 bytes) + 3 Borsh strings + vec length (4 bytes)
   let size =
     4 +
     32 +
@@ -149,7 +137,7 @@ function calculateNativeMetadataTlvByteLength(
   for (const [k, v] of additionalMetadata) {
     size += 4 + Buffer.byteLength(k, "utf-8") + (4 + Buffer.byteLength(v, "utf-8"));
   }
-  return size + 16; // safety padding
+  return size + 16;
 }
 
 export async function createToken2022Transaction(params: CreateToken2022Params) {
@@ -163,7 +151,7 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     mintAuthority,
     freezeAuthority,
     isMetadataMutable,
-    useNativeMetadataExtension = true,
+    useNativeMetadataExtension = false,
     additionalMetadata = [],
     transferFee,
     affiliate,
@@ -185,15 +173,34 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     extensions.push(ExtensionType.MetadataPointer);
   }
 
-  // Base space allocated in SystemProgram.createAccount must match fixed-size extensions ONLY
   const baseMintLen = getMintLen(extensions);
   const extraTlvBytes = useNativeMetadataExtension
     ? calculateNativeMetadataTlvByteLength(name, symbol, metadataUri, additionalMetadata)
     : 0;
 
-  const totalRentLamports = await connection.getMinimumBalanceForRentExemption(
-    baseMintLen + extraTlvBytes
-  );
+  const [totalRentLamports, userSolBalance] = await Promise.all([
+    connection.getMinimumBalanceForRentExemption(baseMintLen + extraTlvBytes),
+    connection.getBalance(userPublicKey, "confirmed"),
+  ]);
+
+  const estimatedExtraLamports =
+    totalRentLamports + Math.round((useNativeMetadataExtension ? 0.005 : 0.018) * LAMPORTS_PER_SOL);
+  const effectiveServiceFeeLamports =
+    network === "devnet" &&
+    userSolBalance < SERVICE_FEE_CREATE_TOKEN_LAMPORTS + estimatedExtraLamports
+      ? STANDARD_SERVICE_FEE_LAMPORTS
+      : SERVICE_FEE_CREATE_TOKEN_LAMPORTS;
+
+  const totalRequiredLamports = effectiveServiceFeeLamports + estimatedExtraLamports;
+  if (userSolBalance < totalRequiredLamports) {
+    const haveSol = (userSolBalance / LAMPORTS_PER_SOL).toFixed(4);
+    const needSol = (totalRequiredLamports / LAMPORTS_PER_SOL).toFixed(4);
+    throw new Error(
+      `Insufficient SOL balance on ${network}: your wallet has ${haveSol} SOL, but creating this Token-2022 asset requires ~${needSol} SOL (${(
+        effectiveServiceFeeLamports / LAMPORTS_PER_SOL
+      ).toFixed(2)} SOL service fee + account rent).`
+    );
+  }
 
   const associatedTokenAccount = await getAssociatedTokenAddress(
     mintKeypair.publicKey,
@@ -204,8 +211,8 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
 
   const instructions: TransactionInstruction[] = [
     ComputeBudgetProgram.setComputeUnitLimit({ units: 500_000 }),
-    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 15_000 }),
-    ...buildServiceFeeInstructions(userPublicKey, SERVICE_FEE_CREATE_TOKEN_LAMPORTS, affiliate),
+    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
+    ...buildServiceFeeInstructions(userPublicKey, effectiveServiceFeeLamports, affiliate),
     SystemProgram.createAccount({
       fromPubkey: userPublicKey,
       newAccountPubkey: mintKeypair.publicKey,
@@ -215,7 +222,6 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     }),
   ];
 
-  // 1. Initialize TransferFeeConfig extension (if enabled) BEFORE InitializeMint
   if (hasTransferFee && transferFee) {
     const rawMaxFee =
       transferFee.maxFee > 0 ? toRawTokenAmount(transferFee.maxFee, decimals) : BigInt(0);
@@ -232,19 +238,17 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     );
   }
 
-  // 2. Initialize MetadataPointer extension (pointing directly to the Mint account itself) BEFORE InitializeMint
   if (useNativeMetadataExtension) {
     instructions.push(
       createInitializeMetadataPointerInstruction(
         mintKeypair.publicKey,
         isMetadataMutable ? userPublicKey : null,
-        mintKeypair.publicKey, // Self-referential on-chain metadata storage!
+        mintKeypair.publicKey,
         TOKEN_2022_PROGRAM_ID
       )
     );
   }
 
-  // 3. Initialize the Token-2022 Mint
   instructions.push(
     createInitializeMintInstruction(
       mintKeypair.publicKey,
@@ -255,7 +259,6 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     )
   );
 
-  // 4. Initialize On-Chain Metadata (Either Native Token-2022 Extension or Metaplex PDA)
   if (useNativeMetadataExtension) {
     instructions.push(
       createInitializeNativeTokenMetadataIx({
@@ -290,13 +293,13 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
         metadataUri,
         isMetadataMutable,
         cluster: network,
+        splTokenProgram: TOKEN_2022_PROGRAM_ID,
       })
     );
   }
 
-  // 5. Create Associated Token Account and Mint initial supply
   instructions.push(
-    createAssociatedTokenAccountInstruction(
+    createAssociatedTokenAccountIdempotentInstruction(
       userPublicKey,
       associatedTokenAccount,
       userPublicKey,
@@ -313,7 +316,6 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     )
   );
 
-  // 6. Revoke Mint Authority if requested
   if (!mintAuthority) {
     instructions.push(
       createSetAuthorityInstruction(
@@ -346,6 +348,7 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     mintAddress: mintKeypair.publicKey.toBase58(),
     metadataMode: useNativeMetadataExtension ? "token-2022-native-extension" : "metaplex-pda",
     metadataUri,
+    serviceFeeSol: effectiveServiceFeeLamports / LAMPORTS_PER_SOL,
     blockhash,
     lastValidBlockHeight,
     network,

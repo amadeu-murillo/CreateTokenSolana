@@ -11,7 +11,6 @@ import {
 import {
   AuthorityType,
   MINT_SIZE,
-  NATIVE_MINT,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -62,10 +61,6 @@ export interface CreateLiquidityPoolOutput {
   network: SolanaCluster;
 }
 
-/**
- * Integer square root for BigInt using Newton's method: computes floor(sqrt(n))
- * to determine initial LP token supply (sqrt(rawBaseAmount * rawQuoteAmount)).
- */
 function bigIntSqrt(value: bigint): bigint {
   if (value <= BigInt(0)) return BigInt(0);
   if (value < BigInt(4)) return BigInt(1);
@@ -89,17 +84,6 @@ function sortTokenMints(
   return { token0: mintB, token1: mintA, isBaseToken0: false };
 }
 
-/**
- * Builds a 100% deterministic, self-contained On-Chain Liquidity Pool & LP Mint transaction
- * that works reliably on both Solana Devnet and Mainnet-Beta:
- * 1. Charges the mandatory Service Fee to DEV_WALLET_ADDRESS (with 10% affiliate split if applicable).
- * 2. Atomically revokes FreezeAuthority on the base token if active.
- * 3. Derives the canonical Pool Authority PDA for the selected DEX (Raydium CPMM or Meteora DAMM).
- * 4. Creates & initializes a real on-chain LP Token Mint (9 decimals) signed by lpMintKeypair.
- * 5. Creates on-chain Pool Base Vault ATA & Pool Quote Vault ATA (WSOL or USDC) owned by the Pool Authority PDA.
- * 6. Transfers Base Tokens into the Pool Base Vault and wraps/transfers Quote SOL (WSOL) or USDC into the Pool Quote Vault.
- * 7. Mints the initial sqrt(x * y) LP Tokens directly to the user's wallet and locks the LP Mint authority to the Pool PDA.
- */
 export async function createLiquidityPoolTransaction(
   input: CreateLiquidityPoolInput
 ): Promise<CreateLiquidityPoolOutput> {
@@ -129,7 +113,7 @@ export async function createLiquidityPoolTransaction(
   }
 
   // 1. Detect Base Token Program ID on-chain
-  const baseMintAccountInfo = await connection.getAccountInfo(baseMintPublicKey);
+  const baseMintAccountInfo = await connection.getAccountInfo(baseMintPublicKey, "confirmed");
   if (!baseMintAccountInfo) {
     throw new Error(
       `Token Mint (${baseMint.slice(0, 8)}...) was not found on Solana ${network}. Make sure your wallet and top bar are set to the same network where the token was created.`
@@ -149,16 +133,52 @@ export async function createLiquidityPoolTransaction(
     baseTokenProgramId
   );
 
-  const rawBaseAmount = toRawTokenAmount(baseAmount, baseMintInfo.decimals);
+  let rawBaseAmount = toRawTokenAmount(baseAmount, baseMintInfo.decimals);
   const rawQuoteAmount = toRawTokenAmount(quoteAmount, quoteDecimals);
   const lpFeeLamports = getLpServiceFeeLamports(network);
 
-  // 2. Verify user has enough SOL on-chain before building transaction
-  const userSolBalance = await connection.getBalance(userPublicKey, "confirmed");
+  // 2. Verify User Base Token ATA & Balance (and clamp float-rounded MAX amounts safely)
+  const userBaseAta = await getAssociatedTokenAddress(
+    baseMintPublicKey,
+    userPublicKey,
+    false,
+    baseTokenProgramId
+  );
+
+  const [userSolBalance, userBaseAccountParsed] = await Promise.all([
+    connection.getBalance(userPublicKey, "confirmed"),
+    connection.getParsedAccountInfo(userBaseAta, "confirmed"),
+  ]);
+
+  const parsedTokenInfo = (userBaseAccountParsed.value?.data as any)?.parsed?.info;
+  if (!parsedTokenInfo?.tokenAmount?.amount) {
+    throw new Error(
+      `Your wallet does not hold an active token account for ${baseMint.slice(0, 8)}... on Solana ${network}.`
+    );
+  }
+
+  const userRawTokenBalance = BigInt(parsedTokenInfo.tokenAmount.amount);
+  if (userRawTokenBalance <= BigInt(0)) {
+    throw new Error("Your token balance is zero. Please select a token with a positive balance.");
+  }
+
+  if (rawBaseAmount > userRawTokenBalance) {
+    // If within 0.1% of balance (caused by UI float formatting when clicking MAX), clamp to exact raw balance
+    const diff = rawBaseAmount - userRawTokenBalance;
+    if (diff * BigInt(1000) <= userRawTokenBalance) {
+      rawBaseAmount = userRawTokenBalance;
+    } else {
+      throw new Error(
+        `Insufficient token balance: you entered ${baseAmount}, but your wallet holds ${parsedTokenInfo.tokenAmount.uiAmountString}.`
+      );
+    }
+  }
+
+  // 3. Verify user has enough SOL on-chain before building transaction
   const requiredSolLamports =
     lpFeeLamports +
     (quoteToken === "SOL" ? Number(rawQuoteAmount) : 0) +
-    Math.round(0.012 * LAMPORTS_PER_SOL); // Rent for LP Mint + 3 ATAs
+    Math.round(0.011 * LAMPORTS_PER_SOL); // Rent for LP Mint + 3 ATAs
 
   if (userSolBalance < requiredSolLamports) {
     const neededSol = (requiredSolLamports / LAMPORTS_PER_SOL).toFixed(4);
@@ -166,11 +186,11 @@ export async function createLiquidityPoolTransaction(
     throw new Error(
       `Insufficient SOL balance on ${network}: you have ${currentSol} SOL, but initializing this pool requires ~${neededSol} SOL (including ${
         quoteToken === "SOL" ? `${quoteAmount} SOL liquidity + ` : ""
-      }${(lpFeeLamports / LAMPORTS_PER_SOL).toFixed(3)} SOL service fee + account rent).`
+      }${(lpFeeLamports / LAMPORTS_PER_SOL).toFixed(2)} SOL service fee + account rent).`
     );
   }
 
-  // 3. Derive canonical Pool State / Authority PDA and generate LP Mint Keypair
+  // 4. Derive canonical Pool State / Authority PDA and generate LP Mint Keypair
   const { token0, token1 } = sortTokenMints(baseMintPublicKey, quoteMintPublicKey);
   const targetDexProgramId =
     dex === "raydium-cpmm" ? dexConfig.raydiumProgramId : dexConfig.meteoraDammProgramId;
@@ -187,14 +207,6 @@ export async function createLiquidityPoolTransaction(
   const lpMintKeypair = Keypair.generate();
   const lpDecimals = 9;
   const mintRentLamports = await connection.getMinimumBalanceForRentExemption(MINT_SIZE);
-
-  // User source ATAs
-  const userBaseAta = await getAssociatedTokenAddress(
-    baseMintPublicKey,
-    userPublicKey,
-    false,
-    baseTokenProgramId
-  );
 
   // Pool Vault ATAs (owned by poolAuthorityPda with allowOwnerOffCurve = true)
   const poolBaseVaultAta = await getAssociatedTokenAddress(
@@ -221,12 +233,11 @@ export async function createLiquidityPoolTransaction(
 
   const instructions: TransactionInstruction[] = [
     ComputeBudgetProgram.setComputeUnitLimit({ units: 450_000 }),
-    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 15_000 }),
-    // Mandatory Service Fee routed to DEV_WALLET_ADDRESS (with 10% affiliate split if applicable)
+    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
     ...buildServiceFeeInstructions(userPublicKey, lpFeeLamports, affiliate),
   ];
 
-  // 4. Auto-revoke Freeze Authority if active
+  // 5. Auto-revoke Freeze Authority if active
   let freezeAuthorityRevokedInTx = false;
   if (baseMintInfo.freezeAuthority) {
     if (baseMintInfo.freezeAuthority.equals(userPublicKey) && revokeFreezeIfActive) {
@@ -252,7 +263,7 @@ export async function createLiquidityPoolTransaction(
     }
   }
 
-  // 5. Create & Initialize the LP Token Mint
+  // 6. Create & Initialize the LP Token Mint
   instructions.push(
     SystemProgram.createAccount({
       fromPubkey: userPublicKey,
@@ -270,7 +281,7 @@ export async function createLiquidityPoolTransaction(
     )
   );
 
-  // 6. Create Pool Base Vault ATA, Pool Quote Vault ATA, and User LP Token ATA idempotently
+  // 7. Create Pool Base Vault ATA, Pool Quote Vault ATA, and User LP Token ATA idempotently
   instructions.push(
     createAssociatedTokenAccountIdempotentInstruction(
       userPublicKey,
@@ -295,7 +306,7 @@ export async function createLiquidityPoolTransaction(
     )
   );
 
-  // 7. Transfer Base Tokens from User to Pool Base Vault
+  // 8. Transfer Base Tokens from User to Pool Base Vault
   instructions.push(
     createTransferCheckedInstruction(
       userBaseAta,
@@ -309,7 +320,7 @@ export async function createLiquidityPoolTransaction(
     )
   );
 
-  // 8. Deposit Quote Liquidity (SOL wrapped into WSOL inside Pool Quote Vault, or USDC transfer)
+  // 9. Deposit Quote Liquidity (SOL wrapped into WSOL inside Pool Quote Vault, or USDC transfer)
   if (quoteToken === "SOL") {
     instructions.push(
       SystemProgram.transfer({
@@ -340,7 +351,7 @@ export async function createLiquidityPoolTransaction(
     );
   }
 
-  // 9. Mint Initial LP Tokens (sqrt(rawBase * rawQuote)) to Creator and lock LP Mint Authority to Pool PDA
+  // 10. Mint Initial LP Tokens (sqrt(rawBase * rawQuote)) to Creator and lock LP Mint Authority to Pool PDA
   const initialLpSupplyRaw = bigIntSqrt(rawBaseAmount * rawQuoteAmount);
   const safeLpSupplyRaw =
     initialLpSupplyRaw > BigInt(1000) ? initialLpSupplyRaw : BigInt(1_000_000_000);
@@ -373,7 +384,6 @@ export async function createLiquidityPoolTransaction(
   }).compileToV0Message();
 
   const transaction = new VersionedTransaction(messageV0);
-  // Partially sign with the newly generated LP Mint Keypair
   transaction.sign([lpMintKeypair]);
 
   const serializedTransaction = transaction.serialize();

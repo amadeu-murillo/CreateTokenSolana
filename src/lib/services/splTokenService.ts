@@ -1,5 +1,6 @@
 import {
   Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   ComputeBudgetProgram,
@@ -10,14 +11,18 @@ import {
 import {
   TOKEN_PROGRAM_ID,
   createInitializeMintInstruction,
-  createAssociatedTokenAccountInstruction,
+  createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   createMintToInstruction,
   createSetAuthorityInstruction,
   AuthorityType,
   MINT_SIZE,
 } from "@solana/spl-token";
-import { SERVICE_FEE_CREATE_TOKEN_LAMPORTS, SolanaCluster } from "@/lib/constants";
+import {
+  SERVICE_FEE_CREATE_TOKEN_LAMPORTS,
+  STANDARD_SERVICE_FEE_LAMPORTS,
+  SolanaCluster,
+} from "@/lib/constants";
 import { toRawTokenAmount } from "@/lib/security";
 import {
   buildMetaplexMetadataInstructions,
@@ -59,7 +64,30 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
   const connection = getSolanaConnection(network);
 
   const rawSupply = toRawTokenAmount(supply, decimals);
-  const rentLamports = await connection.getMinimumBalanceForRentExemption(MINT_SIZE);
+  const [rentLamports, userSolBalance] = await Promise.all([
+    connection.getMinimumBalanceForRentExemption(MINT_SIZE),
+    connection.getBalance(userPublicKey, "confirmed"),
+  ]);
+
+  // On Mainnet-Beta, always charge the full 0.90 SOL creation fee.
+  // On Devnet, charge 0.90 SOL if the wallet has >= 0.93 SOL; otherwise gracefully use 0.07 SOL on Devnet so 1-SOL faucet tests succeed.
+  const estimatedRentAndMetaplexLamports = rentLamports + Math.round(0.018 * LAMPORTS_PER_SOL);
+  const effectiveServiceFeeLamports =
+    network === "devnet" &&
+    userSolBalance < SERVICE_FEE_CREATE_TOKEN_LAMPORTS + estimatedRentAndMetaplexLamports
+      ? STANDARD_SERVICE_FEE_LAMPORTS
+      : SERVICE_FEE_CREATE_TOKEN_LAMPORTS;
+
+  const totalRequiredLamports = effectiveServiceFeeLamports + estimatedRentAndMetaplexLamports;
+  if (userSolBalance < totalRequiredLamports) {
+    const haveSol = (userSolBalance / LAMPORTS_PER_SOL).toFixed(4);
+    const needSol = (totalRequiredLamports / LAMPORTS_PER_SOL).toFixed(4);
+    throw new Error(
+      `Insufficient SOL balance on ${network}: your wallet has ${haveSol} SOL, but creating this token requires ~${needSol} SOL (${(
+        effectiveServiceFeeLamports / LAMPORTS_PER_SOL
+      ).toFixed(2)} SOL service fee + ~0.02 SOL Solana account rent).`
+    );
+  }
 
   const associatedTokenAccount = await getAssociatedTokenAddress(
     mintKeypair.publicKey,
@@ -70,8 +98,8 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
 
   const instructions: TransactionInstruction[] = [
     ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
-    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 15_000 }),
-    ...buildServiceFeeInstructions(userPublicKey, SERVICE_FEE_CREATE_TOKEN_LAMPORTS, affiliate),
+    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
+    ...buildServiceFeeInstructions(userPublicKey, effectiveServiceFeeLamports, affiliate),
     SystemProgram.createAccount({
       fromPubkey: userPublicKey,
       newAccountPubkey: mintKeypair.publicKey,
@@ -86,7 +114,7 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
       freezeAuthority ? userPublicKey : null,
       TOKEN_PROGRAM_ID
     ),
-    createAssociatedTokenAccountInstruction(
+    createAssociatedTokenAccountIdempotentInstruction(
       userPublicKey,
       associatedTokenAccount,
       userPublicKey,
@@ -109,6 +137,7 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
       metadataUri,
       isMetadataMutable,
       cluster: network,
+      splTokenProgram: TOKEN_PROGRAM_ID,
     }),
   ];
 
@@ -142,6 +171,7 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
   return {
     transaction: base64Transaction,
     mintAddress: mintKeypair.publicKey.toBase58(),
+    serviceFeeSol: effectiveServiceFeeLamports / LAMPORTS_PER_SOL,
     blockhash,
     lastValidBlockHeight,
     network,

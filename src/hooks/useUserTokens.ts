@@ -57,7 +57,7 @@ async function fetchImageFromMetadataUri(uri?: string | null): Promise<string> {
 export const useUserTokens = () => {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
-  const { rpcEndpoint } = useCluster();
+  const { cluster, rpcEndpoint } = useCluster();
   const [tokens, setTokens] = useState<UserToken[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [tokenMap, setTokenMap] = useState<Map<string, SolanaToken>>(new Map());
@@ -99,8 +99,16 @@ export const useUserTokens = () => {
     setIsLoading(true);
     try {
       const [tokenAccounts, token2022Accounts] = await Promise.all([
-        connection.getParsedTokenAccountsByOwner(publicKey, { programId: TOKEN_PROGRAM_ID }),
-        connection.getParsedTokenAccountsByOwner(publicKey, { programId: TOKEN_2022_PROGRAM_ID }),
+        connection.getParsedTokenAccountsByOwner(
+          publicKey,
+          { programId: TOKEN_PROGRAM_ID },
+          "confirmed"
+        ),
+        connection.getParsedTokenAccountsByOwner(
+          publicKey,
+          { programId: TOKEN_2022_PROGRAM_ID },
+          "confirmed"
+        ),
       ]);
 
       const allAccounts = [
@@ -116,7 +124,7 @@ export const useUserTokens = () => {
 
       const resolvedTokens: UserToken[] = [];
       const BATCH_SIZE = 5;
-      const DELAY_MS = 200;
+      const DELAY_MS = 180;
       const metadataCache = getMetadataCache();
 
       for (let i = 0; i < allAccounts.length; i += BATCH_SIZE) {
@@ -219,6 +227,36 @@ export const useUserTokens = () => {
         }
       }
 
+      // Immediate fallback for newly minted tokens (within last 10 mins) if RPC indexing is slightly behind
+      try {
+        const lastRaw = localStorage.getItem("lastCreatedTokenDossier");
+        if (lastRaw) {
+          const lastDossier = JSON.parse(lastRaw);
+          const isRecent = Date.now() - (lastDossier.createdAt || 0) < 10 * 60 * 1000;
+          if (
+            isRecent &&
+            lastDossier.mintAddress &&
+            lastDossier.network === cluster &&
+            !resolvedTokens.some((t) => t.mint === lastDossier.mintAddress)
+          ) {
+            resolvedTokens.unshift({
+              mint: lastDossier.mintAddress,
+              amount: String(lastDossier.supply || "0"),
+              decimals: Number(lastDossier.decimals ?? 9),
+              name: lastDossier.name || "New Token",
+              symbol: lastDossier.symbol || "TOKEN",
+              logoURI: lastDossier.imageUrl || "",
+              programId:
+                lastDossier.tokenStandard === "token-2022"
+                  ? TOKEN_2022_PROGRAM_ID.toBase58()
+                  : TOKEN_PROGRAM_ID.toBase58(),
+            });
+          }
+        }
+      } catch {
+        // Ignore storage read errors
+      }
+
       setMetadataCache(metadataCache);
       setTokens(resolvedTokens);
     } catch (error) {
@@ -227,7 +265,7 @@ export const useUserTokens = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [publicKey, connection, tokenMap, umi]);
+  }, [publicKey, connection, cluster, tokenMap, umi]);
 
   useEffect(() => {
     fetchUserTokens();

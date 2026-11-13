@@ -101,11 +101,19 @@ export const useCreateToken = () => {
           );
         }
 
+        // Simulate unsigned VersionedTransaction with sigVerify: false & replaceRecentBlockhash: true
         const simulationResult = await connection.simulateTransaction(transaction, {
+          sigVerify: false,
+          replaceRecentBlockhash: true,
           commitment: "confirmed",
         });
 
         if (simulationResult.value.err) {
+          console.error(
+            "Token creation simulation failed:",
+            simulationResult.value.err,
+            simulationResult.value.logs
+          );
           throw new Error(
             `Transaction simulation failed: ${JSON.stringify(simulationResult.value.err)}`
           );
@@ -114,7 +122,10 @@ export const useCreateToken = () => {
         setProgressStep(3);
         setStatusStep("Stage 3/5: Waiting for signature approval in your Solana wallet...");
 
-        const signature = await sendTransaction(transaction, connection);
+        const signature = await sendTransaction(transaction, connection, {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
 
         setProgressStep(4);
         setStatusStep("Stage 4/5: Broadcasting & confirming block finality on Solana...");
@@ -138,6 +149,8 @@ export const useCreateToken = () => {
 
         setProgressStep(5);
         setStatusStep("Stage 5/5: Token minted on-chain! Indexing metadata & preparing receipt...");
+
+        const effectiveFeeSol = result.serviceFeeSol ?? SERVICE_FEE_CREATE_TOKEN_SOL;
 
         if (result.mintAddress) {
           const cache = getMetadataCache();
@@ -167,7 +180,7 @@ export const useCreateToken = () => {
                 mintAuthority: tokenData.mintAuthority,
                 freezeAuthority: tokenData.freezeAuthority,
                 isMetadataMutable: tokenData.isMetadataMutable,
-                serviceFeeSol: SERVICE_FEE_CREATE_TOKEN_SOL,
+                serviceFeeSol: effectiveFeeSol,
                 network: cluster,
                 createdAt: Date.now(),
               })
@@ -183,7 +196,7 @@ export const useCreateToken = () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               affiliateWallet: affiliateRef,
-              commissionAmountSOL: SERVICE_FEE_CREATE_TOKEN_SOL * AFFILIATE_COMMISSION_RATE,
+              commissionAmountSOL: effectiveFeeSol * AFFILIATE_COMMISSION_RATE,
               transactionSignature: signature,
               tokenCreatorWallet: publicKey.toBase58(),
               mintAddress: result.mintAddress,
