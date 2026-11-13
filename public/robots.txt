@@ -1,9 +1,10 @@
-# Allow all user agents (crawlers)
 User-agent: *
 Allow: /
 
-# Disallow crawling of Next.js build internals
+# Prevent indexing of internal API routes, build assets, and transient confirmation query strings
 Disallow: /_next/
+Disallow: /api/
+Disallow: /confirmation
 
-# Point Google (and other crawlers) to your sitemap
+Host: https://www.createtoken.sbs
 Sitemap: https://www.createtoken.sbs/sitemap.xml

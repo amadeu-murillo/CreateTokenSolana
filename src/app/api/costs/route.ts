@@ -7,25 +7,25 @@ import {
   SERVICE_FEE_CREATE_LP_SOL,
 } from "@/lib/constants";
 
-// RF05: Gerenciamento de Custos
-// Este endpoint calcula e retorna os custos estimados para várias operações.
+// RF05: Cost Management
+// Calculates and returns estimated costs (Service Fee + Network Rent/Gas) for all platform operations.
 export async function GET() {
   try {
-    const networkCostInSol = 0.01; // Custo de rede genérico estimado
+    const networkCostInSol = 0.01;
 
     const costs = {
       createToken: (networkCostInSol + SERVICE_FEE_CREATE_TOKEN_SOL).toFixed(4),
       burnToken: (networkCostInSol + SERVICE_FEE_BURN_TOKEN_SOL).toFixed(4),
-      airdrop: (networkCostInSol + SERVICE_FEE_AIRDROP_SOL).toFixed(4), // Custo base por lote
+      airdrop: (networkCostInSol + SERVICE_FEE_AIRDROP_SOL).toFixed(4),
       manageAuthority: (networkCostInSol + SERVICE_FEE_MANAGE_AUTHORITY_SOL).toFixed(4),
       createLiquidityPool: (networkCostInSol + SERVICE_FEE_CREATE_LP_SOL).toFixed(4),
     };
 
     return NextResponse.json(costs);
   } catch (error) {
-    console.error("Erro ao calcular custos:", error);
+    console.error("Error calculating costs:", error);
     return NextResponse.json(
-      { error: "Erro interno do servidor ao calcular custos." },
+      { error: "Internal server error while calculating costs." },
       { status: 500 }
     );
   }

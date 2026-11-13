@@ -6,7 +6,7 @@ import Link from "next/link";
 import styles from "./Confirmation.module.css";
 import { Button } from "@/components/ui/button";
 import Notification from "@/components/ui/Notification";
-import { useState, Suspense } from "react"; // Import Suspense
+import { useState, Suspense } from "react";
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
@@ -14,43 +14,42 @@ function ConfirmationContent() {
   const tokenAddress = searchParams.get("tokenAddress");
   const txId = searchParams.get("txId");
   const errorMessage = searchParams.get("error");
-  
+
   const [isInfoVisible, setIsInfoVisible] = useState(true);
 
   return (
     <div className={styles.contentWrapper}>
-      <h2 className={styles.title}>Creation Status</h2>
+      <h2 className={styles.title}>Token Launch Status</h2>
 
       {status === "success" && isInfoVisible && (
         <Notification
           type="info"
-          message="Your token may not immediately appear in your wallet’s main list (e.g., Phantom). This is normal! Wallets hide unknown tokens to prevent spam. To display it, go to 'Manage Token List' in your wallet, search for your token, and enable visibility."
+          message="Your token is now live on Solana! Next step: initialize a Liquidity Pool below so anyone can trade your token."
           onClose={() => setIsInfoVisible(false)}
         />
       )}
 
       {status === "success" && tokenAddress ? (
         <>
-          <Feedback 
-            success={true} 
-            tokenAddress={tokenAddress} 
-            txId={txId}
-          />
+          <Feedback success={true} tokenAddress={tokenAddress} txId={txId} />
           <div className={styles.ctaContainer}>
-              <p>Congratulations! Your token is now on the blockchain. The next step is to create a liquidity pool so it can be traded.</p>
-              <Link href={`/add-liquidity`}>
-                  <Button className={styles.ctaButton}>
-                      Add Liquidity
-                  </Button>
-              </Link>
+            <p>
+              Ready to make your token tradable? Click below to pre-select this token in the
+              Liquidity Pool Creator.
+            </p>
+            <Link href={`/add-liquidity?mint=${encodeURIComponent(tokenAddress)}`}>
+              <Button className={styles.ctaButton}>
+                💧 Create Liquidity Pool for This Token →
+              </Button>
+            </Link>
           </div>
         </>
       ) : (
         <Feedback success={false} errorMessage={errorMessage || "An unknown error occurred."} />
       )}
       <div className={styles.linkContainer}>
-        <Link href="/create" className={styles.link}>
-          Create another token
+        <Link href="/" className={styles.link}>
+          ← Back to Token Creator
         </Link>
       </div>
     </div>
@@ -60,7 +59,7 @@ function ConfirmationContent() {
 export default function ConfirmationPage() {
   return (
     <div className={styles.container}>
-      <Suspense fallback={<div>Loading...</div>}>
+      <Suspense fallback={<div>Loading confirmation...</div>}>
         <ConfirmationContent />
       </Suspense>
     </div>

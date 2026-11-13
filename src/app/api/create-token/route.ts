@@ -1,111 +1,196 @@
-// src/app/api/create-token/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
+import { createSplTokenTransaction } from "@/lib/services/splTokenService";
+import { createToken2022Transaction } from "@/lib/services/token2022Service";
+import { uploadMetadataJsonToArweave } from "@/lib/services/arweaveService";
+import {
+  checkRateLimit,
+  createTokenRequestSchema,
+  getClientIp,
+  sanitizeHttpsUrl,
+} from "@/lib/security";
 
-import { NextRequest, NextResponse } from 'next/server';
-import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
-import { createSplTokenTransaction } from '@/lib/services/splTokenService';
-import { createToken2022Transaction } from '@/lib/services/token2022Service';
-
-// Configures Cloudinary with your credentials
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dgurmzcht',
-  api_key: process.env.CLOUDINARY_API_KEY || '376481879818689',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'YfZk9mhp8eVA6xaZOZzHbF2H_qM',
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "dgurmzcht",
+  api_key: process.env.CLOUDINARY_API_KEY || "376481879818689",
+  api_secret: process.env.CLOUDINARY_API_SECRET || "YfZk9mhp8eVA6xaZOZzHbF2H_qM",
+  secure: true,
 });
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const {
-        name,
-        symbol,
-        imageUrl,
-        decimals,
-        supply,
-        wallet,
-        mintAuthority,
-        freezeAuthority,
-        isMetadataMutable,
-        tokenStandard,
-        transferFee,
-        affiliate,
-        description,
-        website,
-        twitter,
-        instagram
-    } = body;
+    const clientIp = getClientIp(request);
+    const rateLimit = checkRateLimit(`create-token:${clientIp}`, 12, 60_000);
 
-    if (!name || !symbol || !imageUrl || decimals === undefined || !supply || !wallet) {
-      return NextResponse.json({ error: 'Incomplete data provided.' }, { status: 400 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: `Rate limit exceeded. Please wait ${rateLimit.retryAfterSeconds}s.` },
+        { status: 429 }
+      );
     }
 
-    // 1. Builds the metadata object in Metaplex standard
-    const attributes = [];
-    if (website) attributes.push({ trait_type: 'Website', value: website });
+    const rawBody = await request.json();
+    const parsed = createTokenRequestSchema.safeParse(rawBody);
+
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
+      return NextResponse.json(
+        { error: firstIssue?.message || "Incomplete or invalid token data provided." },
+        { status: 400 }
+      );
+    }
+
+    const {
+      name,
+      symbol,
+      imageUrl,
+      decimals,
+      supply,
+      wallet,
+      mintAuthority,
+      freezeAuthority,
+      isMetadataMutable,
+      tokenStandard,
+      useNativeMetadataExtension = false, // Defaults to Metaplex PDA so Phantom & Solscan display the token image immediately on Devnet & Mainnet
+      storageProvider = "arweave",
+      metadataUri: preUploadedMetadataUri,
+      transferFee,
+      affiliate,
+      description,
+      website,
+      twitter,
+      instagram,
+      network = "mainnet-beta",
+    } = parsed.data;
+
+    const safeImageUrl = sanitizeHttpsUrl(imageUrl);
+    if (!safeImageUrl) {
+      return NextResponse.json(
+        { error: "Image URL must use the secure HTTPS or Arweave protocol." },
+        { status: 400 }
+      );
+    }
+
+    const attributes: Array<{ trait_type: string; value: string }> = [];
+    const additionalMetadata: Array<[string, string]> = [];
+    const safeWebsite = sanitizeHttpsUrl(website);
+
+    if (description) {
+      additionalMetadata.push(["description", description]);
+    }
+    if (safeWebsite) {
+      attributes.push({ trait_type: "Website", value: safeWebsite });
+      additionalMetadata.push(["website", safeWebsite]);
+    }
     if (twitter) {
-        const twitterUrl = twitter.startsWith('https://') ? twitter : `https://twitter.com/${twitter.replace('@', '')}`;
-        attributes.push({ trait_type: 'Twitter', value: twitterUrl });
+      const cleanHandle = twitter.replace(/^@/, "").replace(/[^a-zA-Z0-9_:/.-]/g, "");
+      const twitterUrl = sanitizeHttpsUrl(twitter) || `https://x.com/${cleanHandle}`;
+      attributes.push({ trait_type: "Twitter", value: twitterUrl });
+      additionalMetadata.push(["twitter", twitterUrl]);
     }
     if (instagram) {
-        const instagramUrl = instagram.startsWith('https://') ? instagram : `https://instagram.com/${instagram.replace('@', '')}`;
-        attributes.push({ trait_type: 'Instagram', value: instagramUrl });
+      const cleanHandle = instagram.replace(/^@/, "").replace(/[^a-zA-Z0-9_:/.-]/g, "");
+      const instagramUrl =
+        sanitizeHttpsUrl(instagram) || `https://instagram.com/${cleanHandle}`;
+      attributes.push({ trait_type: "Instagram", value: instagramUrl });
+      additionalMetadata.push(["instagram", instagramUrl]);
     }
 
     const metadataJson = {
-      name: name,
-      symbol: symbol,
-      image: imageUrl,
-      description: description || `Token ${name} - Symbol ${symbol}`,
-      attributes: attributes,
+      name,
+      symbol,
+      image: safeImageUrl,
+      description: description || `Token ${name} (${symbol}) on Solana`,
+      attributes,
       properties: {
-        files: [{ uri: imageUrl, type: "image/png" }],
-        category: 'image',
+        files: [{ uri: safeImageUrl, type: "image/png" }],
+        category: "image",
       },
-      ...(website && { external_url: website }),
+      ...(safeWebsite && { external_url: safeWebsite }),
     };
 
-    // 2. Uploads the metadata JSON to Cloudinary as a raw file
-    const metadataString = JSON.stringify(metadataJson);
-    const metadataBuffer = Buffer.from(metadataString);
+    let finalMetadataUri = sanitizeHttpsUrl(preUploadedMetadataUri);
 
-    const uploadResponse = await new Promise<UploadApiResponse>((resolve, reject) => {
+    // 1. Try Arweave/Irys only when IRYS_UPLOADER_PRIVATE_KEY is configured and funded
+    if (!finalMetadataUri && storageProvider === "arweave" && process.env.IRYS_UPLOADER_PRIVATE_KEY) {
+      try {
+        const arweaveUpload = await uploadMetadataJsonToArweave({
+          metadata: metadataJson,
+          cluster: network,
+        });
+        finalMetadataUri = arweaveUpload.metadataUri;
+      } catch (arweaveErr) {
+        console.warn("Arweave metadata JSON upload fell back to HTTPS JSON storage:", arweaveErr);
+      }
+    }
+
+    // 2. Guaranteed HTTPS JSON Metadata Hosting (Cloudinary raw JSON stream)
+    if (!finalMetadataUri) {
+      const metadataBuffer = Buffer.from(JSON.stringify(metadataJson), "utf-8");
+      const uploadResponse = await new Promise<UploadApiResponse>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
-            { resource_type: 'raw', folder: 'token_metadata' },
-            (error, result) => {
-                if (error) return reject(new Error('Failed to upload metadata.'));
-                if (!result) return reject(new Error('No result from metadata upload.'));
-                resolve(result);
-            }
+          {
+            resource_type: "raw",
+            folder: "token_metadata",
+            public_id: `${symbol.toLowerCase()}_${Date.now()}.json`,
+          },
+          (error, result) => {
+            if (error) return reject(new Error("Failed to upload metadata JSON to storage."));
+            if (!result)
+              return reject(new Error("Empty response from metadata storage service."));
+            resolve(result);
+          }
         );
         uploadStream.end(metadataBuffer);
+      });
+      finalMetadataUri = uploadResponse.secure_url;
+    }
+
+    const cleanSupplyStr = String(supply).replace(/,/g, "").trim();
+
+    const result =
+      tokenStandard === "token-2022"
+        ? await createToken2022Transaction({
+            name,
+            symbol,
+            metadataUri: finalMetadataUri,
+            decimals,
+            supply: cleanSupplyStr,
+            wallet,
+            mintAuthority,
+            freezeAuthority,
+            isMetadataMutable,
+            useNativeMetadataExtension,
+            additionalMetadata,
+            transferFee,
+            affiliate,
+            network,
+          })
+        : await createSplTokenTransaction({
+            name,
+            symbol,
+            metadataUri: finalMetadataUri,
+            decimals,
+            supply: cleanSupplyStr,
+            wallet,
+            mintAuthority,
+            freezeAuthority,
+            isMetadataMutable,
+            affiliate,
+            network,
+          });
+
+    return NextResponse.json({
+      ...result,
+      imageUrl: safeImageUrl,
+      metadataUri: finalMetadataUri,
     });
-
-    const metadataUri = uploadResponse.secure_url;
-    console.log(`Metadata uploaded to: ${metadataUri}`);
-
-    // 3. Calls the transaction creation function with the metadata URI
-    const numericSupply = Number(String(supply).replace(/[^0-9]/g, ''));
-    if (isNaN(numericSupply) || numericSupply <= 0) {
-        return NextResponse.json({ error: 'Invalid supply.' }, { status: 400 });
-    }
-    
-    let result;
-    if (tokenStandard === 'token-2022') {
-        result = await createToken2022Transaction({
-            name, symbol, metadataUri, decimals, supply: numericSupply, wallet,
-            mintAuthority, freezeAuthority, isMetadataMutable, transferFee, affiliate,
-        });
-    } else {
-        result = await createSplTokenTransaction({
-            name, symbol, metadataUri, decimals, supply: numericSupply, wallet,
-            mintAuthority, freezeAuthority, isMetadataMutable, affiliate,
-        });
-    }
-
-    return NextResponse.json(result);
-
   } catch (error) {
-    console.error('Detailed error while creating transaction:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error while creating the transaction.';
+    console.error("Detailed error while creating token transaction:", error);
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Internal server error while creating the token transaction.";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

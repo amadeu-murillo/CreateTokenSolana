@@ -1,45 +1,38 @@
 :root {
-  /* Cores e Raio - Sistema de Design */
-  --radius: 0.75rem;
+  --radius: 0.875rem;
 
-  /* Paleta Light (Exemplo, focando no Dark) */
-  --background-light: 0 0% 100%;
-  --foreground-light: 240 10% 3.9%;
+  /* Swiss Light Palette */
+  --background-light: 210 20% 98%;
+  --foreground-light: 224 71% 4%;
   --card-light: 0 0% 100%;
-  --card-foreground-light: 240 10% 3.9%;
-  --border-light: 240 5.9% 90%;
-  --input-light: 240 5.9% 90%;
-  --muted-light: 240 4.8% 95.9%;
-  --muted-foreground-light: 240 5% 40%; 
+  --card-foreground-light: 224 71% 4%;
+  --border-light: 220 13% 88%;
+  --input-light: 220 13% 88%;
+  --muted-light: 220 14% 94%;
+  --muted-foreground-light: 220 9% 42%;
 
-  /* Paleta Dark (Refinada) */
-  --background-dark: 240 10% 3.9%; /* Preto azulado escuro */
-  --foreground-dark: 0 0% 98%; /* Branco suave */
-  
-  --card-dark: 240 5% 10%; /* Cinza um pouco mais claro para cards */
+  /* Swiss Dark / Bento Palette (Obsidian Zinc) */
+  --background-dark: 240 10% 4%;
+  --foreground-dark: 0 0% 98%;
+  --card-dark: 240 8% 7.5%;
   --card-foreground-dark: 0 0% 98%;
+  --border-dark: 240 6% 15%;
+  --input-dark: 240 6% 15%;
+  --muted-dark: 240 7% 11.5%;
+  --muted-foreground-dark: 240 5% 65%;
 
-  --border-dark: 240 3.7% 15.9%;
-  --input-dark: 240 3.7% 15.9%;
-  --muted-dark: 240 3.7% 15.9%;
-  --muted-foreground-dark: 240 5% 65%; /* Contraste melhorado */
-
-  --primary: 260 85% 65%; /* Roxo vibrante */
-  --primary-foreground: 0 0% 98%;
-  
-  --secondary: 240 3.7% 15.9%;
+  --primary: 262 83% 64%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 7% 13%;
   --secondary-foreground: 0 0% 98%;
-  
-  --destructive: 0 72% 51%;
+  --destructive: 0 72% 54%;
   --destructive-foreground: 0 0% 98%;
+  --ring: 262 83% 68%;
 
-  --ring: 260 85% 70%;
-
-  /* Gradiente Primário Moderno */
-  --primary-gradient: linear-gradient(90deg, hsl(260, 85%, 65%), hsl(220, 85%, 60%));
+  --primary-gradient: linear-gradient(135deg, #7c3aed 0%, #4f46e5 52%, #10b981 100%);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Modo Light */
 body {
   --background: var(--background-light);
   --foreground: var(--foreground-light);
@@ -51,7 +44,6 @@ body {
   --muted-foreground: var(--muted-foreground-light);
 }
 
-/* Modo Dark */
 body.dark {
   --background: var(--background-dark);
   --foreground: var(--foreground-dark);
@@ -85,47 +77,74 @@ body {
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  
-  /* Efeito de fundo sutil e moderno */
-  background-image: 
-    radial-gradient(circle at 25px 25px, hsla(var(--primary), 0.08) 2%, transparent 0%),
-    radial-gradient(circle at 75px 75px, hsla(var(--primary), 0.04) 2%, transparent 0%);
-  background-size: 100px 100px;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-image:
+    radial-gradient(circle at 14% 8%, hsla(262, 83%, 64%, 0.08) 0%, transparent 38%),
+    radial-gradient(circle at 86% 86%, hsla(160, 84%, 39%, 0.06) 0%, transparent 38%);
+  transition: background-color 0.3s var(--ease-out-expo), color 0.3s var(--ease-out-expo);
 }
 
 a {
   color: inherit;
   text-decoration: none;
-  transition: color 0.2s ease-in-out;
+  transition: color 0.2s var(--ease-out-expo), opacity 0.2s var(--ease-out-expo);
 }
 
 a:hover {
   color: hsl(var(--primary));
 }
 
-h1, h2, h3, h4, h5, h6 {
+button,
+input,
+select,
+textarea {
+  transition:
+    border-color 0.22s var(--ease-out-expo),
+    box-shadow 0.22s var(--ease-out-expo),
+    transform 0.22s var(--ease-out-expo),
+    background-color 0.22s var(--ease-out-expo);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-weight: 700;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.03em;
   color: hsl(var(--foreground));
 }
 
-/* Animação de entrada para elementos principais */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Implementação de Estados de Foco Visíveis (Acessibilidade) */
 *:focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
   border-radius: var(--radius);
+}
+
+@keyframes bentoFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pulseGlow {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.12);
+  }
 }

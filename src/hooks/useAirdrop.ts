@@ -1,143 +1,137 @@
 import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { VersionedTransaction, SendTransactionError, Connection } from "@solana/web3.js";
-
-// Enhanced error handling function
-async function getFriendlyErrorMessage(error: any, connection: Connection): Promise<string> {
-    const message = error.message || String(error);
-    console.error("Airdrop error:", error);
-
-    if (error instanceof SendTransactionError) {
-        const logs = error.logs;
-        if (logs && logs.some(log => log.includes("insufficient lamports"))) {
-             return "You don't have enough SOL to cover the network and service fees.";
-        }
-    }
-
-    if (message.includes("User rejected the request") || message.includes("Transações não assinadas pelo usuário")) {
-        return "Transaction rejected by the user in the wallet.";
-    }
-    if (message.includes("insufficient lamports")) {
-        return "You don't have enough SOL to cover the network and service fees.";
-    }
-    if (message.includes("Transaction simulation failed")) {
-        // Specific handling for already processed transaction error
-        if (message.includes("This transaction has already been processed")) {
-            return "SUCCESS_ALREADY_PROCESSED";
-        }
-        return "Transaction simulation failed. Check the addresses and make sure you have enough balance.";
-    }
-    if (message.includes("blockhash")) {
-        return "The transaction blockhash has expired. Please try again.";
-    }
-    return "An error occurred during the airdrop. Check the console for more details.";
-}
-
+import { VersionedTransaction } from "@solana/web3.js";
+import { useCluster } from "@/context/WalletContext";
+import { MAX_AIRDROP_RECIPIENTS_PER_TX } from "@/lib/constants";
+import { verifyTransactionIntegrity } from "@/lib/security";
+import { parseSolanaError } from "./useErrorHandler";
 
 interface Recipient {
-    address: string;
-    amount: number;
+  address: string;
+  amount: number;
 }
 
 export const useAirdrop = () => {
   const { publicKey, sendTransaction, signAllTransactions } = useWallet();
   const { connection } = useConnection();
+  const { cluster } = useCluster();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
 
-  const performAirdrop = async (mint: string, recipients: Recipient[], programId: string) => {
-    if (!publicKey || !sendTransaction || !signAllTransactions) {
-      setError("Wallet not connected or does not support multiple transactions.");
-      return;
-    }
-    if (!connection) {
+  const performAirdrop = useCallback(
+    async (mint: string, recipients: Recipient[], programId: string) => {
+      if (!publicKey || !sendTransaction || !signAllTransactions) {
+        setError("Wallet not connected or does not support batch transaction signing.");
+        return null;
+      }
+      if (!connection) {
         setError("Connection to the Solana network was not established.");
-        return;
-    }
+        return null;
+      }
 
-    setIsLoading(true);
-    setError(null);
-    setSignature(null);
+      setIsLoading(true);
+      setError(null);
+      setSignature(null);
 
-    let firstSignature: string | null = null;
+      let firstSignature: string | null = null;
 
-    try {
-        const BATCH_SIZE = 10;
+      try {
+        const batchSize = Math.min(10, MAX_AIRDROP_RECIPIENTS_PER_TX);
         const recipientChunks: Recipient[][] = [];
+
         if (recipients && recipients.length > 0) {
-            for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
-                recipientChunks.push(recipients.slice(i, i + BATCH_SIZE));
-            }
+          for (let i = 0; i < recipients.length; i += batchSize) {
+            recipientChunks.push(recipients.slice(i, i + batchSize));
+          }
         } else {
-            throw new Error("The recipient list is empty or invalid.");
+          throw new Error("The recipient list is empty or invalid.");
         }
 
-
+        const affiliateRef =
+          typeof window !== "undefined" ? localStorage.getItem("affiliateRef") : null;
         const transactions: VersionedTransaction[] = [];
-        
-        for (let i = 0; i < recipientChunks.length; i++) {
-             setSignature(`Preparing transaction ${i + 1} of ${recipientChunks.length}...`);
-             const chunk = recipientChunks[i];
-             const response = await fetch('/api/airdrop', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mint, recipients: chunk, wallet: publicKey.toBase58(), programId }),
-            });
 
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || `API request failed for batch ${i+1}.`);
-            
-            const transactionBuffer = Buffer.from(result.transaction, 'base64');
-            transactions.push(VersionedTransaction.deserialize(transactionBuffer));
+        for (let i = 0; i < recipientChunks.length; i++) {
+          setSignature(`Preparing batch ${i + 1} of ${recipientChunks.length}...`);
+          const chunk = recipientChunks[i];
+          const response = await fetch("/api/airdrop", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mint,
+              recipients: chunk,
+              wallet: publicKey.toBase58(),
+              programId,
+              network: cluster,
+              affiliate: affiliateRef,
+            }),
+          });
+
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.error || `Failed to prepare batch ${i + 1}.`);
+          }
+
+          const transactionBuffer = Buffer.from(result.transaction, "base64");
+          const deserializedTx = VersionedTransaction.deserialize(transactionBuffer);
+          const integrity = verifyTransactionIntegrity(deserializedTx, publicKey.toBase58());
+          if (!integrity.valid) {
+            throw new Error(integrity.reason || `Batch ${i + 1} failed client-side security check.`);
+          }
+          transactions.push(deserializedTx);
         }
 
-        setSignature(`Waiting for approval of ${transactions.length} transactions...`);
+        setSignature(`Waiting for approval of ${transactions.length} transaction(s) in wallet...`);
         const signedTransactions = await signAllTransactions(transactions);
 
-        if (!signedTransactions) {
-            throw new Error("Transactions not signed by the user.");
+        if (!signedTransactions || signedTransactions.length === 0) {
+          throw new Error("Transactions were not signed by the user.");
         }
 
-        setSignature(`Sending ${signedTransactions.length} transactions...`);
-
+        setSignature(`Sending ${signedTransactions.length} transaction(s) to Solana...`);
         const signatures = await Promise.all(
-            signedTransactions.map(tx => connection.sendRawTransaction(tx.serialize()))
+          signedTransactions.map((tx) =>
+            connection.sendRawTransaction(tx.serialize(), { maxRetries: 3 })
+          )
         );
 
-        setSignature('Confirming transactions...');
-
+        setSignature("Confirming transactions on-chain...");
         firstSignature = signatures[0];
+
         if (firstSignature) {
-            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-            await connection.confirmTransaction({
-                signature: firstSignature,
-                blockhash,
-                lastValidBlockHeight
-            }, 'confirmed');
+          const { blockhash, lastValidBlockHeight } =
+            await connection.getLatestBlockhash("confirmed");
+          await connection.confirmTransaction(
+            {
+              signature: firstSignature,
+              blockhash,
+              lastValidBlockHeight,
+            },
+            "confirmed"
+          );
         }
 
         setSignature(firstSignature);
         return firstSignature;
+      } catch (err) {
+        const friendlyMessage = parseSolanaError(err, "execute the airdrop");
 
-    } catch (err: any) {
-      const friendlyMessage = await getFriendlyErrorMessage(err, connection);
-      
-      if (friendlyMessage === "SUCCESS_ALREADY_PROCESSED") {
-        console.log('The transaction has already been processed, treating as success.');
-        // Even without the first signature, treat as success.
-        const successSignature = firstSignature || 'confirmed';
-        setSignature(successSignature);
-        setError(null); // Clear any previous error
-        return successSignature;
+        if (friendlyMessage === "SUCCESS_ALREADY_PROCESSED") {
+          const successSignature = firstSignature || "confirmed";
+          setSignature(successSignature);
+          setError(null);
+          return successSignature;
+        }
+
+        setError(friendlyMessage);
+        return null;
+      } finally {
+        setIsLoading(false);
       }
-
-      setError(friendlyMessage);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    [publicKey, sendTransaction, signAllTransactions, connection, cluster]
+  );
 
   const reset = useCallback(() => {
     setError(null);

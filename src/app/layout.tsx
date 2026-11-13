@@ -1,200 +1,115 @@
-"use client";
-
 import "./globals.css";
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { WalletProvider } from "../context/WalletContext";
-import ConnectWallet from "../components/ConnectWallet";
-import styles from './Layout.module.css';
-import ThemeSwitcher from "../components/ThemeSwitcher";
-import { useEffect, Suspense, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import AppShell from "@/components/AppShell";
+import { JSON_LD_STRUCTURED_DATA, SITE_NAME, SITE_URL } from "@/lib/seo";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#09090B",
+};
 
-// SVG Icons
-const IconPlusCircle = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>
-);
-const IconFlame = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
-);
-const IconSend = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-);
-const IconSettings = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15.08a2 2 0 0 0 .73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-);
-const IconLayers = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-);
-const IconBookOpen = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-);
-const IconDollarSign = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-);
-const IconMenu = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-);
-const IconX = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-);
-
-function AffiliateTracker() {
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    const ref = searchParams.get('ref');
-    if (ref) {
-      localStorage.setItem('affiliateRef', ref);
-    }
-  }, [searchParams]);
-
-  return null;
-}
-
-const navLinks = [
-    { href: "/create", icon: <IconPlusCircle className={styles.navIcon} />, label: "Create" },
-    { href: "/add-liquidity", icon: <IconLayers className={styles.navIcon} />, label: "Liquidity" },
-    { href: "/burn", icon: <IconFlame className={styles.navIcon} />, label: "Burn" },
-    { href: "/airdrop", icon: <IconSend className={styles.navIcon} />, label: "Airdrop" },
-    { href: "/dashboard", icon: <IconSettings className={styles.navIcon} />, label: "Manage" },
-    { href: "/afiliates", icon: <IconDollarSign className={styles.navIcon} />, label: "Earn" },
-    { href: "/documentacao", icon: <IconBookOpen className={styles.navIcon} />, label: "Documentation" },
-];
-
-function NavLinks({ onLinkClick }: { onLinkClick?: () => void }) {
-  const pathname = usePathname();
-
-  return (
-    <nav className={styles.nav}>
-      {navLinks.map(link => (
-        <Link key={link.href} href={link.href} className={`${styles.navLink} ${pathname === link.href ? styles.active : ''}`} onClick={onLinkClick}>
-          {link.icon}
-          <span>{link.label}</span>
-        </Link>
-      ))}
-    </nav>
-  );
-}
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Create Token Solana — No-Code SPL & Token-2022 Launchpad + Liquidity Pool Builder",
+    template: "%s | CreateTokenSolana",
+  },
+  description:
+    "Create your Solana SPL or Token-2022 token in under 60 seconds for a flat 0.07 SOL fee. Upload permanent Arweave/Irys metadata, initialize Raydium & Meteora liquidity pools, burn LP tokens, run mass airdrops, and revoke authorities.",
+  keywords: [
+    "create solana token",
+    "solana token creator",
+    "spl token generator",
+    "token 2022 creator",
+    "solana meme coin creator",
+    "create raydium liquidity pool",
+    "meteora liquidity pool builder",
+    "burn solana lp tokens",
+    "solana mass airdrop tool",
+    "revoke mint authority solana",
+    "revoke freeze authority solana",
+    "createtoken.sbs",
+  ],
+  authors: [{ name: SITE_NAME, url: SITE_URL }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  alternates: {
+    canonical: SITE_URL,
+  },
+  verification: {
+    google: "KgtGmUrAXO4vF6RITCjOmdyXvH3Bh4zzf01pDYs2pbc",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: "Create Token Solana — No-Code SPL & Token-2022 Launchpad + Liquidity Pool Builder",
+    description:
+      "Launch custom SPL & Token-2022 tokens, store permanent Arweave metadata, and initialize on-chain Liquidity Pools on Solana Mainnet-Beta and Devnet.",
+    images: [
+      {
+        url: `${SITE_URL}/sol.png`,
+        width: 512,
+        height: 512,
+        alt: "CreateTokenSolana Launchpad",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Create Token Solana — SPL & Token-2022 Launchpad + AMM Pool Builder",
+    description:
+      "Create SPL & Token-2022 tokens, initialize Raydium/Meteora liquidity pools, burn LP tokens, and distribute airdrops on Solana for a flat 0.07 SOL fee.",
+    images: [`${SITE_URL}/sol.png`],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const pathname = usePathname();
-
-  const toggleMobileMenu = () => setIsMobileMenuOpen(prev => !prev);
-  const closeMobileMenu = () => setIsMobileMenuOpen(false);
-  
-  useEffect(() => {
-    closeMobileMenu();
-  }, [pathname]);
-
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
-        <title>Create Token Solana</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet" />
-        {/* <!-- Google tag (gtag.js) --> */}
-        <Script async src="https://www.googletagmanager.com/gtag/js?id=AW-17652797085"></Script>
-        <Script id="google-analytics">
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_STRUCTURED_DATA) }}
+        />
+        <Script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=AW-17652797085"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
-            
             gtag('config', 'AW-17652797085');
-            `}
+          `}
         </Script>
-        <meta name="google-site-verification" content="KgtGmUrAXO4vF6RITCjOmdyXvH3Bh4zzf01pDYs2pbc" />c
-        <link rel="canonical" href="https://www.createtoken.sbs/" />
       </head>
-      <body>
-        <WalletProvider>
-          <Suspense fallback={null}>
-            <AffiliateTracker />
-          </Suspense>
-          <div className={styles.wrapper}>
-            <header className={styles.header}>
-              <div className={`${styles.container} ${styles.headerContainer}`}>
-                <div className={styles.navContainer}>
-                  <Link href="/" className={styles.logoLink} onClick={closeMobileMenu}>
-                    <span className={styles.logoText}>🚀 CreateToken</span>
-                  </Link>
-                  <NavLinks onLinkClick={closeMobileMenu} />
-                </div>
-                <div className={styles.rightItemsContainer}>
-                  <ThemeSwitcher />
-                  <button className={styles.mobileMenuButton} onClick={toggleMobileMenu} aria-label="Toggle Menu">
-                    {isMobileMenuOpen ? <IconX /> : <IconMenu />}
-                  </button>
-                </div>
-              </div>
-            </header>
-
-            {isMobileMenuOpen && (
-                <div className={styles.mobileNav}>
-                    {navLinks.map(link => (
-                        <Link key={link.href} href={link.href} className={`${styles.mobileNavLink} ${pathname === link.href ? styles.active : ''}`} onClick={closeMobileMenu}>
-                            {link.icon}
-                            <span>{link.label}</span>
-                        </Link>
-                    ))}
-                </div>
-            )}
-
-            <div className={styles.floatingWalletContainer}>
-              <ConnectWallet />
-            </div>
-            
-            <main className={`${styles.container} ${styles.main}`}>{children}</main>
-            
-            <footer className={styles.footer}>
-              <div className={`${styles.container} ${styles.footerContainer}`}>
-                <div className={styles.footerGrid}>
-                  <div className={styles.footerBranding}>
-                    <Link href="/" className={styles.logoLink}>
-                      <span className={styles.logoText}>🚀 CreateToken</span>
-                    </Link>
-                    <p className={styles.footerTagline}>
-                      The easiest and safest way to launch and manage tokens on the Solana network.
-                    </p>
-                    
-                  </div>
-                  <div className={styles.footerColumn}>
-                    <h4 className={styles.footerColumnTitle}>Tools</h4>
-                    <Link href="/create" className={styles.footerLink}>Create Token</Link>
-                    <Link href="/add-liquidity" className={styles.footerLink}>Add Liquidity</Link>
-                    <Link href="/burn" className={styles.footerLink}>Burn Tokens</Link>
-                    <Link href="/airdrop" className={styles.footerLink}>Airdrop</Link>
-                    <Link href="/dashboard" className={styles.footerLink}>Manage</Link>
-                  </div>
-                  <div className={styles.footerColumn}>
-                    <h4 className={styles.footerColumnTitle}>Resources</h4>
-                    <a href="/#faq" className={styles.footerLink}>FAQ</a>
-                    <Link href="/costs" className={styles.footerLink}>Costs</Link>
-                    <Link href="/afiliates" className={styles.footerLink}>Affiliate Program</Link>
-                    <Link href="/documentacao" className={styles.footerLink}>Documentation</Link>
-                  </div>
-                  <div className={styles.footerColumn}>
-                    <h4 className={styles.footerColumnTitle}>Contact</h4>
-                    <a href="mailto:createtokensol@gmail.com" className={styles.footerLink}>createtokensol@gmail.com</a>
-                  </div>
-                </div>
-                <div className={styles.footerBottom}>
-                  <p className={styles.footerText}>
-                    © {new Date().getFullYear()} CreateTokenSolana. All rights reserved.
-                  </p>
-                  <p className={styles.footerDisclaimer}>
-                      Always verify transactions in your wallet.
-                  </p>
-                </div>
-              </div>
-            </footer>
-          </div>
-        </WalletProvider>
+      <body className="dark">
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

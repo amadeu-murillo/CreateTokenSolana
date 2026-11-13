@@ -1,104 +1,155 @@
-import { NextResponse } from 'next/server';
-import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, TransactionInstruction, ComputeBudgetProgram } from '@solana/web3.js';
-import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction, getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
-import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_AIRDROP_LAMPORTS } from '@/lib/constants';
+import { NextResponse } from "next/server";
+import {
+  PublicKey,
+  TransactionMessage,
+  VersionedTransaction,
+  TransactionInstruction,
+  ComputeBudgetProgram,
+} from "@solana/web3.js";
+import {
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountIdempotentInstruction,
+  createTransferCheckedInstruction,
+  getMint,
+} from "@solana/spl-token";
+import { SERVICE_FEE_AIRDROP_LAMPORTS } from "@/lib/constants";
+import {
+  airdropRequestSchema,
+  checkRateLimit,
+  getClientIp,
+  toRawTokenAmount,
+} from "@/lib/security";
+import {
+  buildServiceFeeInstructions,
+  getSolanaConnection,
+} from "@/lib/services/solanaHelpers";
 
 export async function POST(request: Request) {
-    try {
-        const { mint, recipients, wallet, programId } = await request.json();
+  try {
+    const clientIp = getClientIp(request);
+    const rateLimit = checkRateLimit(`airdrop:${clientIp}`, 30, 60_000);
 
-        if (!mint || !recipients || !wallet || !programId || !Array.isArray(recipients) || recipients.length === 0) {
-            return NextResponse.json({ error: 'Incomplete or invalid data.' }, { status: 400 });
-        }
-        
-        // Validate if the programId is one of the known ones
-        if (programId !== TOKEN_PROGRAM_ID.toBase58() && programId !== TOKEN_2022_PROGRAM_ID.toBase58()) {
-            return NextResponse.json({ error: 'Invalid token Program ID.' }, { status: 400 });
-        }
-
-        const connection = new Connection(RPC_ENDPOINT, 'confirmed');
-        const payerPublicKey = new PublicKey(wallet);
-        const mintPublicKey = new PublicKey(mint);
-        const tokenProgramId = new PublicKey(programId);
-
-        // Fetch mint information to get decimals using the correct programId
-        const mintInfo = await getMint(connection, mintPublicKey, 'confirmed', tokenProgramId);
-
-        const instructions: TransactionInstruction[] = [
-            // Increase compute unit limit based on number of recipients to avoid errors
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 200000 + 40000 * recipients.length }),
-            ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-            // Service fee per transaction batch
-            SystemProgram.transfer({
-                fromPubkey: payerPublicKey,
-                toPubkey: DEV_WALLET_ADDRESS,
-                lamports: SERVICE_FEE_AIRDROP_LAMPORTS,
-            }),
-        ];
-        
-        const sourceTokenAccount = await getAssociatedTokenAddress(
-            mintPublicKey, 
-            payerPublicKey, 
-            false, 
-            tokenProgramId
-        );
-        
-        // Use Promise.all to check associated token accounts (ATAs) in parallel
-        const destinationAtas = await Promise.all(recipients.map(async (recipient: { address: string }) => {
-            const destinationPublicKey = new PublicKey(recipient.address);
-            return getAssociatedTokenAddress(mintPublicKey, destinationPublicKey, false, tokenProgramId);
-        }));
-
-        const accountsInfo = await connection.getMultipleAccountsInfo(destinationAtas);
-
-        recipients.forEach((recipient: { address: string, amount: number }, index: number) => {
-            const destinationPublicKey = new PublicKey(recipient.address);
-            const destinationAta = destinationAtas[index];
-            const accountInfo = accountsInfo[index];
-
-            // If the associated token account does not exist, create it
-            if (accountInfo === null) {
-                instructions.push(
-                    createAssociatedTokenAccountInstruction(
-                        payerPublicKey,
-                        destinationAta,
-                        destinationPublicKey,
-                        mintPublicKey,
-                        tokenProgramId
-                    )
-                );
-            }
-
-            // Create the transfer instruction
-            instructions.push(
-                createTransferInstruction(
-                    sourceTokenAccount,
-                    destinationAta,
-                    payerPublicKey,
-                    BigInt(recipient.amount * Math.pow(10, mintInfo.decimals)),
-                    [],
-                    tokenProgramId
-                )
-            );
-        });
-        
-        const { blockhash } = await connection.getLatestBlockhash('confirmed');
-        
-        const messageV0 = new TransactionMessage({
-            payerKey: payerPublicKey,
-            recentBlockhash: blockhash,
-            instructions,
-        }).compileToV0Message();
-
-        const transaction = new VersionedTransaction(messageV0);
-        const serializedTransaction = transaction.serialize();
-        const base64Transaction = Buffer.from(serializedTransaction).toString('base64');
-
-        return NextResponse.json({ transaction: base64Transaction });
-
-    } catch (error) {
-        console.error('Error in airdrop API:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Internal server error.';
-        return NextResponse.json({ error: errorMessage }, { status: 500 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: `Too many requests. Please wait ${rateLimit.retryAfterSeconds}s.` },
+        { status: 429 }
+      );
     }
+
+    const rawBody = await request.json();
+    const parsed = airdropRequestSchema.safeParse(rawBody);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid airdrop data." },
+        { status: 400 }
+      );
+    }
+
+    const {
+      mint,
+      recipients,
+      wallet,
+      programId,
+      affiliate,
+      network = "mainnet-beta",
+    } = parsed.data;
+
+    const connection = getSolanaConnection(network);
+    const payerPublicKey = new PublicKey(wallet);
+    const mintPublicKey = new PublicKey(mint);
+    const tokenProgramId = new PublicKey(programId);
+
+    const mintInfo = await getMint(connection, mintPublicKey, "confirmed", tokenProgramId);
+
+    const instructions: TransactionInstruction[] = [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: Math.min(1_400_000, 150_000 + 45_000 * recipients.length),
+      }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 15_000 }),
+      // Mandatory Service Fee per batch routed to DEV_WALLET_ADDRESS
+      ...buildServiceFeeInstructions(
+        payerPublicKey,
+        SERVICE_FEE_AIRDROP_LAMPORTS,
+        affiliate
+      ),
+    ];
+
+    const sourceTokenAccount = await getAssociatedTokenAddress(
+      mintPublicKey,
+      payerPublicKey,
+      false,
+      tokenProgramId
+    );
+
+    const destinationAtas = await Promise.all(
+      recipients.map(async (recipient) => {
+        const destinationPublicKey = new PublicKey(recipient.address);
+        return getAssociatedTokenAddress(
+          mintPublicKey,
+          destinationPublicKey,
+          false,
+          tokenProgramId
+        );
+      })
+    );
+
+    const accountsInfo = await connection.getMultipleAccountsInfo(destinationAtas);
+
+    recipients.forEach((recipient, index) => {
+      const destinationPublicKey = new PublicKey(recipient.address);
+      const destinationAta = destinationAtas[index];
+      const accountInfo = accountsInfo[index];
+      const rawTransferAmount = toRawTokenAmount(recipient.amount, mintInfo.decimals);
+
+      if (accountInfo === null) {
+        instructions.push(
+          createAssociatedTokenAccountIdempotentInstruction(
+            payerPublicKey,
+            destinationAta,
+            destinationPublicKey,
+            mintPublicKey,
+            tokenProgramId
+          )
+        );
+      }
+
+      instructions.push(
+        createTransferCheckedInstruction(
+          sourceTokenAccount,
+          mintPublicKey,
+          destinationAta,
+          payerPublicKey,
+          rawTransferAmount,
+          mintInfo.decimals,
+          [],
+          tokenProgramId
+        )
+      );
+    });
+
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+
+    const messageV0 = new TransactionMessage({
+      payerKey: payerPublicKey,
+      recentBlockhash: blockhash,
+      instructions,
+    }).compileToV0Message();
+
+    const transaction = new VersionedTransaction(messageV0);
+    const serializedTransaction = transaction.serialize();
+    const base64Transaction = Buffer.from(serializedTransaction).toString("base64");
+
+    return NextResponse.json({
+      transaction: base64Transaction,
+      blockhash,
+      lastValidBlockHeight,
+      network,
+    });
+  } catch (error) {
+    console.error("Error in airdrop API:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Internal server error while preparing airdrop batch.";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
 }

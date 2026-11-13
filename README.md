@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CreateTokenSolana — Refactored, Hardened & On-Chain Arweave / Token-2022 Edition
+
+Full-stack **Next.js 14 (App Router) + TypeScript + Solana Web3.js / SPL Token / Metaplex Umi** platform for launching fungible tokens (**SPL** and **Token-2022**), uploading token images and metadata JSON permanently to the **Arweave blockchain via Irys/Bundlr**, storing metadata natively on-chain via the **Token-2022 Metadata Extension (`MetadataPointer` + `TokenMetadata`)**, initializing **Liquidity Pools (Raydium CPMM & Meteora Dynamic AMM)**, burning tokens/LP (**Burn**), executing batched **Airdrops**, managing **Mint/Freeze Authorities**, and earning **10% atomic SOL affiliate commissions** across both **Solana Mainnet-Beta** and **Solana Devnet**.
+
+## Key Features & Architecture
+
+1. **Decentralized Permanent Storage on Arweave via Irys / Bundlr (`src/lib/services/arweaveService.ts` & `src/hooks/useArweaveUpload.ts`)**:
+   - Supports **Client-Side Wallet-Signed Irys Uploads** (`walletAdapterIdentity` + `bundlrUploader`) and **Server-Side Irys Uploads** (`IRYS_UPLOADER_PRIVATE_KEY`) on both **Mainnet-Beta (`https://node1.irys.xyz`)** and **Devnet (`https://devnet.irys.xyz`)**.
+   - Permanently stores both the token logo image and the Metaplex-standard JSON on Arweave (`https://arweave.net/<tx_id>`), with optional fallback to Cloudinary if desired.
+2. **Native On-Chain Token-2022 Metadata Extension (`src/lib/services/token2022Service.ts`)**:
+   - Implements `ExtensionType.MetadataPointer` pointing directly to the Mint account itself (`createInitializeMetadataPointerInstruction`), combined with `spl_token_metadata_interface` (`initialize_account` and `updating_field` instructions).
+   - Stores `name`, `symbol`, `uri` (Arweave TX URI), and custom `additionalMetadata` (`description`, `website`, `twitter`, `instagram`) **100% inside the Token-2022 Mint account on the Solana blockchain**, pre-funding exact TLV rent-exemption lamports.
+3. **Token Creator as Default Home Page (`/`) & Dual-Cluster Switcher (`Mainnet-Beta` & `Devnet`)**:
+   - Instant header network toggle (`useCluster` in `src/context/WalletContext.tsx`) switching RPC endpoints, Irys nodes, Raydium CPMM / Meteora DAMM Program IDs, and Solscan explorer URLs (`?cluster=devnet`).
+4. **Liquidity Pool Creation (`/add-liquidity` & `/api/create-liquidity-pool`)**:
+   - Supports **Raydium CPMM** and **Meteora Dynamic AMM** paired with **SOL (WSOL)** or **USDC**, automatic WSOL wrapping (`SyncNative`), optional atomic `FreezeAuthority` revocation in the same transaction, and a live Initial Price & Market Cap simulator.
+5. **Security & Precision Hardening (`src/lib/security.ts`)**:
+   - Exact string-to-`BigInt` conversion (`toRawTokenAmount`), binary magic-byte image inspection (`validateImageBuffer`), on-chain affiliate transaction verification (`getParsedTransaction`) with deterministic Firestore IDs, sliding-window rate limiting, and HTTP security headers.
 
 ## Getting Started
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Copy `.env.example` to `.env.local` and configure your environment variables:
+   ```bash
+   cp .env.example .env.local
+   ```
+2. Install dependencies and start the development server:
+   ```bash
+   npm install
+   npm run dev
+   ```

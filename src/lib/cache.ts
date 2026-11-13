@@ -1,46 +1,42 @@
-// src/lib/cache.ts
-
-const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutos
-const METADATA_CACHE_KEY = 'tokenMetadataCache';
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+const METADATA_CACHE_KEY = "tokenMetadataCache";
 
 interface CacheData {
-    [key: string]: {
-        data: any;
-        timestamp: number;
-    };
+  [key: string]: {
+    data: any;
+    timestamp: number;
+  };
 }
 
 /**
- * Lê o cache de metadados do localStorage.
- * @returns {CacheData} O objeto de cache.
+ * Reads token metadata cache from localStorage.
  */
 export const getMetadataCache = (): CacheData => {
-    try {
-        const cachedData = localStorage.getItem(METADATA_CACHE_KEY);
-        return cachedData ? JSON.parse(cachedData) : {};
-    } catch (e) {
-        console.error("Falha ao ler o cache de metadados:", e);
-        return {};
-    }
+  try {
+    const cachedData = localStorage.getItem(METADATA_CACHE_KEY);
+    return cachedData ? JSON.parse(cachedData) : {};
+  } catch (e) {
+    console.error("Failed to read metadata cache:", e);
+    return {};
+  }
 };
 
 /**
- * Salva o cache de metadados no localStorage.
- * @param {CacheData} cache O objeto de cache a ser salvo.
+ * Saves token metadata cache to localStorage.
  */
 export const setMetadataCache = (cache: CacheData) => {
-    try {
-        localStorage.setItem(METADATA_CACHE_KEY, JSON.stringify(cache));
-    } catch (e) {
-        console.error("Falha ao salvar o cache de metadados:", e);
-    }
+  try {
+    localStorage.setItem(METADATA_CACHE_KEY, JSON.stringify(cache));
+  } catch (e) {
+    console.error("Failed to save metadata cache:", e);
+  }
 };
 
 /**
- * Verifica se um item do cache ainda é válido.
- * @param {object} cacheItem O item do cache com `timestamp`.
- * @returns {boolean} `true` se o cache for válido, `false` caso contrário.
+ * Checks if a cached item is still within its validity window.
  */
-export const isCacheItemValid = (cacheItem: { timestamp: number } | undefined): boolean => {
-    return !!cacheItem && (Date.now() - cacheItem.timestamp < CACHE_DURATION_MS);
+export const isCacheItemValid = (
+  cacheItem: { timestamp: number } | undefined
+): boolean => {
+  return !!cacheItem && Date.now() - cacheItem.timestamp < CACHE_DURATION_MS;
 };

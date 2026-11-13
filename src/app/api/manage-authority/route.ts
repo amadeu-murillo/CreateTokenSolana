@@ -1,71 +1,105 @@
-import { NextResponse } from 'next/server';
-import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, ComputeBudgetProgram } from '@solana/web3.js';
-import { createSetAuthorityInstruction, AuthorityType, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
-import { DEV_WALLET_ADDRESS, RPC_ENDPOINT, SERVICE_FEE_MANAGE_AUTHORITY_LAMPORTS } from '@/lib/constants';
+import { NextResponse } from "next/server";
+import {
+  PublicKey,
+  TransactionMessage,
+  VersionedTransaction,
+  ComputeBudgetProgram,
+} from "@solana/web3.js";
+import {
+  createSetAuthorityInstruction,
+  AuthorityType,
+} from "@solana/spl-token";
+import { SERVICE_FEE_MANAGE_AUTHORITY_LAMPORTS } from "@/lib/constants";
+import {
+  checkRateLimit,
+  getClientIp,
+  manageAuthorityRequestSchema,
+} from "@/lib/security";
+import {
+  buildServiceFeeInstructions,
+  getSolanaConnection,
+} from "@/lib/services/solanaHelpers";
 
 export async function POST(request: Request) {
   try {
-    const { mint, authorityType, wallet, programId } = await request.json();
+    const clientIp = getClientIp(request);
+    const rateLimit = checkRateLimit(`manage-authority:${clientIp}`, 15, 60_000);
 
-    if (!mint || !authorityType || !wallet || !programId) {
-      return NextResponse.json({ error: 'Incomplete data.' }, { status: 400 });
-    }
-    
-    if (programId !== TOKEN_PROGRAM_ID.toBase58() && programId !== TOKEN_2022_PROGRAM_ID.toBase58()) {
-        return NextResponse.json({ error: 'Invalid Program ID.' }, { status: 400 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: `Too many requests. Please wait ${rateLimit.retryAfterSeconds}s.` },
+        { status: 429 }
+      );
     }
 
-    const connection = new Connection(RPC_ENDPOINT, 'confirmed');
+    const rawBody = await request.json();
+    const parsed = manageAuthorityRequestSchema.safeParse(rawBody);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid authority management parameters." },
+        { status: 400 }
+      );
+    }
+
+    const {
+      mint,
+      authorityType,
+      wallet,
+      programId,
+      affiliate,
+      network = "mainnet-beta",
+    } = parsed.data;
+
+    const connection = getSolanaConnection(network);
     const userPublicKey = new PublicKey(wallet);
     const mintPublicKey = new PublicKey(mint);
     const tokenProgramId = new PublicKey(programId);
 
-    let type: AuthorityType;
-    if (authorityType === 'mint') {
-        type = AuthorityType.MintTokens;
-    } else if (authorityType === 'freeze') {
-        type = AuthorityType.FreezeAccount;
-    } else {
-        return NextResponse.json({ error: 'Invalid authority type.' }, { status: 400 });
-    }
-    
+    const type =
+      authorityType === "mint" ? AuthorityType.MintTokens : AuthorityType.FreezeAccount;
+
     const instructions = [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-        SystemProgram.transfer({
-            fromPubkey: userPublicKey,
-            toPubkey: DEV_WALLET_ADDRESS,
-            lamports: SERVICE_FEE_MANAGE_AUTHORITY_LAMPORTS,
-        }),
-        createSetAuthorityInstruction(
-            mintPublicKey,
-            userPublicKey,
-            type,
-            null, // Set new authority to null to remove it
-            [],
-            tokenProgramId
-        )
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 15_000 }),
+      // Mandatory Service Fee routed to DEV_WALLET_ADDRESS
+      ...buildServiceFeeInstructions(
+        userPublicKey,
+        SERVICE_FEE_MANAGE_AUTHORITY_LAMPORTS,
+        affiliate
+      ),
+      createSetAuthorityInstruction(
+        mintPublicKey,
+        userPublicKey,
+        type,
+        null,
+        [],
+        tokenProgramId
+      ),
     ];
 
-    const { blockhash } = await connection.getLatestBlockhash('confirmed');
-    
-    // MODIFICATION: Building and serializing a VersionedTransaction
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+
     const messageV0 = new TransactionMessage({
-        payerKey: userPublicKey,
-        recentBlockhash: blockhash,
-        instructions,
+      payerKey: userPublicKey,
+      recentBlockhash: blockhash,
+      instructions,
     }).compileToV0Message();
 
     const transaction = new VersionedTransaction(messageV0);
     const serializedTransaction = transaction.serialize();
-    const base64Transaction = Buffer.from(serializedTransaction).toString('base64');
+    const base64Transaction = Buffer.from(serializedTransaction).toString("base64");
 
     return NextResponse.json({
       transaction: base64Transaction,
+      blockhash,
+      lastValidBlockHeight,
+      network,
     });
-
   } catch (error) {
-    console.error('Error managing authority:', error);
-    return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
+    console.error("Error managing authority:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Internal server error while revoking authority.";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

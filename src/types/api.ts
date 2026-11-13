@@ -1,45 +1,31 @@
-// src/types/api.ts
+import { SolanaCluster } from "@/lib/constants";
 
-export interface CreatePoolWithSolParams {
-  baseTokenMint: string;
-  baseTokenDecimals: number;
-  initialBaseTokenAmount: number;
-  initialSolAmount: number;
-  userWalletAddress: string;
-}
+export type SupportedDex = "raydium-cpmm" | "meteora-damm";
+export type QuoteAsset = "SOL" | "USDC";
 
-export interface CreatePoolWithSolResponse {
-  transaction: string;
-  ammId: string;
-  lpTokenAddress: string;
-}
-
-// --- Novos Tipos para a Criação do Mercado ---
-
-export interface CreateMarketParams {
-  baseTokenMint: string;
-  baseTokenDecimals: number;
-  quoteTokenMint: string;
-  quoteTokenDecimals: number;
-  userWalletAddress: string;
-}
-
-export interface InitializePoolParams {
-  userWalletAddress: string;
-  marketId: string;
-  baseToken: { mint: string; decimals: number };
-  quoteToken: { mint: string; decimals: number };
+export interface CreateLiquidityPoolParams {
+  dex: SupportedDex;
+  baseMint: string;
+  quoteToken: QuoteAsset;
   baseAmount: number;
   quoteAmount: number;
+  feeTierBps: number;
+  startTime?: number | null;
+  revokeFreezeIfActive?: boolean;
+  programId?: string;
+  network?: SolanaCluster;
 }
 
-export interface InitializePoolResponse {
+export interface CreateLiquidityPoolResponse {
   transaction: string;
-  ammId: string;
+  poolAddress: string;
   lpMintAddress: string;
-}
-
-export interface CreateMarketResponse {
-  transaction: string;
-  marketId: string;
+  baseVaultAddress: string;
+  quoteVaultAddress: string;
+  dex: SupportedDex;
+  initialPrice: number;
+  freezeAuthorityRevokedInTx: boolean;
+  blockhash: string;
+  lastValidBlockHeight: number;
+  network: SolanaCluster;
 }

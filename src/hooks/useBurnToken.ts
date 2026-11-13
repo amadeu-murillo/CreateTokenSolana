@@ -1,83 +1,121 @@
 import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
-
-// Função de tratamento de erro aprimorada e padronizada
-function getFriendlyErrorMessage(error: any): string {
-    const message = error.message || String(error);
-    console.error("Burn token error:", error);
-
-    if (message.includes("User rejected the request")) {
-        return "Transaction rejected by the user in the wallet.";
-    }
-    if (message.includes("insufficient lamports")) {
-        return "You don't have enough SOL to cover the network fees.";
-    }
-    if (message.includes("not enough SOL")) {
-        return "Transaction failed. Please check if you have enough SOL for fees.";
-    }
-    if (message.includes("Transaction simulation failed")) {
-        return "Transaction simulation failed. Check if the token address is correct and if you have the amount to burn.";
-    }
-    if (message.includes("blockhash")) {
-        return "The transaction blockhash has expired. Please try again.";
-    }
-    return "An error occurred while burning tokens. Check the console for more details.";
-}
+import { useCluster } from "@/context/WalletContext";
+import { verifyTransactionIntegrity } from "@/lib/security";
+import { parseSolanaError } from "./useErrorHandler";
 
 export const useBurnToken = () => {
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
+  const { cluster } = useCluster();
   const [isLoading, setIsLoading] = useState(false);
+  const [statusStep, setStatusStep] = useState<string | null>(null);
+  const [progressStep, setProgressStep] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
 
-  const burnToken = async (mint: string, amount: number, programId: string) => {
-    if (!publicKey || !sendTransaction) {
-      setError("Wallet not connected.");
-      return null;
-    }
-    if (!connection) {
+  const burnToken = useCallback(
+    async (mint: string, amount: number, programId: string) => {
+      if (!publicKey || !sendTransaction) {
+        setError("Wallet not connected.");
+        return null;
+      }
+      if (!connection) {
         setError("Connection to the Solana network was not established.");
         return null;
-    }
+      }
 
-    setIsLoading(true);
-    setError(null);
-    setSignature(null);
+      setIsLoading(true);
+      setError(null);
+      setSignature(null);
+      setProgressStep(1);
+      setStatusStep("Stage 1/5: Preparing permanent token burn instruction...");
 
-    try {
-      const response = await fetch('/api/burn-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mint, amount, wallet: publicKey.toBase58(), programId }),
-      });
+      try {
+        let affiliateRef: string | null = null;
+        try {
+          affiliateRef = localStorage.getItem("affiliateRef");
+        } catch {
+          affiliateRef = null;
+        }
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error);
-      
-      const transactionBuffer = Buffer.from(result.transaction, 'base64');
-      const transaction = VersionedTransaction.deserialize(transactionBuffer);
-      
-      const sig = await sendTransaction(transaction, connection);
-      await connection.confirmTransaction(sig, 'confirmed');
+        const response = await fetch("/api/burn-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mint,
+            amount,
+            wallet: publicKey.toBase58(),
+            programId,
+            affiliate: affiliateRef,
+            network: cluster,
+          }),
+        });
 
-      setSignature(sig);
-      return sig;
-      
-    } catch (err: any) {
-      const friendlyMessage = getFriendlyErrorMessage(err);
-      setError(friendlyMessage);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error);
+
+        setProgressStep(2);
+        setStatusStep("Stage 2/5: Auditing program whitelist & transaction integrity...");
+
+        const transactionBuffer = Buffer.from(result.transaction, "base64");
+        const transaction = VersionedTransaction.deserialize(transactionBuffer);
+
+        const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58());
+        if (!integrity.valid) {
+          throw new Error(
+            integrity.reason || "Transaction failed client-side security verification."
+          );
+        }
+
+        setProgressStep(3);
+        setStatusStep("Stage 3/5: Waiting for signature approval in your wallet...");
+
+        const sig = await sendTransaction(transaction, connection);
+
+        setProgressStep(4);
+        setStatusStep("Stage 4/5: Confirming permanent burn on Solana blockchain...");
+
+        const blockhashInfo =
+          result.blockhash && result.lastValidBlockHeight
+            ? {
+                blockhash: result.blockhash,
+                lastValidBlockHeight: result.lastValidBlockHeight,
+              }
+            : await connection.getLatestBlockhash("confirmed");
+
+        await connection.confirmTransaction(
+          {
+            signature: sig,
+            blockhash: blockhashInfo.blockhash,
+            lastValidBlockHeight: blockhashInfo.lastValidBlockHeight,
+          },
+          "confirmed"
+        );
+
+        setProgressStep(5);
+        setStatusStep("Stage 5/5: Burn confirmed on-chain!");
+        setSignature(sig);
+        return sig;
+      } catch (err) {
+        setError(parseSolanaError(err, "burn tokens"));
+        return null;
+      } finally {
+        setIsLoading(false);
+        setStatusStep(null);
+        setProgressStep(0);
+      }
+    },
+    [publicKey, sendTransaction, connection, cluster]
+  );
 
   const reset = useCallback(() => {
     setError(null);
     setSignature(null);
+    setStatusStep(null);
+    setProgressStep(0);
   }, []);
 
-  return { burnToken, isLoading, error, signature, reset };
+  return { burnToken, isLoading, statusStep, progressStep, error, signature, reset };
 };
