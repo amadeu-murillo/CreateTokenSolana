@@ -3,9 +3,8 @@ import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 export type SolanaCluster = "mainnet-beta" | "devnet";
 
 /**
- * RF-01: Developer wallet address that receives the standardized 0.07 SOL service fee
- * across ALL platform operations (Create Token, Create Liquidity Pool, Burn Token,
- * Mass Airdrop, and Manage/Revoke Authority).
+ * RF-01: Developer wallet address that receives service fees across ALL platform operations
+ * (Create Token: 0.90 SOL; Liquidity Pool, Burn, Airdrop, and Manage Authority: 0.07 SOL).
  */
 export const DEV_WALLET_ADDRESS_STRING =
   process.env.NEXT_PUBLIC_DEV_WALLET_ADDRESS || "CP6teSg2LUxQsSBBtwZ9xjG2aZjjznhfCvGED9LNgjrJ";
@@ -41,20 +40,21 @@ export function getSolscanUrl(
 }
 
 /**
- * RF-03: Standardized Mandatory Service Fee (0.07 SOL) routed to DEV_WALLET_ADDRESS
- * across every single platform service on both Mainnet-Beta and Devnet.
+ * RF-03: Mandatory Service Fees in SOL routed to DEV_WALLET_ADDRESS:
+ * - Token Creation (SPL & Token-2022): 0.90 SOL (900,000,000 lamports)
+ * - Liquidity Pool, Burn, Mass Airdrop, and Authority Management: 0.07 SOL (70,000,000 lamports)
  */
 export const STANDARD_SERVICE_FEE_SOL = 0.07;
-export const SERVICE_FEE_CREATE_TOKEN_SOL = 0.07;
+export const SERVICE_FEE_CREATE_TOKEN_SOL = 0.9;
 export const SERVICE_FEE_BURN_TOKEN_SOL = 0.07;
 export const SERVICE_FEE_AIRDROP_SOL = 0.07;
 export const SERVICE_FEE_MANAGE_AUTHORITY_SOL = 0.07;
 export const SERVICE_FEE_CREATE_LP_SOL = 0.07;
 export const SERVICE_FEE_CREATE_LP_DEVNET_SOL = 0.07;
-export const AFFILIATE_COMMISSION_RATE = 0.10; // 10% atomic referral commission (0.007 SOL per operation)
+export const AFFILIATE_COMMISSION_RATE = 0.10; // 10% atomic referral commission (0.09 SOL per token created)
 
 /**
- * Standardized Service Fees in Lamports (70,000,000 lamports = 0.07 SOL).
+ * Service Fees in Lamports.
  */
 export const STANDARD_SERVICE_FEE_LAMPORTS = Math.round(
   STANDARD_SERVICE_FEE_SOL * LAMPORTS_PER_SOL

@@ -1,33 +1,60 @@
-/* Efeito de Glassmorphism com borda sutil */
 .card {
   border-radius: var(--radius);
-  border: 1px solid hsla(var(--border), 0.5);
-  background-color: hsla(var(--card), 0.5); /* Fundo semi-transparente */
+  border: 1px solid hsla(var(--border), 0.85);
+  background-color: hsla(var(--card), 0.88);
   color: hsl(var(--card-foreground));
-  backdrop-filter: blur(8px); /* Efeito de desfoque no fundo */
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08); /* Sombra suave */
-  transition: all 0.2s ease-in-out;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #9945ff 0%, #00d1ff 50%, #14f195 100%);
+  opacity: 0.85;
+}
+
+.card:hover {
+  border-color: rgba(0, 209, 255, 0.38);
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.28),
+    0 0 24px rgba(153, 69, 255, 0.08);
 }
 
 .cardHeader {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
   padding: 1.5rem;
-  border-bottom: 1px solid hsl(var(--border)); /* Adiciona separador */
+  border-bottom: 1px solid hsl(var(--border));
+  background: linear-gradient(
+    180deg,
+    rgba(153, 69, 255, 0.05) 0%,
+    rgba(0, 209, 255, 0.02) 100%
+  );
 }
 
 .cardTitle {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.4rem;
+  font-weight: 800;
   letter-spacing: -0.025em;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .cardDescription {
   font-size: 0.9rem;
   color: hsl(var(--muted-foreground));
+  line-height: 1.5;
 }
 
 .cardContent {

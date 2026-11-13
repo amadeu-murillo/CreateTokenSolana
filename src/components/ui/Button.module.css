@@ -3,57 +3,60 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius);
-  font-size: 1rem;
-  font-weight: 600;
-  transition: all 0.2s ease-in-out;
-  padding: 0.875rem 2rem;
+  font-size: 0.98rem;
+  font-weight: 700;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0.9rem 2rem;
   cursor: pointer;
-  background-image: var(--primary-gradient);
+  background-image: linear-gradient(135deg, #9945ff 0%, #00d1ff 50%, #14f195 100%);
   background-size: 200% auto;
-  color: white;
+  color: #ffffff;
   border: none;
   width: 100%;
   text-transform: none;
-  letter-spacing: 0.02em;
-  box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.01em;
+  box-shadow: 0 6px 20px rgba(153, 69, 255, 0.28), 0 2px 8px rgba(0, 209, 255, 0.18);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .button:hover:not(:disabled) {
   background-position: right center;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px 0 hsla(var(--primary), 0.25); /* Sombra aprimorada */
+  box-shadow: 0 10px 28px rgba(0, 209, 255, 0.35), 0 4px 12px rgba(20, 241, 149, 0.25);
 }
 
 .button:disabled {
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.48;
 }
 
 .button:focus-visible {
-  outline: 2px solid hsl(var(--ring));
+  outline: 2px solid #00d1ff;
   outline-offset: 2px;
 }
 
-/* Novas variantes de botão */
 .secondary {
-  background-color: var(--secondary);
-  color: var(--secondary-foreground);
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
   background-image: none;
-  border: 1px solid hsl(var(--border));
+  border: 1px solid hsla(266, 95%, 64%, 0.35);
+  box-shadow: none;
+  text-shadow: none;
 }
 
 .secondary:hover:not(:disabled) {
-  background-color: var(--muted);
+  background-color: hsla(266, 95%, 64%, 0.14);
+  border-color: #00d1ff;
   background-image: none;
+  box-shadow: 0 4px 14px rgba(0, 209, 255, 0.15);
 }
 
 .destructive {
-    background-color: var(--destructive);
-    color: var(--destructive-foreground);
-    background-image: none;
+  background-image: linear-gradient(135deg, #ff4d8d 0%, #ef4444 100%);
+  color: #ffffff;
 }
 
 .destructive:hover:not(:disabled) {
-    background-color: hsl(var(--destructive) / 0.9);
-    background-image: none;
+  filter: brightness(1.08);
+  box-shadow: 0 8px 24px rgba(255, 77, 141, 0.35);
 }

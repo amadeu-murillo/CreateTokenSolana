@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     template: "%s | CreateTokenSolana",
   },
   description:
-    "Create your Solana SPL or Token-2022 token in under 60 seconds for a flat 0.07 SOL fee. Upload permanent Arweave/Irys metadata, initialize Raydium & Meteora liquidity pools, burn LP tokens, run mass airdrops, and revoke authorities.",
+    "Create your Solana SPL or Token-2022 token in under 60 seconds for a 0.90 SOL token creation fee. Upload permanent Arweave/Irys metadata, initialize Raydium & Meteora liquidity pools, burn LP tokens, run mass airdrops, and revoke authorities.",
   keywords: [
     "create solana token",
     "solana token creator",
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Create Token Solana — SPL & Token-2022 Launchpad + AMM Pool Builder",
     description:
-      "Create SPL & Token-2022 tokens, initialize Raydium/Meteora liquidity pools, burn LP tokens, and distribute airdrops on Solana for a flat 0.07 SOL fee.",
+      "Create SPL & Token-2022 tokens, initialize Raydium/Meteora liquidity pools, burn LP tokens, and distribute airdrops on Solana for a 0.90 SOL token creation fee.",
     images: [`${SITE_URL}/sol.png`],
   },
   robots: {

@@ -67,7 +67,7 @@ export const JSON_LD_STRUCTURED_DATA = {
       operatingSystem: "Web",
       offers: {
         "@type": "Offer",
-        price: "0.07",
+        price: "0.90",
         priceCurrency: "SOL",
         description:
           "Standardized 0.07 SOL service fee for creating SPL & Token-2022 tokens, initializing liquidity pools, burning tokens, airdrops, and authority management on Solana.",

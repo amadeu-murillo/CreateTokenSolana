@@ -52,7 +52,7 @@ export default function CostSummary({ operation }: CostSummaryProps) {
       } catch (error) {
         console.error(error);
         setCosts({
-          createToken: "0.0800",
+          createToken: "0.9100",
           burnToken: "0.0800",
           airdrop: "0.0800",
           manageAuthority: "0.0800",
@@ -75,12 +75,12 @@ export default function CostSummary({ operation }: CostSummaryProps) {
         <p>Service Fee (Dev Wallet):</p>
         <p>{devFee.toFixed(2)} SOL</p>
       </div>
-      <div className={styles.item} style={{ marginTop: "0.35rem", fontSize: "0.82rem" }}>
+      <div className={styles.item} style={{ marginTop: "0.35rem", fontSize: "0.84rem" }}>
         <p>Estimated Total (+ Rent):</p>
         <p>{isLoading ? "Loading..." : `~${parseFloat(costValue).toFixed(2)} SOL`}</p>
       </div>
       <p className={styles.disclaimer}>
-        Standardized 0.07 SOL service fee routes atomically on-chain to Dev Wallet (
+        100% of the {devFee.toFixed(2)} SOL service fee routes atomically on-chain to Dev Wallet (
         {devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}).
       </p>
     </div>

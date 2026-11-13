@@ -1,35 +1,43 @@
 :root {
-  --radius: 0.875rem;
+  --radius: 0.95rem;
 
-  /* Swiss Light Palette */
-  --background-light: 210 20% 98%;
-  --foreground-light: 224 71% 4%;
+  /* Vibrant Solana Aurora Brand Tokens */
+  --solana-violet: #9945ff;
+  --solana-cyan: #00d1ff;
+  --solana-mint: #14f195;
+  --solana-pink: #ff4d8d;
+  --solana-amber: #ffb800;
+
+  /* Clean Daylight Mode Palette (Luminous & Colorful) */
+  --background-light: 216 33% 97.5%;
+  --foreground-light: 226 55% 8%;
   --card-light: 0 0% 100%;
-  --card-foreground-light: 224 71% 4%;
-  --border-light: 220 13% 88%;
-  --input-light: 220 13% 88%;
-  --muted-light: 220 14% 94%;
-  --muted-foreground-light: 220 9% 42%;
+  --card-foreground-light: 226 55% 8%;
+  --border-light: 220 22% 86%;
+  --input-light: 220 22% 86%;
+  --muted-light: 220 28% 93.5%;
+  --muted-foreground-light: 222 15% 38%;
 
-  /* Swiss Dark / Bento Palette (Obsidian Zinc) */
-  --background-dark: 240 10% 4%;
-  --foreground-dark: 0 0% 98%;
-  --card-dark: 240 8% 7.5%;
-  --card-foreground-dark: 0 0% 98%;
-  --border-dark: 240 6% 15%;
-  --input-dark: 240 6% 15%;
-  --muted-dark: 240 7% 11.5%;
-  --muted-foreground-dark: 240 5% 65%;
+  /* Vibrant Solana Aurora Dark Mode Palette (Deep Midnight Sapphire + Luminous Accents) */
+  --background-dark: 228 48% 5.5%;
+  --foreground-dark: 210 40% 98%;
+  --card-dark: 228 38% 9.5%;
+  --card-foreground-dark: 210 40% 98%;
+  --border-dark: 226 28% 19%;
+  --input-dark: 226 28% 19%;
+  --muted-dark: 228 32% 13.5%;
+  --muted-foreground-dark: 218 18% 68%;
 
-  --primary: 262 83% 64%;
+  --primary: 266 95% 64%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 240 7% 13%;
-  --secondary-foreground: 0 0% 98%;
-  --destructive: 0 72% 54%;
+  --secondary: 226 32% 15%;
+  --secondary-foreground: 210 40% 98%;
+  --destructive: 346 84% 58%;
   --destructive-foreground: 0 0% 98%;
-  --ring: 262 83% 68%;
+  --ring: 190 100% 50%;
 
-  --primary-gradient: linear-gradient(135deg, #7c3aed 0%, #4f46e5 52%, #10b981 100%);
+  --primary-gradient: linear-gradient(135deg, #9945ff 0%, #00d1ff 50%, #14f195 100%);
+  --secondary-gradient: linear-gradient(135deg, #ff4d8d 0%, #9945ff 55%, #00d1ff 100%);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -79,8 +87,10 @@ body {
   color: hsl(var(--foreground));
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background-image:
-    radial-gradient(circle at 14% 8%, hsla(262, 83%, 64%, 0.08) 0%, transparent 38%),
-    radial-gradient(circle at 86% 86%, hsla(160, 84%, 39%, 0.06) 0%, transparent 38%);
+    radial-gradient(circle at 10% 12%, rgba(153, 69, 255, 0.14) 0%, transparent 42%),
+    radial-gradient(circle at 88% 18%, rgba(0, 209, 255, 0.11) 0%, transparent 38%),
+    radial-gradient(circle at 78% 85%, rgba(20, 241, 149, 0.11) 0%, transparent 42%),
+    radial-gradient(circle at 18% 82%, rgba(255, 77, 141, 0.08) 0%, transparent 36%);
   transition: background-color 0.3s var(--ease-out-expo), color 0.3s var(--ease-out-expo);
 }
 
@@ -91,7 +101,7 @@ a {
 }
 
 a:hover {
-  color: hsl(var(--primary));
+  color: var(--solana-cyan);
 }
 
 button,
@@ -115,13 +125,13 @@ h3,
 h4,
 h5,
 h6 {
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: -0.03em;
   color: hsl(var(--foreground));
 }
 
 *:focus-visible {
-  outline: 2px solid hsl(var(--ring));
+  outline: 2px solid var(--solana-cyan);
   outline-offset: 2px;
   border-radius: var(--radius);
 }
@@ -145,6 +155,6 @@ h6 {
   }
   50% {
     opacity: 0.65;
-    transform: scale(1.12);
+    transform: scale(1.14);
   }
 }

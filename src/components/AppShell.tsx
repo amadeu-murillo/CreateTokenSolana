@@ -258,7 +258,7 @@ function TrustFooter() {
           <div className={styles.footerColumn}>
             <h4 className={styles.footerColumnTitle}>Platform Services ({feeText})</h4>
             <Link href="/" className={styles.footerLink}>
-              Token Creator ({feeText} Fee)
+              Token Creator (0.90 SOL Fee)
             </Link>
             <Link href="/add-liquidity" className={styles.footerLink}>
               Liquidity Pool ({feeText} Fee)
