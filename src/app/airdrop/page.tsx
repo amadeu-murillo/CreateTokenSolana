@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { Suspense,  useState, useEffect, useMemo, useRef } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useAirdrop } from "@/hooks/useAirdrop";
 import { useUserTokens } from "@/hooks/useUserTokens";
@@ -115,7 +115,7 @@ const tutorialSteps = [
   },
 ];
 
-export default function AirdropPage() {
+function AirdropPageInner() {
   const { cluster, setCluster } = useCluster();
   const [selectedTokenMint, setSelectedTokenMint] = useState("");
   const [recipientsText, setRecipientsText] = useState("");
@@ -537,5 +537,13 @@ export default function AirdropPage() {
         </aside>
       </div>
     </div>
+  );
+}
+
+export default function AirdropPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
+      <AirdropPageInner />
+    </Suspense>
   );
 }

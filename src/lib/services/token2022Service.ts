@@ -22,8 +22,7 @@ import {
   createInitializeMetadataPointerInstruction,
 } from "@solana/spl-token";
 import {
-  SERVICE_FEE_CREATE_TOKEN_LAMPORTS,
-  STANDARD_SERVICE_FEE_LAMPORTS,
+  calculateModularTokenCreationFee,
   SolanaCluster,
 } from "@/lib/constants";
 import { toRawTokenAmount } from "@/lib/security";
@@ -43,6 +42,7 @@ export interface CreateToken2022Params {
   mintAuthority: boolean;
   freezeAuthority: boolean;
   isMetadataMutable: boolean;
+  customCreatorInfo?: boolean;
   useNativeMetadataExtension?: boolean;
   additionalMetadata?: Array<[string, string]>;
   transferFee?: {
@@ -151,6 +151,7 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     mintAuthority,
     freezeAuthority,
     isMetadataMutable,
+    customCreatorInfo = false,
     useNativeMetadataExtension = false,
     additionalMetadata = [],
     transferFee,
@@ -164,6 +165,16 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
 
   const rawSupply = toRawTokenAmount(supply, decimals);
   const hasTransferFee = Boolean(transferFee && transferFee.basisPoints > 0);
+
+  // Phase 1: Calculate exact modular fee in lamports (including +0.15 SOL when Token-2022 Transfer Fee extension is active)
+  const { totalLamports: modularFeeLamports, totalSol: modularFeeSol } =
+    calculateModularTokenCreationFee({
+      revokeFreeze: !freezeAuthority,
+      revokeMint: !mintAuthority,
+      immutableMetadata: !isMetadataMutable,
+      customCreatorInfo: Boolean(customCreatorInfo),
+      hasTransferFeeExtension: hasTransferFee,
+    });
 
   const extensions: ExtensionType[] = [];
   if (hasTransferFee) {
@@ -185,20 +196,15 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
 
   const estimatedExtraLamports =
     totalRentLamports + Math.round((useNativeMetadataExtension ? 0.005 : 0.018) * LAMPORTS_PER_SOL);
-  const effectiveServiceFeeLamports =
-    network === "devnet" &&
-    userSolBalance < SERVICE_FEE_CREATE_TOKEN_LAMPORTS + estimatedExtraLamports
-      ? STANDARD_SERVICE_FEE_LAMPORTS
-      : SERVICE_FEE_CREATE_TOKEN_LAMPORTS;
+  const totalRequiredLamports = modularFeeLamports + estimatedExtraLamports;
 
-  const totalRequiredLamports = effectiveServiceFeeLamports + estimatedExtraLamports;
   if (userSolBalance < totalRequiredLamports) {
     const haveSol = (userSolBalance / LAMPORTS_PER_SOL).toFixed(4);
     const needSol = (totalRequiredLamports / LAMPORTS_PER_SOL).toFixed(4);
     throw new Error(
-      `Insufficient SOL balance on ${network}: your wallet has ${haveSol} SOL, but creating this Token-2022 asset requires ~${needSol} SOL (${(
-        effectiveServiceFeeLamports / LAMPORTS_PER_SOL
-      ).toFixed(2)} SOL service fee + account rent).`
+      `Insufficient SOL balance on ${network}: your wallet has ${haveSol} SOL, but creating this Token-2022 asset requires ~${needSol} SOL (${modularFeeSol.toFixed(
+        2
+      )} SOL modular service fee + account rent).`
     );
   }
 
@@ -210,9 +216,9 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
   );
 
   const instructions: TransactionInstruction[] = [
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 500_000 }),
+    ComputeBudgetProgram.setComputeUnitLimit({ units: 520_000 }),
     ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
-    ...buildServiceFeeInstructions(userPublicKey, effectiveServiceFeeLamports, affiliate),
+    ...buildServiceFeeInstructions(userPublicKey, modularFeeLamports, affiliate),
     SystemProgram.createAccount({
       fromPubkey: userPublicKey,
       newAccountPubkey: mintKeypair.publicKey,
@@ -254,7 +260,7 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
       mintKeypair.publicKey,
       decimals,
       userPublicKey,
-      freezeAuthority ? userPublicKey : null,
+      userPublicKey,
       TOKEN_2022_PROGRAM_ID
     )
   );
@@ -316,6 +322,20 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     )
   );
 
+  // Execute explicit on-chain authority revocations paid by the user
+  if (!freezeAuthority) {
+    instructions.push(
+      createSetAuthorityInstruction(
+        mintKeypair.publicKey,
+        userPublicKey,
+        AuthorityType.FreezeAccount,
+        null,
+        [],
+        TOKEN_2022_PROGRAM_ID
+      )
+    );
+  }
+
   if (!mintAuthority) {
     instructions.push(
       createSetAuthorityInstruction(
@@ -348,7 +368,7 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     mintAddress: mintKeypair.publicKey.toBase58(),
     metadataMode: useNativeMetadataExtension ? "token-2022-native-extension" : "metaplex-pda",
     metadataUri,
-    serviceFeeSol: effectiveServiceFeeLamports / LAMPORTS_PER_SOL,
+    serviceFeeSol: modularFeeSol,
     blockhash,
     lastValidBlockHeight,
     network,

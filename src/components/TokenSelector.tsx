@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import styles from "./TokenSelector.module.css";
 
@@ -26,6 +27,35 @@ interface TokenSelectorProps {
   showQuickWalletCards?: boolean;
 }
 
+/**
+ * Child component inside <Suspense> that reads ?mint= from URL searchParams
+ * and auto-selects the matching token once wallet tokens load.
+ */
+function UrlMintAutoSelector({
+  tokens,
+  selectedTokenMint,
+  onSelectToken,
+  isLoading,
+}: {
+  tokens: SelectableWalletToken[];
+  selectedTokenMint: string;
+  onSelectToken: (mint: string) => void;
+  isLoading: boolean;
+}) {
+  const searchParams = useSearchParams();
+  const mintFromUrl = searchParams.get("mint");
+
+  useEffect(() => {
+    if (!mintFromUrl || isLoading || tokens.length === 0) return;
+    const match = tokens.find((t) => t.mint === mintFromUrl);
+    if (match && selectedTokenMint !== match.mint) {
+      onSelectToken(match.mint);
+    }
+  }, [mintFromUrl, isLoading, tokens, selectedTokenMint, onSelectToken]);
+
+  return null;
+}
+
 export const TokenSelector = ({
   tokens,
   selectedTokenMint,
@@ -38,9 +68,17 @@ export const TokenSelector = ({
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Auto-select the first token from the user's connected wallet when tokens load
+  // Auto-select from URL ?mint= if present, or fall back to first token in wallet
   useEffect(() => {
-    if (autoSelectFirst && !selectedTokenMint && tokens.length > 0 && !isLoading) {
+    if (isLoading || tokens.length === 0 || selectedTokenMint) return;
+    if (typeof window !== "undefined") {
+      const urlMint = new URLSearchParams(window.location.search).get("mint");
+      if (urlMint && tokens.some((t) => t.mint === urlMint)) {
+        onSelectToken(urlMint);
+        return;
+      }
+    }
+    if (autoSelectFirst) {
       onSelectToken(tokens[0].mint);
     }
   }, [autoSelectFirst, selectedTokenMint, tokens, isLoading, onSelectToken]);
@@ -66,6 +104,15 @@ export const TokenSelector = ({
 
   return (
     <div className={styles.container}>
+      <Suspense fallback={null}>
+        <UrlMintAutoSelector
+          tokens={tokens}
+          selectedTokenMint={selectedTokenMint}
+          onSelectToken={onSelectToken}
+          isLoading={isLoading}
+        />
+      </Suspense>
+
       {/* 1-Click Direct Wallet Token Cards (No typing or symbol input required) */}
       {showQuickWalletCards && tokens.length > 0 && (
         <div className={styles.walletCardsStrip}>

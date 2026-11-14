@@ -3,7 +3,10 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 import { useCluster } from "@/context/WalletContext";
-import { AFFILIATE_COMMISSION_RATE, SERVICE_FEE_CREATE_TOKEN_SOL } from "@/lib/constants";
+import {
+  AFFILIATE_COMMISSION_RATE,
+  calculateModularTokenCreationFee,
+} from "@/lib/constants";
 import { getMetadataCache, setMetadataCache } from "@/lib/cache";
 import { verifyTransactionIntegrity } from "@/lib/security";
 import { parseSolanaError } from "./useErrorHandler";
@@ -23,6 +26,11 @@ export interface TokenData {
   tokenStandard: "spl" | "token-2022";
   useNativeMetadataExtension?: boolean;
   storageProvider?: "arweave" | "cloudinary";
+  customCreator?: {
+    enabled: boolean;
+    name?: string;
+    website?: string;
+  };
   transferFee: {
     basisPoints: number;
     maxFee: number;
@@ -57,7 +65,7 @@ export const useCreateToken = () => {
       setIsLoading(true);
       setError(null);
       setProgressStep(1);
-      setStatusStep("Stage 1/5: Validating token parameters & uploading metadata JSON...");
+      setStatusStep("Stage 1/5: Validating modular options & uploading metadata JSON...");
 
       try {
         let affiliateRef: string | null = null;
@@ -66,6 +74,16 @@ export const useCreateToken = () => {
         } catch {
           affiliateRef = null;
         }
+
+        const { totalSol: expectedModularFeeSol } = calculateModularTokenCreationFee({
+          revokeFreeze: !tokenData.freezeAuthority,
+          revokeMint: !tokenData.mintAuthority,
+          immutableMetadata: !tokenData.isMetadataMutable,
+          customCreatorInfo: Boolean(tokenData.customCreator?.enabled),
+          hasTransferFeeExtension:
+            tokenData.tokenStandard === "token-2022" &&
+            Boolean(tokenData.transferFee && tokenData.transferFee.basisPoints > 0),
+        });
 
         const apiPayload = {
           ...tokenData,
@@ -101,7 +119,6 @@ export const useCreateToken = () => {
           );
         }
 
-        // Simulate unsigned VersionedTransaction with sigVerify: false & replaceRecentBlockhash: true
         const simulationResult = await connection.simulateTransaction(transaction, {
           sigVerify: false,
           replaceRecentBlockhash: true,
@@ -150,7 +167,7 @@ export const useCreateToken = () => {
         setProgressStep(5);
         setStatusStep("Stage 5/5: Token minted on-chain! Indexing metadata & preparing receipt...");
 
-        const effectiveFeeSol = result.serviceFeeSol ?? SERVICE_FEE_CREATE_TOKEN_SOL;
+        const effectiveFeeSol = result.serviceFeeSol ?? expectedModularFeeSol;
 
         if (result.mintAddress) {
           const cache = getMetadataCache();
@@ -190,13 +207,14 @@ export const useCreateToken = () => {
           }
         }
 
-        if (affiliateRef && affiliateRef !== publicKey.toBase58()) {
+        // Phase 2: Record the 30% on-chain affiliate commission in Firebase / in-memory store
+        if (affiliateRef && affiliateRef.trim() !== publicKey.toBase58()) {
           fetch("/api/record-commission", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              affiliateWallet: affiliateRef,
-              commissionAmountSOL: effectiveFeeSol * AFFILIATE_COMMISSION_RATE,
+              affiliateWallet: affiliateRef.trim(),
+              commissionAmountSOL: Number((effectiveFeeSol * AFFILIATE_COMMISSION_RATE).toFixed(4)),
               transactionSignature: signature,
               tokenCreatorWallet: publicKey.toBase58(),
               mintAddress: result.mintAddress,

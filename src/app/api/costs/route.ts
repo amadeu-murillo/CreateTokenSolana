@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import {
+  MODULAR_FEE_BASE_CREATE_SOL,
+  MODULAR_FEE_REVOKE_FREEZE_SOL,
+  MODULAR_FEE_REVOKE_MINT_SOL,
+  MODULAR_FEE_IMMUTABLE_METADATA_SOL,
+  MODULAR_FEE_CUSTOM_CREATOR_SOL,
+  MODULAR_FEE_TRANSFER_FEE_EXT_SOL,
   SERVICE_FEE_CREATE_TOKEN_SOL,
   SERVICE_FEE_BURN_TOKEN_SOL,
   SERVICE_FEE_AIRDROP_SOL,
@@ -19,6 +25,14 @@ export async function GET() {
       manageAuthority: (networkCostInSol + SERVICE_FEE_MANAGE_AUTHORITY_SOL).toFixed(4),
       createLiquidityPool: (networkCostInSol + SERVICE_FEE_CREATE_LP_SOL).toFixed(4),
       removeLiquidity: (networkCostInSol + SERVICE_FEE_REMOVE_LP_SOL).toFixed(4),
+      modularBreakdown: {
+        baseCreate: MODULAR_FEE_BASE_CREATE_SOL.toFixed(2),
+        revokeFreeze: MODULAR_FEE_REVOKE_FREEZE_SOL.toFixed(2),
+        revokeMint: MODULAR_FEE_REVOKE_MINT_SOL.toFixed(2),
+        immutableMetadata: MODULAR_FEE_IMMUTABLE_METADATA_SOL.toFixed(2),
+        customCreator: MODULAR_FEE_CUSTOM_CREATOR_SOL.toFixed(2),
+        transferFeeExtension: MODULAR_FEE_TRANSFER_FEE_EXT_SOL.toFixed(2),
+      },
     };
 
     return NextResponse.json(costs);

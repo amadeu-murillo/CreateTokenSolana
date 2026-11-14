@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,16 +8,94 @@ import { Button } from "@/components/ui/button";
 import { useCluster } from "@/context/WalletContext";
 import {
   AFFILIATE_COMMISSION_RATE,
+  DEV_AFFILIATE_SHARE_RATE,
   SERVICE_FEE_CREATE_LP_SOL,
   SERVICE_FEE_CREATE_TOKEN_SOL,
 } from "@/lib/constants";
 import styles from "./Affiliates.module.css";
 
-const IconTrendingUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
-const IconUsers = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
-const IconZap = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>;
-const IconPercent = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="5" x2="5" y2="19"></line><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>;
-const IconShieldCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>;
+const IconTrendingUp = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+    <polyline points="17 6 23 6 23 12" />
+  </svg>
+);
+const IconUsers = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+const IconZap = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+  </svg>
+);
+const IconPercent = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="19" y1="5" x2="5" y2="19"></line>
+    <circle cx="6.5" cy="6.5" r="2.5"></circle>
+    <circle cx="17.5" cy="17.5" r="2.5"></circle>
+  </svg>
+);
+const IconShieldCheck = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+    <polyline points="9 12 11 14 15 10"></polyline>
+  </svg>
+);
 
 interface AffiliateTransaction {
   signature: string;
@@ -31,7 +109,7 @@ interface AffiliateEarnings {
   transactions: AffiliateTransaction[];
 }
 
-export default function AfiliatesPage() {
+function AffiliatesContent() {
   const { connected, publicKey } = useWallet();
   const { getExplorerUrl } = useCluster();
   const [copySuccess, setCopySuccess] = useState(false);
@@ -41,6 +119,8 @@ export default function AfiliatesPage() {
   const [error, setError] = useState<string | null>(null);
   const [showEarnings, setShowEarnings] = useState(false);
 
+  const commissionPct = Math.round(AFFILIATE_COMMISSION_RATE * 100);
+  const devSharePct = Math.round(DEV_AFFILIATE_SHARE_RATE * 100);
   const tokenCommissionSol = (
     SERVICE_FEE_CREATE_TOKEN_SOL * AFFILIATE_COMMISSION_RATE
   ).toFixed(4);
@@ -95,12 +175,13 @@ export default function AfiliatesPage() {
   return (
     <div className={styles.pageContainer}>
       <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Affiliate Program: Earn SOL by Referring</h1>
+        <h1 className={styles.pageTitle}>Affiliate Program: Earn {commissionPct}% SOL Instantly</h1>
         <p className={styles.pageDescription}>
-          Join our affiliate program and earn{" "}
-          <span className={styles.highlight}>10% commission</span> in SOL for every token or
-          liquidity pool created through your referral link. Payments are atomic and instant,
-          sent directly to your wallet.
+          Join our on-chain affiliate program and earn{" "}
+          <span className={styles.highlight}>{commissionPct}% instant commission in SOL</span> on
+          every token creation or liquidity pool transaction through your referral link (atomic{" "}
+          {devSharePct}% Dev / {commissionPct}% Affiliate split via{" "}
+          <code>SystemProgram.transfer</code>).
         </p>
       </header>
 
@@ -115,8 +196,9 @@ export default function AfiliatesPage() {
                 {connected && publicKey ? (
                   <div className={styles.linkContainer}>
                     <p className={styles.linkExplanation}>
-                      This is your exclusive referral link. The <code>ref</code> parameter contains
-                      your public key, enabling automatic on-chain fee splitting.
+                      This is your exclusive referral link. The <code>?ref=</code> parameter is
+                      captured on any entry page and splits {commissionPct}% of the service fee
+                      directly to your wallet in the exact same transaction.
                     </p>
                     <div className={styles.inputWrapper}>
                       <Input id="affiliate-link" type="text" value={affiliateLink} readOnly />
@@ -136,14 +218,15 @@ export default function AfiliatesPage() {
             {connected && publicKey && (
               <>
                 <Button onClick={handleToggleEarnings} className="w-full">
-                  {showEarnings ? "Hide Earnings Panel" : "View My Earnings"}
+                  {showEarnings ? "Hide Earnings Panel" : "View My Earnings & Ranking"}
                 </Button>
                 {showEarnings && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Earnings Panel</CardTitle>
+                      <CardTitle>Earnings Dashboard</CardTitle>
                       <CardDescription>
-                        Track your on-chain verified referral performance and commissions received.
+                        Track your on-chain verified referral performance and {commissionPct}% SOL
+                        commissions received.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -160,7 +243,7 @@ export default function AfiliatesPage() {
                             <div className={styles.earningStat}>
                               <div className={styles.statHeader}>
                                 <IconTrendingUp />
-                                <span>Total Earnings</span>
+                                <span>Total Earnings ({commissionPct}% Split)</span>
                               </div>
                               <p className={styles.statValue}>
                                 {earnings.totalEarningsSol.toFixed(4)} SOL
@@ -169,13 +252,13 @@ export default function AfiliatesPage() {
                             <div className={styles.earningStat}>
                               <div className={styles.statHeader}>
                                 <IconUsers />
-                                <span>Referrals</span>
+                                <span>Verified Referrals</span>
                               </div>
                               <p className={styles.statValue}>{earnings.referralCount}</p>
                             </div>
                           </div>
 
-                          <h4 className={styles.historyTitle}>Last 10 Commissions</h4>
+                          <h4 className={styles.historyTitle}>Last 10 Verified Commissions</h4>
                           {earnings.transactions.length > 0 ? (
                             <div className={styles.historyTable}>
                               <div className={styles.historyTableHeader}>
@@ -239,8 +322,9 @@ export default function AfiliatesPage() {
                   or liquidity pools.
                 </li>
                 <li className={styles.stepItem}>
-                  <strong>4. Receive Instant Commissions:</strong> 10% of the service fee is
-                  transferred to your wallet in the exact same transaction.
+                  <strong>4. Receive {commissionPct}% Instant Commissions:</strong> {commissionPct}%
+                  of the service fee is transferred directly to your wallet in the exact same
+                  transaction ({devSharePct}% Dev / {commissionPct}% Affiliate).
                 </li>
               </ol>
             </CardContent>
@@ -249,15 +333,16 @@ export default function AfiliatesPage() {
           <Card className={styles.sidebarCard}>
             <CardHeader>
               <CardTitle className={styles.sidebarCardTitle}>
-                <IconPercent /> Your Commission
+                <IconPercent /> Your {commissionPct}% Commission
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className={styles.sidebarText}>
-                You receive <strong className={styles.highlight}>10%</strong> of our service fee:{" "}
-                <strong className={styles.highlight}>{tokenCommissionSol} SOL</strong> per token
-                created and <strong className={styles.highlight}>{lpCommissionSol} SOL</strong> per
-                liquidity pool initialized through your link.
+                You receive <strong className={styles.highlight}>{commissionPct}%</strong> of our
+                service fee: <strong className={styles.highlight}>~{tokenCommissionSol} SOL</strong>{" "}
+                on a standard 0.35 SOL token launch (up to 0.1650 SOL on a full 0.55 SOL launch) and{" "}
+                <strong className={styles.highlight}>{lpCommissionSol} SOL</strong> per liquidity
+                pool initialized through your link.
               </p>
             </CardContent>
           </Card>
@@ -271,12 +356,20 @@ export default function AfiliatesPage() {
             <CardContent>
               <p className={styles.sidebarText}>
                 Commissions are paid atomically via Solana’s System Program and verified on-chain
-                before being indexed, guaranteeing instant, tamper-proof payouts.
+                before being indexed in Firebase, guaranteeing instant, tamper-proof payouts.
               </p>
             </CardContent>
           </Card>
         </aside>
       </div>
     </div>
+  );
+}
+
+export default function AfiliatesPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading affiliate dashboard...</div>}>
+      <AffiliatesContent />
+    </Suspense>
   );
 }

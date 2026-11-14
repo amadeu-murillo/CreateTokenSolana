@@ -51,9 +51,10 @@ export async function POST(request: NextRequest) {
       freezeAuthority,
       isMetadataMutable,
       tokenStandard,
-      useNativeMetadataExtension = false, // Defaults to Metaplex PDA so Phantom & Solscan display the token image immediately on Devnet & Mainnet
+      useNativeMetadataExtension = false,
       storageProvider = "arweave",
       metadataUri: preUploadedMetadataUri,
+      customCreator,
       transferFee,
       affiliate,
       description,
@@ -96,12 +97,27 @@ export async function POST(request: NextRequest) {
       additionalMetadata.push(["instagram", instagramUrl]);
     }
 
+    const isCustomCreatorEnabled = Boolean(customCreator?.enabled);
+    const customCreatorName = customCreator?.name?.trim() || "CreateTokenSolana";
+    const customCreatorSite =
+      sanitizeHttpsUrl(customCreator?.website) || "https://www.createtoken.sbs";
+
+    if (isCustomCreatorEnabled) {
+      attributes.push({ trait_type: "Creator", value: customCreatorName });
+      additionalMetadata.push(["creator_name", customCreatorName]);
+      additionalMetadata.push(["creator_site", customCreatorSite]);
+    }
+
     const metadataJson = {
       name,
       symbol,
       image: safeImageUrl,
       description: description || `Token ${name} (${symbol}) on Solana`,
       attributes,
+      creator: {
+        name: isCustomCreatorEnabled ? customCreatorName : "CreateTokenSolana",
+        site: isCustomCreatorEnabled ? customCreatorSite : "https://www.createtoken.sbs",
+      },
       properties: {
         files: [{ uri: safeImageUrl, type: "image/png" }],
         category: "image",
@@ -111,7 +127,6 @@ export async function POST(request: NextRequest) {
 
     let finalMetadataUri = sanitizeHttpsUrl(preUploadedMetadataUri);
 
-    // 1. Try Arweave/Irys only when IRYS_UPLOADER_PRIVATE_KEY is configured and funded
     if (!finalMetadataUri && storageProvider === "arweave" && process.env.IRYS_UPLOADER_PRIVATE_KEY) {
       try {
         const arweaveUpload = await uploadMetadataJsonToArweave({
@@ -124,7 +139,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Guaranteed HTTPS JSON Metadata Hosting (Cloudinary raw JSON stream)
     if (!finalMetadataUri) {
       const metadataBuffer = Buffer.from(JSON.stringify(metadataJson), "utf-8");
       const uploadResponse = await new Promise<UploadApiResponse>((resolve, reject) => {
@@ -160,6 +174,7 @@ export async function POST(request: NextRequest) {
             mintAuthority,
             freezeAuthority,
             isMetadataMutable,
+            customCreatorInfo: isCustomCreatorEnabled,
             useNativeMetadataExtension,
             additionalMetadata,
             transferFee,
@@ -176,6 +191,7 @@ export async function POST(request: NextRequest) {
             mintAuthority,
             freezeAuthority,
             isMetadataMutable,
+            customCreatorInfo: isCustomCreatorEnabled,
             affiliate,
             network,
           });

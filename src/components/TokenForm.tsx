@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,7 +8,15 @@ import { z } from "zod";
 import { useCreateToken } from "@/hooks/useCreateToken";
 import { useArweaveUpload } from "@/hooks/useArweaveUpload";
 import { useCluster } from "@/context/WalletContext";
-import { SERVICE_FEE_CREATE_TOKEN_SOL } from "@/lib/constants";
+import {
+  MODULAR_FEE_BASE_CREATE_SOL,
+  MODULAR_FEE_REVOKE_FREEZE_SOL,
+  MODULAR_FEE_REVOKE_MINT_SOL,
+  MODULAR_FEE_IMMUTABLE_METADATA_SOL,
+  MODULAR_FEE_CUSTOM_CREATOR_SOL,
+  MODULAR_FEE_TRANSFER_FEE_EXT_SOL,
+  calculateModularTokenCreationFee,
+} from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +61,11 @@ const tokenSchema = z.object({
   isMetadataMutable: z.boolean(),
   tokenStandard: z.enum(["spl", "token-2022"]),
   useNativeMetadataExtension: z.boolean(),
+  customCreator: z.object({
+    enabled: z.boolean(),
+    name: z.string().max(64).optional(),
+    website: z.string().max(200).optional(),
+  }),
   transferFee: z
     .object({
       basisPoints: z.number().min(0).max(10000).optional(),
@@ -125,17 +138,57 @@ export default function TokenForm() {
       website: "",
       twitter: "",
       instagram: "",
+      // Phase 1: Revoke Freeze (+0.10), Revoke Mint (+0.10), and Immutable Metadata (+0.05) ON by default!
       mintAuthority: false,
       freezeAuthority: false,
-      isMetadataMutable: true,
+      isMetadataMutable: false,
       tokenStandard: "spl",
       useNativeMetadataExtension: false,
+      customCreator: {
+        enabled: false,
+        name: "",
+        website: "",
+      },
       transferFee: { basisPoints: 0, maxFee: 0 },
     },
     mode: "onChange",
   });
 
   const watchedFields = watch();
+
+  const modularOptions = useMemo(
+    () => ({
+      revokeFreeze: !watchedFields.freezeAuthority,
+      revokeMint: !watchedFields.mintAuthority,
+      immutableMetadata: !watchedFields.isMetadataMutable,
+      customCreatorInfo: Boolean(watchedFields.customCreator?.enabled),
+      hasTransferFeeExtension:
+        watchedFields.tokenStandard === "token-2022" &&
+        Boolean((watchedFields.transferFee?.basisPoints ?? 0) > 0),
+    }),
+    [
+      watchedFields.freezeAuthority,
+      watchedFields.mintAuthority,
+      watchedFields.isMetadataMutable,
+      watchedFields.customCreator?.enabled,
+      watchedFields.tokenStandard,
+      watchedFields.transferFee?.basisPoints,
+    ]
+  );
+
+  const { totalSol: liveModularTotalSol } = useMemo(
+    () => calculateModularTokenCreationFee(modularOptions),
+    [modularOptions]
+  );
+
+  // Broadcast live modular selections to CostSummary in the sidebar
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("modular-fee-update", { detail: modularOptions })
+      );
+    }
+  }, [modularOptions]);
 
   const nextStep = async () => {
     let fieldsToValidate: (keyof TokenFormData)[] = [];
@@ -194,6 +247,11 @@ export default function TokenForm() {
     const tokenDataForApi = {
       ...data,
       supply: Number(String(data.supply).replace(/[^0-9]/g, "")),
+      customCreator: {
+        enabled: Boolean(data.customCreator?.enabled),
+        name: data.customCreator?.name || "",
+        website: data.customCreator?.website || "",
+      },
       transferFee: {
         basisPoints: data.transferFee?.basisPoints ?? 0,
         maxFee: data.transferFee?.maxFee ?? 0,
@@ -205,7 +263,7 @@ export default function TokenForm() {
   return (
     <div className={styles.formGrid}>
       <div className={styles.formWrapper}>
-        {/* Top Network & Fee Bar Inside Form Card */}
+        {/* Top Network & Live Modular Fee Bar Inside Form Card */}
         <div className={styles.formTopBar}>
           <div className={styles.networkInlineGroup}>
             <span className={styles.networkLabel}>Target Network:</span>
@@ -230,8 +288,8 @@ export default function TokenForm() {
           </div>
 
           <div className={styles.feePill}>
-            <span>Service Fee:</span>
-            <strong>{SERVICE_FEE_CREATE_TOKEN_SOL.toFixed(2)} SOL</strong>
+            <span>Total Modular Fee:</span>
+            <strong>{liveModularTotalSol.toFixed(2)} SOL</strong>
           </div>
         </div>
 
@@ -265,7 +323,6 @@ export default function TokenForm() {
             <Notification type="error" message={createError} onClose={clearError} />
           )}
 
-          {/* Real-Time 5-Stage Visual Stepper During Token Creation */}
           <TransactionStatusStepper
             isActive={isCreatingToken}
             currentStepIndex={progressStep}
@@ -277,7 +334,7 @@ export default function TokenForm() {
             <section className={styles.formSection}>
               <div className={styles.fieldGrid}>
                 <div className={styles.field}>
-                  <Label htmlFor="name">Token Name</Label>
+                  <Label htmlFor="name">Token Name (Base: {MODULAR_FEE_BASE_CREATE_SOL.toFixed(2)} SOL)</Label>
                   <Controller
                     name="name"
                     control={control}
@@ -461,6 +518,68 @@ export default function TokenForm() {
                   />
                 </div>
               </div>
+
+              {/* Phase 1: Custom Creator Info Upsell Toggle (+0.05 SOL) */}
+              <div className={styles.authorityOption}>
+                <div className={styles.authorityText}>
+                  <Label htmlFor="customCreatorEnabled">
+                    Customizar &quot;Creator Info&quot; nos Metadados (+
+                    {MODULAR_FEE_CUSTOM_CREATOR_SOL.toFixed(2)} SOL)
+                  </Label>
+                  <p>
+                    Substitui a assinatura padrão nos metadados pelo nome e site oficial do seu
+                    projeto/estúdio.
+                  </p>
+                </div>
+                <Controller
+                  name="customCreator.enabled"
+                  control={control}
+                  render={({ field }) => (
+                    <label className={styles.switch}>
+                      <input
+                        type="checkbox"
+                        id="customCreatorEnabled"
+                        checked={Boolean(field.value)}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                      />
+                      <span className={styles.slider}></span>
+                    </label>
+                  )}
+                />
+              </div>
+
+              {watchedFields.customCreator?.enabled && (
+                <div className={styles.fieldGrid}>
+                  <div className={styles.field}>
+                    <Label htmlFor="customCreatorName">Creator / Studio Name</Label>
+                    <Controller
+                      name="customCreator.name"
+                      control={control}
+                      render={({ field }) => (
+                        <Input
+                          id="customCreatorName"
+                          placeholder="Ex: Nexus Labs Official"
+                          {...field}
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <Label htmlFor="customCreatorWebsite">Creator Official URL</Label>
+                    <Controller
+                      name="customCreator.website"
+                      control={control}
+                      render={({ field }) => (
+                        <Input
+                          id="customCreatorWebsite"
+                          placeholder="https://nexuslabs.io"
+                          {...field}
+                        />
+                      )}
+                    />
+                  </div>
+                </div>
+              )}
             </section>
           )}
 
@@ -485,7 +604,7 @@ export default function TokenForm() {
                         className={field.value === "token-2022" ? styles.active : ""}
                         onClick={() => field.onChange("token-2022")}
                       >
-                        Token-2022 (Transfer Fees & Extensions)
+                        Token-2022 (+{MODULAR_FEE_TRANSFER_FEE_EXT_SOL.toFixed(2)} SOL Tax Token Ext)
                       </button>
                     </div>
                   )}
@@ -524,7 +643,9 @@ export default function TokenForm() {
                   </div>
 
                   <div className={styles.field}>
-                    <Label htmlFor="transferFeeBasisPoints">Transfer Fee (Basis Points)</Label>
+                    <Label htmlFor="transferFeeBasisPoints">
+                      Transfer Fee / Tax Token (+{MODULAR_FEE_TRANSFER_FEE_EXT_SOL.toFixed(2)} SOL when &gt; 0)
+                    </Label>
                     <Controller
                       name="transferFee.basisPoints"
                       control={control}
@@ -565,62 +686,21 @@ export default function TokenForm() {
                 </div>
               )}
 
+              {/* Phase 1: Modular Security & Authority Revocation Toggles (ON by Default) */}
               <div className={styles.authoritySection}>
-                <h3 className={styles.authorityTitle}>On-Chain Security Authorities</h3>
+                <h3 className={styles.authorityTitle}>
+                  Blindagem On-Chain & RugCheck 100/100 (Upsell Modular)
+                </h3>
                 <div className={styles.authorityOptionsGrid}>
+                  {/* 1. Revoke Freeze Authority (+0.10 SOL - Default ON) */}
                   <div className={styles.authorityOption}>
                     <div className={styles.authorityText}>
-                      <Label htmlFor="mintAuthority">Keep Mint Authority</Label>
+                      <Label htmlFor="revokeFreezeToggle">
+                        Revogar Freeze Authority (+{MODULAR_FEE_REVOKE_FREEZE_SOL.toFixed(2)} SOL — Recomendado)
+                      </Label>
                       <p>
-                        Leave unchecked to permanently cap your token supply (recommended for
-                        investor trust).
-                      </p>
-                    </div>
-                    <Controller
-                      name="mintAuthority"
-                      control={control}
-                      render={({ field }) => (
-                        <label className={styles.switch}>
-                          <input
-                            type="checkbox"
-                            id="mintAuthority"
-                            checked={field.value}
-                            onChange={field.onChange}
-                          />
-                          <span className={styles.slider}></span>
-                        </label>
-                      )}
-                    />
-                  </div>
-                  <div className={styles.authorityOption}>
-                    <div className={styles.authorityText}>
-                      <Label htmlFor="isMetadataMutable">Mutable Metadata</Label>
-                      <p>
-                        Allows updating token name, symbol, and logo URI later. Uncheck to lock
-                        metadata forever.
-                      </p>
-                    </div>
-                    <Controller
-                      name="isMetadataMutable"
-                      control={control}
-                      render={({ field }) => (
-                        <label className={styles.switch}>
-                          <input
-                            type="checkbox"
-                            id="isMetadataMutable"
-                            checked={field.value}
-                            onChange={field.onChange}
-                          />
-                          <span className={styles.slider}></span>
-                        </label>
-                      )}
-                    />
-                  </div>
-                  <div className={styles.authorityOption}>
-                    <div className={styles.authorityText}>
-                      <Label htmlFor="freezeAuthority">Keep Freeze Authority</Label>
-                      <p>
-                        Keep disabled so your token is immediately compatible with Liquidity Pools.
+                        Obrigatório para criar Pool de Liquidez na Raydium/Meteora e negociar na
+                        Jupiter (+50 pts no RugCheck).
                       </p>
                     </div>
                     <Controller
@@ -630,9 +710,66 @@ export default function TokenForm() {
                         <label className={styles.switch}>
                           <input
                             type="checkbox"
-                            id="freezeAuthority"
-                            checked={field.value}
-                            onChange={field.onChange}
+                            id="revokeFreezeToggle"
+                            checked={!field.value}
+                            onChange={(e) => field.onChange(!e.target.checked)}
+                          />
+                          <span className={styles.slider}></span>
+                        </label>
+                      )}
+                    />
+                  </div>
+
+                  {/* 2. Revoke Mint Authority (+0.10 SOL - Default ON) */}
+                  <div className={styles.authorityOption}>
+                    <div className={styles.authorityText}>
+                      <Label htmlFor="revokeMintToggle">
+                        Revogar Mint Authority (+{MODULAR_FEE_REVOKE_MINT_SOL.toFixed(2)} SOL — Recomendado)
+                      </Label>
+                      <p>
+                        Torna o Supply 100% fixo e impossibilita emissão de novos tokens (+35 pts no
+                        RugCheck).
+                      </p>
+                    </div>
+                    <Controller
+                      name="mintAuthority"
+                      control={control}
+                      render={({ field }) => (
+                        <label className={styles.switch}>
+                          <input
+                            type="checkbox"
+                            id="revokeMintToggle"
+                            checked={!field.value}
+                            onChange={(e) => field.onChange(!e.target.checked)}
+                          />
+                          <span className={styles.slider}></span>
+                        </label>
+                      )}
+                    />
+                  </div>
+
+                  {/* 3. Immutable Metadata (+0.05 SOL - Default ON) */}
+                  <div className={styles.authorityOption}>
+                    <div className={styles.authorityText}>
+                      <Label htmlFor="immutableMetadataToggle">
+                        Metadados Imutáveis / Immutable (+
+                        {MODULAR_FEE_IMMUTABLE_METADATA_SOL.toFixed(2)} SOL)
+                      </Label>
+                      <p>
+                        Trava permanentemente nome, símbolo e imagem nos exploradores (+15 pts no
+                        RugCheck).
+                      </p>
+                    </div>
+                    <Controller
+                      name="isMetadataMutable"
+                      control={control}
+                      render={({ field }) => (
+                        <label className={styles.switch}>
+                          <input
+                            type="checkbox"
+                            id="immutableMetadataToggle"
+                            checked={!field.value}
+                            onChange={(e) => field.onChange(!e.target.checked)}
                           />
                           <span className={styles.slider}></span>
                         </label>
@@ -670,7 +807,7 @@ export default function TokenForm() {
                 ) : isUploading ? (
                   "Uploading Token Image..."
                 ) : (
-                  `Create Token on ${cluster === "devnet" ? "Devnet" : "Mainnet"} (${SERVICE_FEE_CREATE_TOKEN_SOL.toFixed(2)} SOL Fee)`
+                  `Create Token on ${cluster === "devnet" ? "Devnet" : "Mainnet"} (Total: ${liveModularTotalSol.toFixed(2)} SOL)`
                 )}
               </Button>
             )}
@@ -685,6 +822,9 @@ export default function TokenForm() {
           imageUrl={watchedFields.imageUrl}
           supply={watchedFields.supply}
           tokenStandard={watchedFields.tokenStandard}
+          mintAuthority={watchedFields.mintAuthority}
+          freezeAuthority={watchedFields.freezeAuthority}
+          isMetadataMutable={watchedFields.isMetadataMutable}
         />
       </div>
     </div>

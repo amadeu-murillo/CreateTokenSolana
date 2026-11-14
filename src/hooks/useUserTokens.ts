@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
@@ -10,6 +10,7 @@ import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { fetchDigitalAsset, mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
 import { publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 import { useCluster } from "@/context/WalletContext";
+import { ESTIMATED_ATA_RENT_SOL } from "@/lib/constants";
 import { getMetadataCache, setMetadataCache, isCacheItemValid } from "@/lib/cache";
 
 interface SolanaToken {
@@ -32,6 +33,18 @@ export interface UserToken {
   isLpToken?: boolean;
   pairedBaseMint?: string;
   pairedLpMint?: string;
+}
+
+/**
+ * Phase 4: Represents an Associated Token Account (ATA) with exact balance === 0
+ * whose rent (~0.00203928 SOL) can be reclaimed via createCloseAccountInstruction.
+ */
+export interface EmptyTokenAccount {
+  pubkey: string;
+  mint: string;
+  programId: string;
+  lamports: number;
+  rentSol: number;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -62,6 +75,7 @@ export const useUserTokens = () => {
   const { publicKey } = useWallet();
   const { cluster, rpcEndpoint } = useCluster();
   const [tokens, setTokens] = useState<UserToken[]>([]);
+  const [emptyAccounts, setEmptyAccounts] = useState<EmptyTokenAccount[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [tokenMap, setTokenMap] = useState<Map<string, SolanaToken>>(new Map());
 
@@ -96,6 +110,7 @@ export const useUserTokens = () => {
   const fetchUserTokens = useCallback(async () => {
     if (!publicKey) {
       setTokens([]);
+      setEmptyAccounts([]);
       return;
     }
 
@@ -122,7 +137,7 @@ export const useUserTokens = () => {
         ),
       ]);
 
-      const allAccounts = [
+      const rawCombined = [
         ...tokenAccounts.value.map((acc) => ({
           ...acc,
           programId: TOKEN_PROGRAM_ID.toBase58(),
@@ -131,7 +146,31 @@ export const useUserTokens = () => {
           ...acc,
           programId: TOKEN_2022_PROGRAM_ID.toBase58(),
         })),
-      ].filter((acc) => acc.account.data.parsed.info.tokenAmount.uiAmount > 0);
+      ];
+
+      // Phase 4: Filter all ATAs with balance === 0 that can be closed to reclaim SOL rent
+      const detectedEmptyAccounts: EmptyTokenAccount[] = rawCombined
+        .filter((acc) => {
+          const info = acc.account.data.parsed?.info;
+          const rawAmount = info?.tokenAmount?.amount ?? "0";
+          const isFrozen = info?.state === "frozen";
+          return rawAmount === "0" && !isFrozen;
+        })
+        .map((acc) => ({
+          pubkey: acc.pubkey.toBase58(),
+          mint: acc.account.data.parsed.info.mint as string,
+          programId: acc.programId,
+          lamports: acc.account.lamports || Math.round(ESTIMATED_ATA_RENT_SOL * LAMPORTS_PER_SOL),
+          rentSol: acc.account.lamports
+            ? acc.account.lamports / LAMPORTS_PER_SOL
+            : ESTIMATED_ATA_RENT_SOL,
+        }));
+
+      setEmptyAccounts(detectedEmptyAccounts);
+
+      const allAccounts = rawCombined.filter(
+        (acc) => acc.account.data.parsed.info.tokenAmount.uiAmount > 0
+      );
 
       const resolvedTokens: UserToken[] = [];
       const BATCH_SIZE = 5;
@@ -144,7 +183,6 @@ export const useUserTokens = () => {
           const { mint, tokenAmount } = accountInfo.account.data.parsed.info;
           const lpEntry = lpPoolsMap[mint];
 
-          // Check if this mint is a known LP Token from a pool created by the user
           if (lpEntry && lpEntry.lpMintAddress === mint) {
             return {
               mint,
@@ -186,7 +224,6 @@ export const useUserTokens = () => {
             };
           }
 
-          // 1. Try Metaplex Token Metadata PDA first
           try {
             const asset = await fetchDigitalAsset(umi, umiPublicKey(mint));
             const finalLogoURI = await fetchImageFromMetadataUri(asset.metadata.uri);
@@ -208,7 +245,6 @@ export const useUserTokens = () => {
               pairedLpMint: lpEntry?.lpMintAddress,
             };
           } catch {
-            // 2. Fallback: If Token-2022, check Native Token-2022 Metadata Extension on the Mint account!
             if (accountInfo.programId === TOKEN_2022_PROGRAM_ID.toBase58()) {
               try {
                 const nativeMeta = await getSplToken2022Metadata(
@@ -235,7 +271,7 @@ export const useUserTokens = () => {
                   };
                 }
               } catch {
-                // Ignore and fall through to default
+                // Fall through
               }
             }
 
@@ -261,7 +297,6 @@ export const useUserTokens = () => {
         }
       }
 
-      // Immediate fallback for newly minted tokens (within last 10 mins) if RPC indexing is slightly behind
       try {
         const lastRaw = localStorage.getItem("lastCreatedTokenDossier");
         if (lastRaw) {
@@ -296,6 +331,7 @@ export const useUserTokens = () => {
     } catch (error) {
       console.error("Failed to fetch user's tokens:", error);
       setTokens([]);
+      setEmptyAccounts([]);
     } finally {
       setIsLoading(false);
     }
@@ -305,5 +341,20 @@ export const useUserTokens = () => {
     fetchUserTokens();
   }, [fetchUserTokens]);
 
-  return { tokens, isLoading, refreshTokens: fetchUserTokens };
+  const totalReclaimableSol = useMemo(
+    () =>
+      emptyAccounts.reduce(
+        (sum, acc) => sum + (acc.rentSol || ESTIMATED_ATA_RENT_SOL),
+        0
+      ),
+    [emptyAccounts]
+  );
+
+  return {
+    tokens,
+    emptyAccounts,
+    totalReclaimableSol,
+    isLoading,
+    refreshTokens: fetchUserTokens,
+  };
 };

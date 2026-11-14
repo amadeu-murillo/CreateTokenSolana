@@ -3,46 +3,122 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
+  min-height: 65vh;
+  padding: 1.5rem 1rem;
 }
 
 .contentWrapper {
   width: 100%;
-  max-width: 28rem; /* 448px */
+  max-width: 42rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .title {
-  font-size: 1.875rem; /* 30px */
-  font-weight: 700;
-  margin-bottom: 1.5rem; /* 24px */
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-align: center;
+  margin: 0;
+}
+
+.funnelCard {
+  padding: 1.5rem;
+  background: linear-gradient(
+    145deg,
+    hsla(var(--card), 0.95) 0%,
+    rgba(153, 69, 255, 0.1) 50%,
+    rgba(20, 241, 149, 0.08) 100%
+  );
+  border: 1px solid hsla(var(--primary), 0.35);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.funnelTitle {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: hsl(var(--foreground));
+  margin: 0;
   text-align: center;
 }
 
+.funnelSubtitle {
+  font-size: 0.88rem;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.funnelStepsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stepActionLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1.15rem;
+  border-radius: calc(var(--radius) * 0.85);
+  background: hsla(var(--background), 0.85);
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stepActionLink:hover {
+  border-color: #14f195;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(20, 241, 149, 0.14);
+}
+
+.stepInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: left;
+}
+
+.stepBadge {
+  font-size: 0.7rem;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #14f195;
+}
+
+.stepInfo strong {
+  font-size: 0.96rem;
+  color: hsl(var(--foreground));
+}
+
+.stepInfo span {
+  font-size: 0.78rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.stepArrow {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: hsl(var(--primary));
+  flex-shrink: 0;
+}
+
 .linkContainer {
-  margin-top: 1.5rem; /* 24px */
+  margin-top: 0.5rem;
   text-align: center;
 }
 
 .link {
-  color: var(--primary);
+  color: hsl(var(--primary));
   text-decoration: underline;
-}
-
-/* Estilos para o Call-to-Action */
-.ctaContainer {
-    margin-top: 2rem;
-    padding: 1.5rem;
-    background-color: hsla(var(--primary), 0.05);
-    border: 1px solid hsla(var(--primary), 0.2);
-    border-radius: var(--radius);
-    text-align: center;
-}
-
-.ctaContainer p {
-    margin-bottom: 1rem;
-    color: hsl(var(--muted-foreground));
-}
-
-.ctaButton {
-    width: 100%;
+  font-size: 0.9rem;
 }

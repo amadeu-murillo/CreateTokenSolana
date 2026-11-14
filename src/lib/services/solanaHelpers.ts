@@ -36,7 +36,10 @@ export function getUmiInstance(
 }
 
 /**
- * Builds service fee payment instructions with atomic 10% affiliate commission splitting.
+ * Phase 2: Instant On-Chain Affiliate Commission Split inside the same principal transaction:
+ * - If NO valid affiliate (or self-referral): sends 100% of totalFeeLamports to DEV_WALLET_ADDRESS.
+ * - If a valid affiliate exists: splits into two SystemProgram.transfer instructions in the same transaction:
+ *   70% of lamports to DEV_WALLET_ADDRESS and 30% directly to the affiliate wallet.
  */
 export function buildServiceFeeInstructions(
   userPublicKey: PublicKey,
@@ -49,26 +52,26 @@ export function buildServiceFeeInstructions(
   if (
     affiliateAddress &&
     isValidPublicKey(affiliateAddress) &&
-    affiliateAddress !== userPublicKey.toBase58() &&
-    affiliateAddress !== DEV_WALLET_ADDRESS.toBase58()
+    affiliateAddress.trim() !== userPublicKey.toBase58() &&
+    affiliateAddress.trim() !== DEV_WALLET_ADDRESS.toBase58()
   ) {
-    affiliatePublicKey = new PublicKey(affiliateAddress);
+    affiliatePublicKey = new PublicKey(affiliateAddress.trim());
   }
 
   if (affiliatePublicKey) {
-    const affiliateCommission = Math.round(totalFeeLamports * AFFILIATE_COMMISSION_RATE);
-    const developerCut = totalFeeLamports - affiliateCommission;
+    const affiliateCommission = Math.round(totalFeeLamports * AFFILIATE_COMMISSION_RATE); // 30%
+    const developerCut = totalFeeLamports - affiliateCommission; // 70%
 
     instructions.push(
       SystemProgram.transfer({
         fromPubkey: userPublicKey,
-        toPubkey: affiliatePublicKey,
-        lamports: affiliateCommission,
+        toPubkey: DEV_WALLET_ADDRESS,
+        lamports: developerCut,
       }),
       SystemProgram.transfer({
         fromPubkey: userPublicKey,
-        toPubkey: DEV_WALLET_ADDRESS,
-        lamports: developerCut,
+        toPubkey: affiliatePublicKey,
+        lamports: affiliateCommission,
       })
     );
   } else {

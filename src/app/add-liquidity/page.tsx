@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { Suspense,  useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -76,7 +76,7 @@ interface SnapshotTokenDossier {
   launchScheduleLabel: string;
 }
 
-export default function AddLiquidityPage() {
+function AddLiquidityPageInner() {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   const { cluster, setCluster, getExplorerUrl } = useCluster();
@@ -1354,5 +1354,13 @@ export default function AddLiquidityPage() {
         </aside>
       </div>
     </div>
+  );
+}
+
+export default function AddLiquidityPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
+      <AddLiquidityPageInner />
+    </Suspense>
   );
 }

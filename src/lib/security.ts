@@ -21,7 +21,6 @@ import {
 
 /**
  * Official whitelisted Solana Program IDs allowed in client-signed transactions.
- * Protects users against MITM instruction injection or malicious program CPIs.
  */
 export const WHITELISTED_SOLANA_PROGRAMS = new Set<string>([
   SystemProgram.programId.toBase58(),
@@ -36,11 +35,6 @@ export const WHITELISTED_SOLANA_PROGRAMS = new Set<string>([
   METEORA_DAMM_PROGRAM_ID.toBase58(),
 ]);
 
-/**
- * Verifies a deserialized VersionedTransaction on the client before prompting the wallet to sign:
- * 1. Confirms the fee payer (account index 0) matches the connected user's wallet.
- * 2. Confirms every instruction only invokes whitelisted Solana protocol programs.
- */
 export function verifyTransactionIntegrity(
   transaction: VersionedTransaction,
   expectedFeePayerBase58: string
@@ -85,9 +79,6 @@ export function verifyTransactionIntegrity(
   }
 }
 
-/**
- * Redacts sensitive RPC API keys or tokens from error messages before returning to the client.
- */
 export function sanitizeErrorMessage(rawMessage: unknown, fallback = "Operation failed."): string {
   const msg =
     rawMessage instanceof Error
@@ -282,13 +273,20 @@ export const createTokenRequestSchema = z.object({
   decimals: z.number().int().min(0).max(9),
   supply: z.union([z.number().positive(), z.string().min(1)]),
   wallet: solanaAddressSchema,
-  mintAuthority: z.boolean().default(true),
+  mintAuthority: z.boolean().default(false),
   freezeAuthority: z.boolean().default(false),
-  isMetadataMutable: z.boolean().default(true),
+  isMetadataMutable: z.boolean().default(false),
   tokenStandard: z.enum(["spl", "token-2022"]).default("spl"),
   useNativeMetadataExtension: z.boolean().default(false),
   storageProvider: z.enum(["arweave", "cloudinary"]).default("arweave"),
   metadataUri: z.string().trim().url().optional(),
+  customCreator: z
+    .object({
+      enabled: z.boolean().default(false),
+      name: z.string().trim().max(64).optional(),
+      website: z.string().trim().max(200).optional(),
+    })
+    .optional(),
   transferFee: z
     .object({
       basisPoints: z.number().int().min(0).max(10000).default(0),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useBurnToken } from "../../hooks/useBurnToken";
 import { useUserTokens } from "../../hooks/useUserTokens";
@@ -21,7 +21,12 @@ import Notification from "../../components/ui/Notification";
 import TransactionStatusStepper from "@/components/TransactionStatusStepper";
 import CostSummary from "@/components/CostSummary";
 import styles from "./Burn.module.css";
-import { DEV_WALLET_ADDRESS, SERVICE_FEE_BURN_TOKEN_SOL } from "@/lib/constants";
+import {
+  DEV_WALLET_ADDRESS,
+  ESTIMATED_ATA_RENT_SOL,
+  RECLAIM_SOL_SERVICE_FEE_RATE,
+  SERVICE_FEE_BURN_TOKEN_SOL,
+} from "@/lib/constants";
 
 const devWalletBase58 = DEV_WALLET_ADDRESS.toBase58();
 
@@ -68,14 +73,14 @@ const FlameIcon = () => (
 const tutorialSteps = [
   {
     icon: <TokenIcon />,
-    title: "1. Click Token Directly from Wallet",
+    title: "1. Seleção Direta da Carteira",
     description:
-      "All SPL, Token-2022, and LP tokens in your connected wallet appear automatically as clickable cards—no symbol or contract address typing required.",
+      "Todos os tokens SPL, Token-2022 e LP da sua carteira conectada aparecem automaticamente (ou são pré-selecionados via ?mint=).",
   },
   {
     icon: <FlameIcon />,
-    title: "2. Preview Impact & Confirm",
-    description: `Use quick percentage presets (25% – 100% MAX) to preview remaining supply. Standardized ${SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL fee routed atomically to Dev Wallet (${devWalletBase58.slice(0, 6)}...${devWalletBase58.slice(-4)}).`,
+    title: "2. Certificado Visual & Reclaim SOL",
+    description: `Após queimar, baixe seu Certificado PNG oficial '100% BURNED & VERIFIED ON-CHAIN' e compartilhe no X. Aproveite também para fechar contas vazias e recuperar seu SOL.`,
   },
 ];
 
@@ -87,20 +92,198 @@ type NotificationState = {
 
 interface LastBurnReceipt {
   displayName: string;
+  symbol: string;
   mint: string;
   burnedAmount: number;
   remainingBalance: number;
   signature: string;
+  timestamp: string;
 }
 
-export default function BurnPage() {
+/**
+ * Phase 3: Renders the high-definition HTML5 <canvas> "LP Burn / Rug-Proof" Visual Certificate
+ * with "Baixar Imagem PNG" and "Compartilhar no X" actions.
+ */
+function BurnCertificateCanvas({
+  receipt,
+  explorerUrl,
+}: {
+  receipt: LastBurnReceipt;
+  explorerUrl: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // 1. Deep Solana Aurora Background
+    const bgGrad = ctx.createLinearGradient(0, 0, w, h);
+    bgGrad.addColorStop(0, "#080D1E");
+    bgGrad.addColorStop(0.5, "#13112C");
+    bgGrad.addColorStop(1, "#06231D");
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    // 2. Decorative Glow Border
+    const borderGrad = ctx.createLinearGradient(0, 0, w, 0);
+    borderGrad.addColorStop(0, "#9945FF");
+    borderGrad.addColorStop(0.5, "#00D1FF");
+    borderGrad.addColorStop(1, "#14F195");
+    ctx.strokeStyle = borderGrad;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(18, 18, w - 36, h - 36);
+
+    // 3. Top Pill Badge: "🔥 100% BURNED & VERIFIED ON-CHAIN"
+    ctx.fillStyle = "rgba(20, 241, 149, 0.16)";
+    ctx.fillRect(54, 48, 490, 44);
+    ctx.strokeStyle = "#14F195";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(54, 48, 490, 44);
+
+    ctx.fillStyle = "#14F195";
+    ctx.font = "bold 20px Inter, sans-serif";
+    ctx.fillText("🔥 100% BURNED & VERIFIED ON-CHAIN", 74, 77);
+
+    // 4. Main Headline & Burned Amount
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 36px Inter, sans-serif";
+    ctx.fillText("LP BURN / RUG-PROOF CERTIFICATE", 54, 145);
+
+    ctx.fillStyle = "#FF4D8D";
+    ctx.font = "bold 44px monospace";
+    ctx.fillText(
+      `-${receipt.burnedAmount.toLocaleString("en-US")} ${receipt.symbol}`,
+      54,
+      208
+    );
+
+    // 5. On-Chain Verification Details Box
+    ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+    ctx.fillRect(54, 240, w - 108, 195);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(54, 240, w - 108, 195);
+
+    const shortMint = `${receipt.mint.slice(0, 12)}...${receipt.mint.slice(-10)}`;
+    const shortSig = `${receipt.signature.slice(0, 16)}...${receipt.signature.slice(-14)}`;
+
+    ctx.fillStyle = "#94A3B8";
+    ctx.font = "600 18px Inter, sans-serif";
+    ctx.fillText("Asset / Token:", 80, 282);
+    ctx.fillText("Mint Address:", 80, 326);
+    ctx.fillText("TX Signature:", 80, 370);
+    ctx.fillText("Timestamp (UTC):", 80, 412);
+
+    ctx.fillStyle = "#F8FAFC";
+    ctx.font = "bold 19px monospace";
+    ctx.fillText(`${receipt.displayName} (${receipt.symbol})`, 280, 282);
+    ctx.fillStyle = "#00D1FF";
+    ctx.fillText(shortMint, 280, 326);
+    ctx.fillStyle = "#14F195";
+    ctx.fillText(shortSig, 280, 370);
+    ctx.fillStyle = "#E2E8F0";
+    ctx.fillText(receipt.timestamp, 280, 412);
+
+    // 6. Platform Watermark Footer
+    ctx.fillStyle = "#A78BFA";
+    ctx.font = "bold 18px Inter, sans-serif";
+    ctx.fillText(
+      "Verified by CreateTokenSolana · https://www.createtoken.sbs",
+      54,
+      485
+    );
+  }, [receipt]);
+
+  const handleDownloadPng = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dataUrl = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.download = `burn-certificate-${receipt.symbol.toLowerCase()}-${Date.now()}.png`;
+    link.href = dataUrl;
+    link.click();
+  };
+
+  const shareText = encodeURIComponent(
+    `🔥 Acabei de queimar permanentemente ${receipt.burnedAmount.toLocaleString(
+      "en-US"
+    )} $${receipt.symbol} on-chain na Solana!\n\n✅ 100% BURNED & VERIFIED ON-CHAIN\n🪙 Mint: ${receipt.mint.slice(
+      0,
+      8
+    )}...${receipt.mint.slice(-6)}\n🔗 Solscan: ${explorerUrl}\n🚀 Via @CreateTokenSol https://www.createtoken.sbs`
+  );
+  const shareUrl = `https://twitter.com/intent/tweet?text=${shareText}`;
+
+  return (
+    <div className={styles.certificateContainer}>
+      <div className={styles.certificateHeader}>
+        <strong>🏆 Certificado Oficial LP Burn / Rug-Proof</strong>
+        <a
+          href={explorerUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: "0.8rem", color: "#14f195", textDecoration: "underline" }}
+        >
+          Ver Transação no Solscan ↗
+        </a>
+      </div>
+
+      <canvas
+        ref={canvasRef}
+        width={960}
+        height={520}
+        className={styles.certificateCanvas}
+      />
+
+      <div className={styles.certificateActions}>
+        <button type="button" onClick={handleDownloadPng} className={styles.downloadPngBtn}>
+          ⬇️ Baixar Imagem PNG
+        </button>
+        <a
+          href={shareUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.shareXBtn}
+        >
+          𝕏 Compartilhar no X (Twitter)
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function BurnPageContent() {
   const { cluster, setCluster, getExplorerUrl } = useCluster();
   const [selectedTokenMint, setSelectedTokenMint] = useState("");
   const [amount, setAmount] = useState("");
   const [notification, setNotification] = useState<NotificationState>(null);
   const [lastBurnReceipt, setLastBurnReceipt] = useState<LastBurnReceipt | null>(null);
-  const { burnToken, isLoading, statusStep, progressStep, error, reset } = useBurnToken();
-  const { tokens: userTokens, isLoading: isLoadingUserTokens, refreshTokens } = useUserTokens();
+
+  const {
+    burnToken,
+    reclaimEmptyAccounts,
+    isLoading,
+    isReclaimingSol,
+    statusStep,
+    progressStep,
+    error,
+    reclaimResult,
+    reset,
+  } = useBurnToken();
+
+  const {
+    tokens: userTokens,
+    emptyAccounts,
+    totalReclaimableSol,
+    isLoading: isLoadingUserTokens,
+    refreshTokens,
+  } = useUserTokens();
 
   const selectedToken = useMemo(
     () => userTokens.find((t) => t.mint === selectedTokenMint) || null,
@@ -159,16 +342,20 @@ export default function BurnPage() {
         selectedToken.programId
       );
       if (signature) {
+        const cleanSymbol =
+          selectedToken.symbol || selectedToken.mint.slice(0, 5).toUpperCase();
         setLastBurnReceipt({
           displayName: selectedTokenDisplayLabel,
+          symbol: cleanSymbol,
           mint: selectedToken.mint,
           burnedAmount: numericAmount,
           remainingBalance,
           signature,
+          timestamp: new Date().toUTCString(),
         });
         setNotification({
           type: "success",
-          message: `Success! ${numericAmount.toLocaleString()} units of ${selectedTokenDisplayLabel} permanently burned on ${cluster}.`,
+          message: `Sucesso! ${numericAmount.toLocaleString()} ${cleanSymbol} queimados permanentemente na rede ${cluster}.`,
           txId: signature,
         });
         setAmount("");
@@ -177,10 +364,28 @@ export default function BurnPage() {
     }
   };
 
+  const handleReclaimSolClick = async () => {
+    setNotification(null);
+    const res = await reclaimEmptyAccounts(emptyAccounts);
+    if (res) {
+      setNotification({
+        type: "success",
+        message: `Resgate concluído! ${res.closedAccountsCount} contas vazias fechadas e +${res.netUserSol.toFixed(
+          5
+        )} SOL devolvidos para sua carteira.`,
+        txId: res.signature,
+      });
+      refreshTokens();
+    }
+  };
+
   const handleCloseNotification = () => {
     setNotification(null);
     reset();
   };
+
+  const estimatedReclaimFeeSol = totalReclaimableSol * RECLAIM_SOL_SERVICE_FEE_RATE;
+  const estimatedNetReclaimSol = Math.max(0, totalReclaimableSol - estimatedReclaimFeeSol);
 
   return (
     <div className={styles.pageContainer}>
@@ -208,23 +413,23 @@ export default function BurnPage() {
           </span>
         </div>
 
-        <h1 className={styles.pageTitle}>On-Chain Token & LP Burner</h1>
+        <h1 className={styles.pageTitle}>On-Chain Token & LP Burner + Reclaim SOL</h1>
         <p className={styles.pageDescription}>
-          Click any token or LP token directly from your connected wallet—no symbol or manual
-          address entry needed. Permanently destroys tokens on Solana ({cluster}) via{" "}
-          <code>burnChecked</code>.
+          Selecione qualquer token ou LP token diretamente da sua carteira conectada, gere seu
+          Certificado Visual Rug-Proof em PNG e recupere o SOL preso em contas vazias.
         </p>
       </header>
 
       <div className={styles.grid}>
         <div className={styles.formContainer}>
+          {/* 1. Token & LP Burner Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Select Wallet Token to Burn ({cluster})</CardTitle>
+              <CardTitle>Burn Tokens or LP Tokens ({cluster})</CardTitle>
               <CardDescription>
-                Choose your token or LP token directly from your connected wallet below and set the
-                amount to destroy. Service Fee:{" "}
-                <strong>{SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL</strong> routed to Dev Wallet{" "}
+                Escolha seu token ou LP token diretamente da sua carteira conectada. Taxa de
+                serviço: <strong>{SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL</strong> enviada para
+                Dev Wallet{" "}
                 <code>
                   {devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}
                 </code>
@@ -243,10 +448,14 @@ export default function BurnPage() {
                 )}
 
                 <TransactionStatusStepper
-                  isActive={isLoading}
+                  isActive={isLoading || isReclaimingSol}
                   currentStepIndex={progressStep}
                   statusMessage={statusStep}
-                  operationTitle={`Burning ${selectedTokenDisplayLabel} on ${cluster}`}
+                  operationTitle={
+                    isReclaimingSol
+                      ? `Closing Empty Token Accounts on ${cluster}`
+                      : `Burning ${selectedTokenDisplayLabel} on ${cluster}`
+                  }
                 />
 
                 <div className={styles.field}>
@@ -324,7 +533,6 @@ export default function BurnPage() {
                       </div>
                     </div>
 
-                    {/* Live Deflationary Burn Impact Simulator */}
                     <div className={styles.impactCard}>
                       <div className={styles.impactHeader}>
                         <strong>🔥 Live Deflationary Burn Impact Preview</strong>
@@ -356,36 +564,12 @@ export default function BurnPage() {
                   </>
                 )}
 
+                {/* Phase 3: HTML5 Canvas Visual Burn Certificate */}
                 {lastBurnReceipt && (
-                  <div className={styles.burnReceiptBox}>
-                    <strong>✓ Verified On-Chain Burn Certificate</strong>
-                    <div className={styles.burnReceiptRow}>
-                      <span>Wallet Asset Destroyed:</span>
-                      <strong className={styles.textRose}>
-                        {lastBurnReceipt.burnedAmount.toLocaleString()} (
-                        {lastBurnReceipt.displayName})
-                      </strong>
-                    </div>
-                    <div className={styles.burnReceiptRow}>
-                      <span>Remaining Wallet Balance:</span>
-                      <strong className={styles.textEmerald}>
-                        {lastBurnReceipt.remainingBalance.toLocaleString()}
-                      </strong>
-                    </div>
-                    <div className={styles.burnReceiptRow}>
-                      <span>Transaction Signature:</span>
-                      <a
-                        href={getExplorerUrl("tx", lastBurnReceipt.signature)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <code>
-                          {lastBurnReceipt.signature.slice(0, 10)}...
-                          {lastBurnReceipt.signature.slice(-8)} ↗
-                        </code>
-                      </a>
-                    </div>
-                  </div>
+                  <BurnCertificateCanvas
+                    receipt={lastBurnReceipt}
+                    explorerUrl={getExplorerUrl("tx", lastBurnReceipt.signature)}
+                  />
                 )}
               </CardContent>
               <CardFooter>
@@ -393,6 +577,7 @@ export default function BurnPage() {
                   type="submit"
                   disabled={
                     isLoading ||
+                    isReclaimingSol ||
                     !selectedToken ||
                     numericAmount <= 0 ||
                     numericAmount > walletBalance
@@ -406,6 +591,77 @@ export default function BurnPage() {
               </CardFooter>
             </form>
           </Card>
+
+          {/* Phase 4: Viral Tool "Recuperar SOL" (Close Empty Token Accounts) */}
+          <div className={styles.reclaimSolCard} id="reclaim-sol">
+            <div>
+              <span className={styles.irreversibleBadge} style={{ background: "rgba(20,241,149,0.16)", borderColor: "rgba(20,241,149,0.4)", color: "#14f195" }}>
+                💎 FERRAMENTA VIRAL · CLOSE EMPTY TOKEN ACCOUNTS
+              </span>
+              <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginTop: "0.5rem" }}>
+                Recuperar SOL de Contas Vazias (Rent Recovery)
+              </h3>
+              <p style={{ fontSize: "0.86rem", color: "hsl(var(--muted-foreground))", marginTop: "0.25rem" }}>
+                Cada token zerado na sua carteira mantém ~{ESTIMATED_ATA_RENT_SOL.toFixed(5)} SOL
+                bloqueados de aluguel (rent). Feche até 20 contas vazias por transação e receba seu
+                SOL de volta instantaneamente.
+              </p>
+            </div>
+
+            <div className={styles.reclaimBanner}>
+              <span>
+                Você possui <strong>{emptyAccounts.length}</strong> contas vazias na carteira =
+              </span>
+              <strong>~{totalReclaimableSol.toFixed(5)} SOL disponível para resgate</strong>
+            </div>
+
+            <div className={styles.reclaimMetricsGrid}>
+              <div className={styles.impactMetric}>
+                <span>Contas Vazias (Saldo 0)</span>
+                <strong>{emptyAccounts.length} ATAs</strong>
+              </div>
+              <div className={styles.impactMetric}>
+                <span>Taxa Plataforma (15%)</span>
+                <strong>~{estimatedReclaimFeeSol.toFixed(5)} SOL</strong>
+              </div>
+              <div className={styles.impactMetric}>
+                <span>Líquido para Você (85%)</span>
+                <strong className={styles.textEmerald}>
+                  +{estimatedNetReclaimSol.toFixed(5)} SOL
+                </strong>
+              </div>
+            </div>
+
+            {reclaimResult && (
+              <div className={styles.reclaimBanner}>
+                <span>
+                  ✓ {reclaimResult.closedAccountsCount} contas fechadas (+
+                  {reclaimResult.netUserSol.toFixed(5)} SOL recebidos)
+                </span>
+                <a
+                  href={getExplorerUrl("tx", reclaimResult.signature)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "#14f195", fontSize: "0.8rem", textDecoration: "underline" }}
+                >
+                  Ver TX no Solscan ↗
+                </a>
+              </div>
+            )}
+
+            <Button
+              type="button"
+              onClick={handleReclaimSolClick}
+              disabled={isReclaimingSol || isLoading || emptyAccounts.length === 0}
+              className="w-full"
+            >
+              {isReclaimingSol
+                ? statusStep || "Recuperando SOL..."
+                : emptyAccounts.length > 0
+                  ? `⚡ Recuperar Meu SOL Agora (+${estimatedNetReclaimSol.toFixed(4)} SOL Líquido)`
+                  : "Nenhuma Conta Vazia Encontrada na Carteira Conectada"}
+            </Button>
+          </div>
         </div>
 
         <div className={styles.sidebar}>
@@ -427,7 +683,7 @@ export default function BurnPage() {
           <Card className={styles.tutorialCard}>
             <CardContent className={styles.tutorialCardContent}>
               <div className={styles.tutorialText}>
-                <p className={styles.tutorialTitle}>Want to Withdraw SOL Instead?</p>
+                <p className={styles.tutorialTitle}>Want to Withdraw SOL Liquidity?</p>
                 <p className={styles.tutorialDescription}>
                   If you want to recover your deposited SOL liquidity before burning LP tokens, use
                   the{" "}
@@ -442,5 +698,13 @@ export default function BurnPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BurnPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading Token Burner...</div>}>
+      <BurnPageContent />
+    </Suspense>
   );
 }

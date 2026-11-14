@@ -19,8 +19,7 @@ import {
   MINT_SIZE,
 } from "@solana/spl-token";
 import {
-  SERVICE_FEE_CREATE_TOKEN_LAMPORTS,
-  STANDARD_SERVICE_FEE_LAMPORTS,
+  calculateModularTokenCreationFee,
   SolanaCluster,
 } from "@/lib/constants";
 import { toRawTokenAmount } from "@/lib/security";
@@ -40,6 +39,7 @@ export interface CreateSplTokenParams {
   mintAuthority: boolean;
   freezeAuthority: boolean;
   isMetadataMutable: boolean;
+  customCreatorInfo?: boolean;
   affiliate?: string | null;
   network?: SolanaCluster;
 }
@@ -55,6 +55,7 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
     mintAuthority,
     freezeAuthority,
     isMetadataMutable,
+    customCreatorInfo = false,
     affiliate,
     network = "mainnet-beta",
   } = params;
@@ -69,23 +70,26 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
     connection.getBalance(userPublicKey, "confirmed"),
   ]);
 
-  // On Mainnet-Beta, always charge the full 0.90 SOL creation fee.
-  // On Devnet, charge 0.90 SOL if the wallet has >= 0.93 SOL; otherwise gracefully use 0.07 SOL on Devnet so 1-SOL faucet tests succeed.
-  const estimatedRentAndMetaplexLamports = rentLamports + Math.round(0.018 * LAMPORTS_PER_SOL);
-  const effectiveServiceFeeLamports =
-    network === "devnet" &&
-    userSolBalance < SERVICE_FEE_CREATE_TOKEN_LAMPORTS + estimatedRentAndMetaplexLamports
-      ? STANDARD_SERVICE_FEE_LAMPORTS
-      : SERVICE_FEE_CREATE_TOKEN_LAMPORTS;
+  // Phase 1: Calculate exact modular fee in lamports based on selected security & metadata flags
+  const { totalLamports: modularFeeLamports, totalSol: modularFeeSol } =
+    calculateModularTokenCreationFee({
+      revokeFreeze: !freezeAuthority,
+      revokeMint: !mintAuthority,
+      immutableMetadata: !isMetadataMutable,
+      customCreatorInfo: Boolean(customCreatorInfo),
+      hasTransferFeeExtension: false,
+    });
 
-  const totalRequiredLamports = effectiveServiceFeeLamports + estimatedRentAndMetaplexLamports;
+  const estimatedRentAndMetaplexLamports = rentLamports + Math.round(0.018 * LAMPORTS_PER_SOL);
+  const totalRequiredLamports = modularFeeLamports + estimatedRentAndMetaplexLamports;
+
   if (userSolBalance < totalRequiredLamports) {
     const haveSol = (userSolBalance / LAMPORTS_PER_SOL).toFixed(4);
     const needSol = (totalRequiredLamports / LAMPORTS_PER_SOL).toFixed(4);
     throw new Error(
-      `Insufficient SOL balance on ${network}: your wallet has ${haveSol} SOL, but creating this token requires ~${needSol} SOL (${(
-        effectiveServiceFeeLamports / LAMPORTS_PER_SOL
-      ).toFixed(2)} SOL service fee + ~0.02 SOL Solana account rent).`
+      `Insufficient SOL balance on ${network}: your wallet has ${haveSol} SOL, but creating this token requires ~${needSol} SOL (${modularFeeSol.toFixed(
+        2
+      )} SOL modular service fee + ~0.02 SOL Solana account rent).`
     );
   }
 
@@ -96,10 +100,11 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
     TOKEN_PROGRAM_ID
   );
 
+  // Initialize Mint with userPublicKey as temporary freezeAuthority if we also want an explicit createSetAuthorityInstruction(FreezeAccount -> null) or initialize directly
   const instructions: TransactionInstruction[] = [
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+    ComputeBudgetProgram.setComputeUnitLimit({ units: 420_000 }),
     ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
-    ...buildServiceFeeInstructions(userPublicKey, effectiveServiceFeeLamports, affiliate),
+    ...buildServiceFeeInstructions(userPublicKey, modularFeeLamports, affiliate),
     SystemProgram.createAccount({
       fromPubkey: userPublicKey,
       newAccountPubkey: mintKeypair.publicKey,
@@ -111,7 +116,7 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
       mintKeypair.publicKey,
       decimals,
       userPublicKey,
-      freezeAuthority ? userPublicKey : null,
+      userPublicKey,
       TOKEN_PROGRAM_ID
     ),
     createAssociatedTokenAccountIdempotentInstruction(
@@ -140,6 +145,20 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
       splTokenProgram: TOKEN_PROGRAM_ID,
     }),
   ];
+
+  // Execute explicit on-chain authority revocations paid by the user
+  if (!freezeAuthority) {
+    instructions.push(
+      createSetAuthorityInstruction(
+        mintKeypair.publicKey,
+        userPublicKey,
+        AuthorityType.FreezeAccount,
+        null,
+        [],
+        TOKEN_PROGRAM_ID
+      )
+    );
+  }
 
   if (!mintAuthority) {
     instructions.push(
@@ -171,7 +190,7 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
   return {
     transaction: base64Transaction,
     mintAddress: mintKeypair.publicKey.toBase58(),
-    serviceFeeSol: effectiveServiceFeeLamports / LAMPORTS_PER_SOL,
+    serviceFeeSol: modularFeeSol,
     blockhash,
     lastValidBlockHeight,
     network,

@@ -3,10 +3,7 @@ import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 export type SolanaCluster = "mainnet-beta" | "devnet";
 
 /**
- * RF-01: Developer wallet address that receives service fees across ALL platform operations:
- * - Create Token: 0.90 SOL
- * - Create Liquidity Pool, Burn Token, Mass Airdrop, Manage Authority: 0.07 SOL
- * - Withdraw / Remove Liquidity in SOL: 0.05 SOL
+ * RF-01: Developer wallet address that receives service fees across ALL platform operations.
  */
 export const DEV_WALLET_ADDRESS_STRING =
   process.env.NEXT_PUBLIC_DEV_WALLET_ADDRESS || "CP6teSg2LUxQsSBBtwZ9xjG2aZjjznhfCvGED9LNgjrJ";
@@ -42,20 +39,121 @@ export function getSolscanUrl(
 }
 
 /**
- * RF-03: Mandatory Service Fees in SOL routed to DEV_WALLET_ADDRESS:
- * - Token Creation (SPL & Token-2022): 0.90 SOL (900,000,000 lamports)
- * - Liquidity Pool Creation, Burn, Mass Airdrop, Authority Management: 0.07 SOL (70,000,000 lamports)
- * - Withdraw Liquidity in SOL: 0.05 SOL (50,000,000 lamports)
+ * RF-03: Phase 1 Modular Pricing Upsell Schedule (in SOL):
+ * - Base Token Creation Fee: 0.10 SOL
+ * - Revoke Freeze Authority: +0.10 SOL (Default ON - Recommended)
+ * - Revoke Mint Authority: +0.10 SOL (Default ON - Recommended)
+ * - Immutable Metadata: +0.05 SOL (Default ON)
+ * - Custom Creator Info in Metadata: +0.05 SOL (Optional Toggle)
+ * - Tax Token / Transfer Fee Extension (Token-2022): +0.15 SOL (When Token-2022 Transfer Fee > 0)
+ */
+export const MODULAR_FEE_BASE_CREATE_SOL = 0.10;
+export const MODULAR_FEE_REVOKE_FREEZE_SOL = 0.10;
+export const MODULAR_FEE_REVOKE_MINT_SOL = 0.10;
+export const MODULAR_FEE_IMMUTABLE_METADATA_SOL = 0.05;
+export const MODULAR_FEE_CUSTOM_CREATOR_SOL = 0.05;
+export const MODULAR_FEE_TRANSFER_FEE_EXT_SOL = 0.15;
+
+export interface ModularPricingOptions {
+  revokeFreeze: boolean;
+  revokeMint: boolean;
+  immutableMetadata: boolean;
+  customCreatorInfo: boolean;
+  hasTransferFeeExtension: boolean;
+}
+
+export interface ModularPricingBreakdownItem {
+  key: string;
+  label: string;
+  sol: number;
+  active: boolean;
+}
+
+export function calculateModularTokenCreationFee(
+  options: ModularPricingOptions
+): {
+  totalSol: number;
+  totalLamports: number;
+  items: ModularPricingBreakdownItem[];
+} {
+  const items: ModularPricingBreakdownItem[] = [
+    {
+      key: "base",
+      label: "Taxa Base de Criação (Token Mint)",
+      sol: MODULAR_FEE_BASE_CREATE_SOL,
+      active: true,
+    },
+    {
+      key: "revokeFreeze",
+      label: "Revogar Freeze Authority (Pool Ready)",
+      sol: MODULAR_FEE_REVOKE_FREEZE_SOL,
+      active: Boolean(options.revokeFreeze),
+    },
+    {
+      key: "revokeMint",
+      label: "Revogar Mint Authority (Supply Fixo)",
+      sol: MODULAR_FEE_REVOKE_MINT_SOL,
+      active: Boolean(options.revokeMint),
+    },
+    {
+      key: "immutable",
+      label: "Metadados Imutáveis (Immutable)",
+      sol: MODULAR_FEE_IMMUTABLE_METADATA_SOL,
+      active: Boolean(options.immutableMetadata),
+    },
+    {
+      key: "customCreator",
+      label: "Customizar Creator Info (Metadados)",
+      sol: MODULAR_FEE_CUSTOM_CREATOR_SOL,
+      active: Boolean(options.customCreatorInfo),
+    },
+    {
+      key: "transferFeeExt",
+      label: "Extensão Tax Token / Transfer Fee (Token-2022)",
+      sol: MODULAR_FEE_TRANSFER_FEE_EXT_SOL,
+      active: Boolean(options.hasTransferFeeExtension),
+    },
+  ];
+
+  const rawTotalSol = items
+    .filter((item) => item.active)
+    .reduce((sum, item) => sum + item.sol, 0);
+
+  const totalSol = Number(rawTotalSol.toFixed(4));
+  const totalLamports = Math.round(totalSol * LAMPORTS_PER_SOL);
+
+  return { totalSol, totalLamports, items };
+}
+
+/**
+ * Default recommended modular token creation fee (Base 0.10 + Freeze 0.10 + Mint 0.10 + Immutable 0.05 = 0.35 SOL).
  */
 export const STANDARD_SERVICE_FEE_SOL = 0.07;
-export const SERVICE_FEE_CREATE_TOKEN_SOL = 0.9;
+export const SERVICE_FEE_CREATE_TOKEN_SOL = 0.35;
 export const SERVICE_FEE_BURN_TOKEN_SOL = 0.07;
 export const SERVICE_FEE_AIRDROP_SOL = 0.07;
 export const SERVICE_FEE_MANAGE_AUTHORITY_SOL = 0.07;
 export const SERVICE_FEE_CREATE_LP_SOL = 0.07;
 export const SERVICE_FEE_CREATE_LP_DEVNET_SOL = 0.07;
 export const SERVICE_FEE_REMOVE_LP_SOL = 0.05;
-export const AFFILIATE_COMMISSION_RATE = 0.10; // 10% atomic referral commission
+
+/**
+ * Phase 2: Instant On-Chain Affiliate Split:
+ * - 30% directly to Affiliate Wallet
+ * - 70% directly to DEV_WALLET_ADDRESS
+ */
+export const AFFILIATE_COMMISSION_RATE = 0.30;
+export const DEV_AFFILIATE_SHARE_RATE = 0.70;
+
+/**
+ * Phase 4: Reclaim SOL (Close Empty Token Accounts) Constants:
+ * - ~0.00203928 SOL rent reclaimed per empty SPL / Token-2022 account
+ * - 15% service fee routed atomically to DEV_WALLET_ADDRESS
+ */
+export const ESTIMATED_ATA_RENT_SOL = 0.00203928;
+export const ESTIMATED_ATA_RENT_LAMPORTS = 2_039_280;
+export const RECLAIM_SOL_SERVICE_FEE_RATE = 0.15;
+export const MAX_CLOSE_ACCOUNTS_PER_TX = 20;
 
 /**
  * Service Fees in Lamports.

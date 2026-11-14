@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -277,7 +277,7 @@ const TokenManagementCard = ({
   );
 };
 
-export default function DashboardPage() {
+function DashboardPageInner() {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   const { cluster, setCluster } = useCluster();
@@ -500,5 +500,13 @@ export default function DashboardPage() {
         isLoading={isManagingAuthority}
       />
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
+      <DashboardPageInner />
+    </Suspense>
   );
 }
