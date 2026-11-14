@@ -3,8 +3,10 @@ import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 export type SolanaCluster = "mainnet-beta" | "devnet";
 
 /**
- * RF-01: Developer wallet address that receives service fees across ALL platform operations
- * (Create Token: 0.90 SOL; Liquidity Pool, Burn, Airdrop, and Manage Authority: 0.07 SOL).
+ * RF-01: Developer wallet address that receives service fees across ALL platform operations:
+ * - Create Token: 0.90 SOL
+ * - Create Liquidity Pool, Burn Token, Mass Airdrop, Manage Authority: 0.07 SOL
+ * - Withdraw / Remove Liquidity in SOL: 0.05 SOL
  */
 export const DEV_WALLET_ADDRESS_STRING =
   process.env.NEXT_PUBLIC_DEV_WALLET_ADDRESS || "CP6teSg2LUxQsSBBtwZ9xjG2aZjjznhfCvGED9LNgjrJ";
@@ -42,7 +44,8 @@ export function getSolscanUrl(
 /**
  * RF-03: Mandatory Service Fees in SOL routed to DEV_WALLET_ADDRESS:
  * - Token Creation (SPL & Token-2022): 0.90 SOL (900,000,000 lamports)
- * - Liquidity Pool, Burn, Mass Airdrop, and Authority Management: 0.07 SOL (70,000,000 lamports)
+ * - Liquidity Pool Creation, Burn, Mass Airdrop, Authority Management: 0.07 SOL (70,000,000 lamports)
+ * - Withdraw Liquidity in SOL: 0.05 SOL (50,000,000 lamports)
  */
 export const STANDARD_SERVICE_FEE_SOL = 0.07;
 export const SERVICE_FEE_CREATE_TOKEN_SOL = 0.9;
@@ -51,7 +54,8 @@ export const SERVICE_FEE_AIRDROP_SOL = 0.07;
 export const SERVICE_FEE_MANAGE_AUTHORITY_SOL = 0.07;
 export const SERVICE_FEE_CREATE_LP_SOL = 0.07;
 export const SERVICE_FEE_CREATE_LP_DEVNET_SOL = 0.07;
-export const AFFILIATE_COMMISSION_RATE = 0.10; // 10% atomic referral commission (0.09 SOL per token created)
+export const SERVICE_FEE_REMOVE_LP_SOL = 0.05;
+export const AFFILIATE_COMMISSION_RATE = 0.10; // 10% atomic referral commission
 
 /**
  * Service Fees in Lamports.
@@ -76,6 +80,9 @@ export const SERVICE_FEE_CREATE_LP_LAMPORTS = Math.round(
 );
 export const SERVICE_FEE_CREATE_LP_DEVNET_LAMPORTS = Math.round(
   SERVICE_FEE_CREATE_LP_DEVNET_SOL * LAMPORTS_PER_SOL
+);
+export const SERVICE_FEE_REMOVE_LP_LAMPORTS = Math.round(
+  SERVICE_FEE_REMOVE_LP_SOL * LAMPORTS_PER_SOL
 );
 
 export function getLpServiceFeeLamports(cluster: SolanaCluster = "mainnet-beta"): number {

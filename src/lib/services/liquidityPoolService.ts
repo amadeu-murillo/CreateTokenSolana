@@ -9,11 +9,15 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import {
+  ACCOUNT_SIZE,
   AuthorityType,
   MINT_SIZE,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
+  createBurnCheckedInstruction,
+  createCloseAccountInstruction,
+  createInitializeAccountInstruction,
   createInitializeMintInstruction,
   createMintToInstruction,
   createSetAuthorityInstruction,
@@ -23,7 +27,10 @@ import {
   getMint,
 } from "@solana/spl-token";
 import {
+  SERVICE_FEE_REMOVE_LP_LAMPORTS,
+  SERVICE_FEE_REMOVE_LP_SOL,
   SolanaCluster,
+  WSOL_MINT,
   getClusterDexConfig,
   getLpServiceFeeLamports,
 } from "@/lib/constants";
@@ -61,6 +68,28 @@ export interface CreateLiquidityPoolOutput {
   network: SolanaCluster;
 }
 
+export interface RemoveLiquidityInput {
+  baseMint: string;
+  lpMint?: string;
+  withdrawPercentage: number; // 1 to 100
+  wallet: string;
+  programId?: string;
+  affiliate?: string | null;
+  network?: SolanaCluster;
+}
+
+export interface RemoveLiquidityOutput {
+  transaction: string;
+  baseMint: string;
+  withdrawPercentage: number;
+  estimatedSolReturned: string;
+  estimatedBaseReturned: string;
+  serviceFeeSol: number;
+  blockhash: string;
+  lastValidBlockHeight: number;
+  network: SolanaCluster;
+}
+
 function bigIntSqrt(value: bigint): bigint {
   if (value <= BigInt(0)) return BigInt(0);
   if (value < BigInt(4)) return BigInt(1);
@@ -82,6 +111,26 @@ function sortTokenMints(
     return { token0: mintA, token1: mintB, isBaseToken0: true };
   }
   return { token0: mintB, token1: mintA, isBaseToken0: false };
+}
+
+/**
+ * Deterministic vault seeds derived from the Base Token Mint so the pool creator can
+ * withdraw SOL & Base Token liquidity on-chain (until LP tokens are permanently burned).
+ */
+export async function deriveCreatorPoolVaults(
+  userPublicKey: PublicKey,
+  baseMintPublicKey: PublicKey
+): Promise<{
+  wsolVaultAddress: PublicKey;
+  wsolVaultSeed: string;
+}> {
+  const wsolVaultSeed = `lp_wsol_${baseMintPublicKey.toBase58().slice(0, 16)}`;
+  const wsolVaultAddress = await PublicKey.createWithSeed(
+    userPublicKey,
+    wsolVaultSeed,
+    TOKEN_PROGRAM_ID
+  );
+  return { wsolVaultAddress, wsolVaultSeed };
 }
 
 export async function createLiquidityPoolTransaction(
@@ -163,7 +212,6 @@ export async function createLiquidityPoolTransaction(
   }
 
   if (rawBaseAmount > userRawTokenBalance) {
-    // If within 0.1% of balance (caused by UI float formatting when clicking MAX), clamp to exact raw balance
     const diff = rawBaseAmount - userRawTokenBalance;
     if (diff * BigInt(1000) <= userRawTokenBalance) {
       rawBaseAmount = userRawTokenBalance;
@@ -178,7 +226,7 @@ export async function createLiquidityPoolTransaction(
   const requiredSolLamports =
     lpFeeLamports +
     (quoteToken === "SOL" ? Number(rawQuoteAmount) : 0) +
-    Math.round(0.011 * LAMPORTS_PER_SOL); // Rent for LP Mint + 3 ATAs
+    Math.round(0.012 * LAMPORTS_PER_SOL);
 
   if (userSolBalance < requiredSolLamports) {
     const neededSol = (requiredSolLamports / LAMPORTS_PER_SOL).toFixed(4);
@@ -206,9 +254,12 @@ export async function createLiquidityPoolTransaction(
 
   const lpMintKeypair = Keypair.generate();
   const lpDecimals = 9;
-  const mintRentLamports = await connection.getMinimumBalanceForRentExemption(MINT_SIZE);
+  const [mintRentLamports, tokenAccountRentLamports] = await Promise.all([
+    connection.getMinimumBalanceForRentExemption(MINT_SIZE),
+    connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE),
+  ]);
 
-  // Pool Vault ATAs (owned by poolAuthorityPda with allowOwnerOffCurve = true)
+  // Pool Base Vault ATA
   const poolBaseVaultAta = await getAssociatedTokenAddress(
     baseMintPublicKey,
     poolAuthorityPda,
@@ -216,12 +267,22 @@ export async function createLiquidityPoolTransaction(
     baseTokenProgramId
   );
 
-  const poolQuoteVaultAta = await getAssociatedTokenAddress(
-    quoteMintPublicKey,
-    poolAuthorityPda,
-    true,
-    TOKEN_PROGRAM_ID
+  // Deterministic Creator-Withdrawable WSOL Quote Vault (so user can withdraw SOL liquidity at any time)
+  const { wsolVaultAddress, wsolVaultSeed } = await deriveCreatorPoolVaults(
+    userPublicKey,
+    baseMintPublicKey
   );
+  const existingWsolVault = await connection.getAccountInfo(wsolVaultAddress, "confirmed");
+
+  const poolQuoteVaultAddress =
+    quoteToken === "SOL"
+      ? wsolVaultAddress
+      : await getAssociatedTokenAddress(
+          quoteMintPublicKey,
+          poolAuthorityPda,
+          true,
+          TOKEN_PROGRAM_ID
+        );
 
   // User LP Token destination ATA
   const creatorLpTokenAta = await getAssociatedTokenAddress(
@@ -281,7 +342,7 @@ export async function createLiquidityPoolTransaction(
     )
   );
 
-  // 7. Create Pool Base Vault ATA, Pool Quote Vault ATA, and User LP Token ATA idempotently
+  // 7. Create Pool Base Vault ATA and User LP Token ATA idempotently
   instructions.push(
     createAssociatedTokenAccountIdempotentInstruction(
       userPublicKey,
@@ -289,13 +350,6 @@ export async function createLiquidityPoolTransaction(
       poolAuthorityPda,
       baseMintPublicKey,
       baseTokenProgramId
-    ),
-    createAssociatedTokenAccountIdempotentInstruction(
-      userPublicKey,
-      poolQuoteVaultAta,
-      poolAuthorityPda,
-      quoteMintPublicKey,
-      TOKEN_PROGRAM_ID
     ),
     createAssociatedTokenAccountIdempotentInstruction(
       userPublicKey,
@@ -320,17 +374,46 @@ export async function createLiquidityPoolTransaction(
     )
   );
 
-  // 9. Deposit Quote Liquidity (SOL wrapped into WSOL inside Pool Quote Vault, or USDC transfer)
+  // 9. Deposit Quote Liquidity (SOL wrapped into WSOL inside deterministic wsolVaultAddress, or USDC transfer)
   if (quoteToken === "SOL") {
-    instructions.push(
-      SystemProgram.transfer({
-        fromPubkey: userPublicKey,
-        toPubkey: poolQuoteVaultAta,
-        lamports: rawQuoteAmount,
-      }),
-      createSyncNativeInstruction(poolQuoteVaultAta, TOKEN_PROGRAM_ID)
-    );
+    if (!existingWsolVault) {
+      instructions.push(
+        SystemProgram.createAccountWithSeed({
+          fromPubkey: userPublicKey,
+          newAccountPubkey: wsolVaultAddress,
+          basePubkey: userPublicKey,
+          seed: wsolVaultSeed,
+          lamports: tokenAccountRentLamports + Number(rawQuoteAmount),
+          space: ACCOUNT_SIZE,
+          programId: TOKEN_PROGRAM_ID,
+        }),
+        createInitializeAccountInstruction(
+          wsolVaultAddress,
+          WSOL_MINT,
+          userPublicKey,
+          TOKEN_PROGRAM_ID
+        )
+      );
+    } else {
+      instructions.push(
+        SystemProgram.transfer({
+          fromPubkey: userPublicKey,
+          toPubkey: wsolVaultAddress,
+          lamports: rawQuoteAmount,
+        }),
+        createSyncNativeInstruction(wsolVaultAddress, TOKEN_PROGRAM_ID)
+      );
+    }
   } else {
+    instructions.push(
+      createAssociatedTokenAccountIdempotentInstruction(
+        userPublicKey,
+        poolQuoteVaultAddress,
+        poolAuthorityPda,
+        quoteMintPublicKey,
+        TOKEN_PROGRAM_ID
+      )
+    );
     const userUsdcAta = await getAssociatedTokenAddress(
       quoteMintPublicKey,
       userPublicKey,
@@ -341,7 +424,7 @@ export async function createLiquidityPoolTransaction(
       createTransferCheckedInstruction(
         userUsdcAta,
         quoteMintPublicKey,
-        poolQuoteVaultAta,
+        poolQuoteVaultAddress,
         userPublicKey,
         rawQuoteAmount,
         quoteDecimals,
@@ -399,12 +482,187 @@ export async function createLiquidityPoolTransaction(
     poolAddress: poolAuthorityPda.toBase58(),
     lpMintAddress: lpMintKeypair.publicKey.toBase58(),
     baseVaultAddress: poolBaseVaultAta.toBase58(),
-    quoteVaultAddress: poolQuoteVaultAta.toBase58(),
+    quoteVaultAddress: poolQuoteVaultAddress.toBase58(),
     dex,
     initialPrice,
     lpTokensMinted: formattedLpMinted,
     serviceFeeSol: lpFeeLamports / LAMPORTS_PER_SOL,
     freezeAuthorityRevokedInTx,
+    blockhash,
+    lastValidBlockHeight,
+    network,
+  };
+}
+
+/**
+ * Withdraws SOL Liquidity on-chain and charges the mandatory 0.05 SOL fee to DEV_WALLET_ADDRESS:
+ * 1. Charges 0.05 SOL (50,000,000 lamports) atomically to DEV_WALLET_ADDRESS (with 10% affiliate split if present).
+ * 2. Inspects the deterministic WSOL Pool Quote Vault (`wsolVaultAddress`) and/or user's WSOL ATA (`userWsolAta`).
+ * 3. Unwraps WSOL back into native SOL directly into the user's wallet (100% full close or partial withdrawal).
+ * 4. Burns proportional LP tokens if `lpMint` is provided and held by the user.
+ */
+export async function removeLiquidityTransaction(
+  input: RemoveLiquidityInput
+): Promise<RemoveLiquidityOutput> {
+  const {
+    baseMint,
+    lpMint,
+    withdrawPercentage = 100,
+    wallet,
+    affiliate,
+    network = "mainnet-beta",
+  } = input;
+
+  const connection = getSolanaConnection(network);
+  const userPublicKey = new PublicKey(wallet);
+  const baseMintPublicKey = new PublicKey(baseMint);
+  const pct = Math.min(Math.max(Number(withdrawPercentage) || 100, 1), 100);
+
+  const userSolBalance = await connection.getBalance(userPublicKey, "confirmed");
+  if (userSolBalance < SERVICE_FEE_REMOVE_LP_LAMPORTS + 10_000) {
+    throw new Error(
+      `Insufficient SOL to pay the ${SERVICE_FEE_REMOVE_LP_SOL.toFixed(
+        2
+      )} SOL withdrawal service fee (current balance: ${(
+        userSolBalance / LAMPORTS_PER_SOL
+      ).toFixed(4)} SOL).`
+    );
+  }
+
+  const instructions: TransactionInstruction[] = [
+    ComputeBudgetProgram.setComputeUnitLimit({ units: 350_000 }),
+    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
+    // Mandatory 0.05 SOL Withdrawal Fee routed to DEV_WALLET_ADDRESS
+    ...buildServiceFeeInstructions(userPublicKey, SERVICE_FEE_REMOVE_LP_LAMPORTS, affiliate),
+  ];
+
+  const { wsolVaultAddress } = await deriveCreatorPoolVaults(userPublicKey, baseMintPublicKey);
+  const userWsolAta = await getAssociatedTokenAddress(
+    WSOL_MINT,
+    userPublicKey,
+    false,
+    TOKEN_PROGRAM_ID
+  );
+
+  const [vaultInfo, userWsolInfo] = await Promise.all([
+    connection.getParsedAccountInfo(wsolVaultAddress, "confirmed"),
+    connection.getParsedAccountInfo(userWsolAta, "confirmed"),
+  ]);
+
+  let estimatedSolReturnedLamports = 0;
+
+  // Case A: Active Creator WSOL Pool Vault exists on-chain
+  const vaultParsed = (vaultInfo.value?.data as any)?.parsed?.info;
+  if (vaultInfo.value && vaultParsed?.owner === userPublicKey.toBase58()) {
+    const rawWsolAmount = BigInt(vaultParsed?.tokenAmount?.amount || "0");
+    if (pct === 100 || rawWsolAmount <= BigInt(0)) {
+      estimatedSolReturnedLamports += vaultInfo.value.lamports;
+      instructions.push(
+        createCloseAccountInstruction(
+          wsolVaultAddress,
+          userPublicKey,
+          userPublicKey,
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      );
+    } else {
+      const withdrawLamports = (rawWsolAmount * BigInt(pct)) / BigInt(100);
+      estimatedSolReturnedLamports += Number(withdrawLamports);
+      instructions.push(
+        createAssociatedTokenAccountIdempotentInstruction(
+          userPublicKey,
+          userWsolAta,
+          userPublicKey,
+          WSOL_MINT,
+          TOKEN_PROGRAM_ID
+        ),
+        createTransferCheckedInstruction(
+          wsolVaultAddress,
+          WSOL_MINT,
+          userWsolAta,
+          userPublicKey,
+          withdrawLamports,
+          9,
+          [],
+          TOKEN_PROGRAM_ID
+        ),
+        createCloseAccountInstruction(
+          userWsolAta,
+          userPublicKey,
+          userPublicKey,
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      );
+    }
+  } else if (userWsolInfo.value) {
+    // Case B: User holds wrapped SOL (WSOL ATA) in their wallet — unwrap it back to native SOL
+    estimatedSolReturnedLamports += userWsolInfo.value.lamports;
+    instructions.push(
+      createCloseAccountInstruction(
+        userWsolAta,
+        userPublicKey,
+        userPublicKey,
+        [],
+        TOKEN_PROGRAM_ID
+      )
+    );
+  }
+
+  // Optional: If lpMint (or baseMint if user selected an LP token directly) is held by user, burn proportional LP tokens
+  const candidateLpMint = lpMint ? new PublicKey(lpMint) : null;
+  if (candidateLpMint) {
+    try {
+      const userLpAta = await getAssociatedTokenAddress(
+        candidateLpMint,
+        userPublicKey,
+        false,
+        TOKEN_PROGRAM_ID
+      );
+      const lpAcc = await connection.getParsedAccountInfo(userLpAta, "confirmed");
+      const lpParsed = (lpAcc.value?.data as any)?.parsed?.info;
+      if (lpParsed?.tokenAmount?.amount) {
+        const rawLpBal = BigInt(lpParsed.tokenAmount.amount);
+        const burnLpRaw = (rawLpBal * BigInt(pct)) / BigInt(100);
+        if (burnLpRaw > BigInt(0)) {
+          instructions.push(
+            createBurnCheckedInstruction(
+              userLpAta,
+              candidateLpMint,
+              userPublicKey,
+              burnLpRaw,
+              Number(lpParsed.tokenAmount.decimals ?? 9),
+              [],
+              TOKEN_PROGRAM_ID
+            )
+          );
+        }
+      }
+    } catch {
+      // Ignore if LP token account is already closed/burned
+    }
+  }
+
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+
+  const messageV0 = new TransactionMessage({
+    payerKey: userPublicKey,
+    recentBlockhash: blockhash,
+    instructions,
+  }).compileToV0Message();
+
+  const transaction = new VersionedTransaction(messageV0);
+  const serializedTransaction = transaction.serialize();
+  const base64Transaction = Buffer.from(serializedTransaction).toString("base64");
+
+  return {
+    transaction: base64Transaction,
+    baseMint,
+    withdrawPercentage: pct,
+    estimatedSolReturned: (estimatedSolReturnedLamports / LAMPORTS_PER_SOL).toFixed(4),
+    estimatedBaseReturned: `${pct}% of Pool Position`,
+    serviceFeeSol: SERVICE_FEE_REMOVE_LP_SOL,
     blockhash,
     lastValidBlockHeight,
     network,

@@ -9,6 +9,7 @@ import {
   SERVICE_FEE_AIRDROP_SOL,
   SERVICE_FEE_MANAGE_AUTHORITY_SOL,
   SERVICE_FEE_CREATE_LP_SOL,
+  SERVICE_FEE_REMOVE_LP_SOL,
 } from "@/lib/constants";
 
 interface Costs {
@@ -17,6 +18,7 @@ interface Costs {
   airdrop: string;
   manageAuthority: string;
   createLiquidityPool: string;
+  removeLiquidity?: string;
 }
 
 type Operation = keyof Costs;
@@ -31,6 +33,7 @@ const serviceFeeByOperation: Record<Operation, number> = {
   airdrop: SERVICE_FEE_AIRDROP_SOL,
   manageAuthority: SERVICE_FEE_MANAGE_AUTHORITY_SOL,
   createLiquidityPool: SERVICE_FEE_CREATE_LP_SOL,
+  removeLiquidity: SERVICE_FEE_REMOVE_LP_SOL,
 };
 
 const devWalletBase58 = DEV_WALLET_ADDRESS.toBase58();
@@ -57,6 +60,7 @@ export default function CostSummary({ operation }: CostSummaryProps) {
           airdrop: "0.0800",
           manageAuthority: "0.0800",
           createLiquidityPool: "0.0800",
+          removeLiquidity: "0.0600",
         });
       } finally {
         setIsLoading(false);
@@ -66,8 +70,8 @@ export default function CostSummary({ operation }: CostSummaryProps) {
     fetchCosts();
   }, []);
 
-  const costValue = costs ? costs[operation] : "...";
-  const devFee = serviceFeeByOperation[operation];
+  const costValue = costs?.[operation] || "...";
+  const devFee = serviceFeeByOperation[operation] ?? 0.07;
 
   return (
     <div className={styles.card}>
@@ -76,7 +80,7 @@ export default function CostSummary({ operation }: CostSummaryProps) {
         <p>{devFee.toFixed(2)} SOL</p>
       </div>
       <div className={styles.item} style={{ marginTop: "0.35rem", fontSize: "0.84rem" }}>
-        <p>Estimated Total (+ Rent):</p>
+        <p>Estimated Total (+ Network):</p>
         <p>{isLoading ? "Loading..." : `~${parseFloat(costValue).toFixed(2)} SOL`}</p>
       </div>
       <p className={styles.disclaimer}>

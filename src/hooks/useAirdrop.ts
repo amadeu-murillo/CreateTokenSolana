@@ -16,6 +16,8 @@ export const useAirdrop = () => {
   const { connection } = useConnection();
   const { cluster } = useCluster();
   const [isLoading, setIsLoading] = useState(false);
+  const [statusStep, setStatusStep] = useState<string | null>(null);
+  const [progressStep, setProgressStep] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
 
@@ -33,6 +35,8 @@ export const useAirdrop = () => {
       setIsLoading(true);
       setError(null);
       setSignature(null);
+      setProgressStep(0);
+      setStatusStep("Splitting recipient list into atomic Solana transaction batches...");
 
       let firstSignature: string | null = null;
 
@@ -53,7 +57,9 @@ export const useAirdrop = () => {
         const transactions: VersionedTransaction[] = [];
 
         for (let i = 0; i < recipientChunks.length; i++) {
-          setSignature(`Preparing batch ${i + 1} of ${recipientChunks.length}...`);
+          const msg = `Preparing batch ${i + 1} of ${recipientChunks.length} (${recipientChunks[i].length} wallets)...`;
+          setSignature(msg);
+          setStatusStep(msg);
           const chunk = recipientChunks[i];
           const response = await fetch("/api/airdrop", {
             method: "POST",
@@ -73,6 +79,7 @@ export const useAirdrop = () => {
             throw new Error(result.error || `Failed to prepare batch ${i + 1}.`);
           }
 
+          setProgressStep(1);
           const transactionBuffer = Buffer.from(result.transaction, "base64");
           const deserializedTx = VersionedTransaction.deserialize(transactionBuffer);
           const integrity = verifyTransactionIntegrity(deserializedTx, publicKey.toBase58());
@@ -82,21 +89,29 @@ export const useAirdrop = () => {
           transactions.push(deserializedTx);
         }
 
-        setSignature(`Waiting for approval of ${transactions.length} transaction(s) in wallet...`);
+        const signMsg = `Waiting for wallet approval of ${transactions.length} batch transaction(s)...`;
+        setProgressStep(2);
+        setSignature(signMsg);
+        setStatusStep(signMsg);
         const signedTransactions = await signAllTransactions(transactions);
 
         if (!signedTransactions || signedTransactions.length === 0) {
           throw new Error("Transactions were not signed by the user.");
         }
 
-        setSignature(`Sending ${signedTransactions.length} transaction(s) to Solana...`);
+        const sendMsg = `Broadcasting ${signedTransactions.length} batch transaction(s) to Solana (${cluster})...`;
+        setProgressStep(3);
+        setSignature(sendMsg);
+        setStatusStep(sendMsg);
         const signatures = await Promise.all(
           signedTransactions.map((tx) =>
             connection.sendRawTransaction(tx.serialize(), { maxRetries: 3 })
           )
         );
 
-        setSignature("Confirming transactions on-chain...");
+        const confirmMsg = "Confirming airdrop distribution on-chain...";
+        setSignature(confirmMsg);
+        setStatusStep(confirmMsg);
         firstSignature = signatures[0];
 
         if (firstSignature) {
@@ -112,6 +127,8 @@ export const useAirdrop = () => {
           );
         }
 
+        setProgressStep(4);
+        setStatusStep("Airdrop distribution finalized on-chain!");
         setSignature(firstSignature);
         return firstSignature;
       } catch (err) {
@@ -119,6 +136,7 @@ export const useAirdrop = () => {
 
         if (friendlyMessage === "SUCCESS_ALREADY_PROCESSED") {
           const successSignature = firstSignature || "confirmed";
+          setProgressStep(4);
           setSignature(successSignature);
           setError(null);
           return successSignature;
@@ -128,6 +146,7 @@ export const useAirdrop = () => {
         return null;
       } finally {
         setIsLoading(false);
+        setStatusStep(null);
       }
     },
     [publicKey, sendTransaction, signAllTransactions, connection, cluster]
@@ -136,7 +155,9 @@ export const useAirdrop = () => {
   const reset = useCallback(() => {
     setError(null);
     setSignature(null);
+    setStatusStep(null);
+    setProgressStep(0);
   }, []);
 
-  return { performAirdrop, isLoading, error, signature, reset };
+  return { performAirdrop, isLoading, statusStep, progressStep, error, signature, reset };
 };

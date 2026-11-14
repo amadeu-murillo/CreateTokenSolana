@@ -10,6 +10,8 @@ export const useManageAuthority = () => {
   const { connection } = useConnection();
   const { cluster } = useCluster();
   const [isLoading, setIsLoading] = useState(false);
+  const [statusStep, setStatusStep] = useState<string | null>(null);
+  const [progressStep, setProgressStep] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
   const manageAuthority = useCallback(
@@ -25,6 +27,10 @@ export const useManageAuthority = () => {
 
       setIsLoading(true);
       setError(null);
+      setProgressStep(0);
+      setStatusStep(
+        `Building ${authorityType === "mint" ? "Mint" : "Freeze"} Authority revocation transaction...`
+      );
 
       try {
         let affiliateRef: string | null = null;
@@ -50,15 +56,41 @@ export const useManageAuthority = () => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error);
 
+        setProgressStep(1);
+        setStatusStep("Verifying program whitelist & simulating revocation on-chain...");
+
         const transactionBuffer = Buffer.from(result.transaction, "base64");
         const transaction = VersionedTransaction.deserialize(transactionBuffer);
 
         const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58());
         if (!integrity.valid) {
-          throw new Error(integrity.reason || "Transaction failed client-side security verification.");
+          throw new Error(
+            integrity.reason || "Transaction failed client-side security verification."
+          );
         }
 
-        const signature = await sendTransaction(transaction, connection);
+        const simulation = await connection.simulateTransaction(transaction, {
+          sigVerify: false,
+          replaceRecentBlockhash: true,
+          commitment: "processed",
+        });
+
+        if (simulation.value.err) {
+          throw new Error(
+            `Simulation failed before signing: ${JSON.stringify(simulation.value.err)}`
+          );
+        }
+
+        setProgressStep(2);
+        setStatusStep("Waiting for wallet signature approval...");
+
+        const signature = await sendTransaction(transaction, connection, {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+
+        setProgressStep(3);
+        setStatusStep("Confirming permanent authority revocation on Solana...");
 
         const blockhashInfo =
           result.blockhash && result.lastValidBlockHeight
@@ -77,12 +109,16 @@ export const useManageAuthority = () => {
           "confirmed"
         );
 
+        setProgressStep(4);
+        setStatusStep("Authority permanently revoked on-chain!");
+
         return signature;
       } catch (err) {
         setError(parseSolanaError(err, "revoke token authority"));
         return null;
       } finally {
         setIsLoading(false);
+        setStatusStep(null);
       }
     },
     [publicKey, sendTransaction, connection, cluster]
@@ -90,7 +126,9 @@ export const useManageAuthority = () => {
 
   const reset = useCallback(() => {
     setError(null);
+    setStatusStep(null);
+    setProgressStep(0);
   }, []);
 
-  return { manageAuthority, isLoading, error, reset };
+  return { manageAuthority, isLoading, statusStep, progressStep, error, reset };
 };

@@ -85,8 +85,71 @@
   font-size: 1rem;
   color: hsl(var(--muted-foreground));
   max-width: 680px;
-  margin: 0 auto;
+  margin: 0 auto 1.35rem;
   line-height: 1.6;
+}
+
+/* Mode Switcher: Add Liquidity vs Withdraw Liquidity in SOL */
+.modeTabsBar {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  padding: 0.35rem;
+  border-radius: 0.9rem;
+  background-color: hsla(var(--card), 0.9);
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  max-width: 640px;
+  width: 100%;
+}
+
+.modeTabBtn,
+.modeTabBtnActive,
+.modeTabBtnWithdrawActive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.72rem 1rem;
+  border-radius: 0.68rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modeTabBtn {
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+}
+
+.modeTabBtn:hover {
+  color: hsl(var(--foreground));
+  background: hsla(var(--muted), 0.5);
+}
+
+.modeTabBtnActive {
+  background: linear-gradient(135deg, rgba(153, 69, 255, 0.22), rgba(0, 209, 255, 0.18));
+  border-color: hsla(var(--primary), 0.55);
+  color: hsl(var(--foreground));
+  box-shadow: 0 4px 16px rgba(153, 69, 255, 0.18);
+}
+
+.modeTabBtnWithdrawActive {
+  background: linear-gradient(135deg, rgba(20, 241, 149, 0.2), rgba(0, 209, 255, 0.18));
+  border-color: rgba(20, 241, 149, 0.55);
+  color: #34d399;
+  box-shadow: 0 4px 16px rgba(20, 241, 149, 0.16);
+}
+
+.modeFeePill {
+  font-size: 0.7rem;
+  font-family: "JetBrains Mono", monospace;
+  padding: 0.14rem 0.48rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .grid {
@@ -306,6 +369,85 @@
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   border-color: hsl(var(--primary));
+}
+
+/* Withdraw Percentage Grid */
+.withdrawShareGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+}
+
+.withdrawShareBtn,
+.withdrawShareBtnActive {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0.5rem;
+  border-radius: calc(var(--radius) * 0.75);
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.withdrawShareBtn strong,
+.withdrawShareBtnActive strong {
+  font-size: 1rem;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.withdrawShareBtn span,
+.withdrawShareBtnActive span {
+  font-size: 0.7rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.15rem;
+}
+
+.withdrawShareBtn:hover {
+  border-color: rgba(20, 241, 149, 0.55);
+}
+
+.withdrawShareBtnActive {
+  border-color: #14f195;
+  background: rgba(20, 241, 149, 0.12);
+  box-shadow: 0 0 0 1px rgba(20, 241, 149, 0.35);
+}
+
+.withdrawShareBtnActive strong {
+  color: #34d399;
+}
+
+.vaultStatusCard {
+  padding: 1rem 1.15rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(0, 209, 255, 0.32);
+  background: linear-gradient(135deg, rgba(0, 209, 255, 0.08), rgba(153, 69, 255, 0.06));
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.vaultStatusHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.vaultStatusHeader strong {
+  font-size: 0.86rem;
+  color: hsl(var(--foreground));
+}
+
+.vaultAddressMono {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.76rem;
+  color: hsl(var(--muted-foreground));
+  word-break: break-all;
 }
 
 /* Fee Tiers */
@@ -638,6 +780,7 @@
   background-color: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
   color: hsl(var(--foreground));
+  cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

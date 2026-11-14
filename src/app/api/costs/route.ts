@@ -5,10 +5,9 @@ import {
   SERVICE_FEE_AIRDROP_SOL,
   SERVICE_FEE_MANAGE_AUTHORITY_SOL,
   SERVICE_FEE_CREATE_LP_SOL,
+  SERVICE_FEE_REMOVE_LP_SOL,
 } from "@/lib/constants";
 
-// RF05: Cost Management
-// Calculates and returns estimated costs (Service Fee + Network Rent/Gas) for all platform operations.
 export async function GET() {
   try {
     const networkCostInSol = 0.01;
@@ -19,6 +18,7 @@ export async function GET() {
       airdrop: (networkCostInSol + SERVICE_FEE_AIRDROP_SOL).toFixed(4),
       manageAuthority: (networkCostInSol + SERVICE_FEE_MANAGE_AUTHORITY_SOL).toFixed(4),
       createLiquidityPool: (networkCostInSol + SERVICE_FEE_CREATE_LP_SOL).toFixed(4),
+      removeLiquidity: (networkCostInSol + SERVICE_FEE_REMOVE_LP_SOL).toFixed(4),
     };
 
     return NextResponse.json(costs);
