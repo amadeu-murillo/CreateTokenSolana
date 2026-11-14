@@ -20,6 +20,9 @@ import {
   getSolanaConnection,
 } from "@/lib/services/solanaHelpers";
 
+export const dynamic = "force-dynamic";
+
+
 export async function POST(request: Request) {
   try {
     const clientIp = getClientIp(request);

@@ -33,12 +33,12 @@ export async function GET() {
         cloudinaryFallbackReady: true,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
       {
         status: "degraded",
         timestamp: new Date().toISOString(),
-        error: error?.message || "RPC health check failed.",
+        error: error instanceof Error ? error.message : "RPC health check failed.",
         rpcEndpoint: getRpcEndpoint("mainnet-beta").replace(/api[-_]?key=[^&]+/gi, "api-key=***"),
       },
       { status: 503 }

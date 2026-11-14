@@ -10,6 +10,9 @@ import {
   sanitizeHttpsUrl,
 } from "@/lib/security";
 
+export const dynamic = "force-dynamic";
+
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "dgurmzcht",
   api_key: process.env.CLOUDINARY_API_KEY || "376481879818689",

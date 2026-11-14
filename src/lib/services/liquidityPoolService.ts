@@ -92,6 +92,26 @@ export interface RemoveLiquidityOutput {
   network: SolanaCluster;
 }
 
+interface ParsedSplAccountData {
+  parsed?: {
+    info?: {
+      owner?: string;
+      tokenAmount?: {
+        amount?: string;
+        decimals?: number;
+        uiAmountString?: string;
+      };
+    };
+  };
+}
+
+function extractParsedTokenInfo(data: unknown) {
+  if (data && typeof data === "object" && "parsed" in data) {
+    return (data as ParsedSplAccountData).parsed?.info;
+  }
+  return undefined;
+}
+
 function bigIntSqrt(value: bigint): bigint {
   if (value <= BigInt(0)) return BigInt(0);
   if (value < BigInt(4)) return BigInt(1);
@@ -108,7 +128,7 @@ function sortTokenMints(
   mintA: PublicKey,
   mintB: PublicKey
 ): { token0: PublicKey; token1: PublicKey; isBaseToken0: boolean } {
-  const comparison = Buffer.compare(mintA.toBuffer(), mintB.toBuffer());
+  const comparison = Buffer.compare(new Uint8Array(mintA.toBuffer()), new Uint8Array(mintB.toBuffer()));
   if (comparison < 0) {
     return { token0: mintA, token1: mintB, isBaseToken0: true };
   }
@@ -201,7 +221,7 @@ export async function createLiquidityPoolTransaction(
     connection.getParsedAccountInfo(userBaseAta, "confirmed"),
   ]);
 
-  const parsedTokenInfo = (userBaseAccountParsed.value?.data as any)?.parsed?.info;
+  const parsedTokenInfo = extractParsedTokenInfo(userBaseAccountParsed.value?.data);
   if (!parsedTokenInfo?.tokenAmount?.amount) {
     throw new Error(
       `Your wallet does not hold an active token account for ${baseMint.slice(0, 8)}... on Solana ${network}.`
@@ -247,9 +267,9 @@ export async function createLiquidityPoolTransaction(
 
   const [poolAuthorityPda] = PublicKey.findProgramAddressSync(
     [
-      Buffer.from(dex === "raydium-cpmm" ? "raydium_cpmm_pool" : "meteora_damm_pool"),
-      token0.toBuffer(),
-      token1.toBuffer(),
+      new Uint8Array(Buffer.from(dex === "raydium-cpmm" ? "raydium_cpmm_pool" : "meteora_damm_pool")),
+      new Uint8Array(token0.toBuffer()),
+      new Uint8Array(token1.toBuffer()),
     ],
     targetDexProgramId
   );
@@ -554,7 +574,7 @@ export async function removeLiquidityTransaction(
   let estimatedSolReturnedLamports = 0;
 
   // Case A: Active Creator WSOL Pool Vault exists on-chain
-  const vaultParsed = (vaultInfo.value?.data as any)?.parsed?.info;
+  const vaultParsed = extractParsedTokenInfo(vaultInfo.value?.data);
   if (vaultInfo.value && vaultParsed?.owner === userPublicKey.toBase58()) {
     const rawWsolAmount = BigInt(vaultParsed?.tokenAmount?.amount || "0");
     if (pct === 100 || rawWsolAmount <= BigInt(0)) {
@@ -623,7 +643,7 @@ export async function removeLiquidityTransaction(
         TOKEN_PROGRAM_ID
       );
       const lpAcc = await connection.getParsedAccountInfo(userLpAta, "confirmed");
-      const lpParsed = (lpAcc.value?.data as any)?.parsed?.info;
+      const lpParsed = extractParsedTokenInfo(lpAcc.value?.data);
       if (lpParsed?.tokenAmount?.amount) {
         const rawLpBal = BigInt(lpParsed.tokenAmount.amount);
         const burnLpRaw = (rawLpBal * BigInt(pct)) / BigInt(100);

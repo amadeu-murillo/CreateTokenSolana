@@ -81,7 +81,7 @@ export const useAirdrop = () => {
 
           setProgressStep(1);
           const transactionBuffer = Buffer.from(result.transaction, "base64");
-          const deserializedTx = VersionedTransaction.deserialize(transactionBuffer);
+          const deserializedTx = VersionedTransaction.deserialize(new Uint8Array(transactionBuffer));
           const integrity = verifyTransactionIntegrity(deserializedTx, publicKey.toBase58());
           if (!integrity.valid) {
             throw new Error(integrity.reason || `Batch ${i + 1} failed client-side security check.`);

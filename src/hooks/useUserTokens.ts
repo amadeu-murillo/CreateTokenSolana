@@ -116,7 +116,7 @@ export const useUserTokens = () => {
 
     setIsLoading(true);
     try {
-      let lpPoolsMap: Record<string, any> = {};
+      let lpPoolsMap: Record<string, { baseSymbol?: string; quoteToken?: string; dex?: string; baseMint?: string; poolAddress?: string }> = {};
       try {
         const rawLp = localStorage.getItem("createdLpPoolsMap");
         if (rawLp) lpPoolsMap = JSON.parse(rawLp);

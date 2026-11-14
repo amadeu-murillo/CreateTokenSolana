@@ -15,7 +15,7 @@ import Notification from "@/components/ui/Notification";
 import { TokenSelector } from "@/components/TokenSelector";
 import { useManageAuthority } from "@/hooks/useManageAuthority";
 import { useCluster } from "@/context/WalletContext";
-import { useUserTokens } from "@/hooks/useUserTokens";
+import { useUserTokens, RichToken } from "@/hooks/useUserTokens";
 import { DEV_WALLET_ADDRESS, SERVICE_FEE_MANAGE_AUTHORITY_SOL } from "@/lib/constants";
 import styles from "./Dashboard.module.css";
 
@@ -122,7 +122,7 @@ const TokenManagementCard = ({
   mintInfo,
   onManageClick,
 }: {
-  token: any;
+  token: RichToken;
   mintInfo: Mint;
   onManageClick: (mint: string, type: "mint" | "freeze", programId: string) => void;
 }) => {

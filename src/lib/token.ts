@@ -1,13 +1,12 @@
-import { Connection, PublicKey, Transaction, SystemProgram } from "@solana/web3.js";
+import { Connection, Signer } from "@solana/web3.js";
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
 
 export async function createToken(
   connection: Connection,
-  payer: any,
+  payer: Signer,
   decimals: number,
   supply: number
-) {
-  // Cria conta de Mint
+): Promise<string> {
   const mint = await createMint(
     connection,
     payer,
@@ -16,7 +15,6 @@ export async function createToken(
     decimals
   );
 
-  // Conta do usuário
   const tokenAccount = await getOrCreateAssociatedTokenAccount(
     connection,
     payer,
@@ -24,7 +22,6 @@ export async function createToken(
     payer.publicKey
   );
 
-  // Mint inicial
   await mintTo(
     connection,
     payer,

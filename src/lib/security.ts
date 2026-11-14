@@ -71,10 +71,10 @@ export function verifyTransactionIntegrity(
     }
 
     return { valid: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       valid: false,
-      reason: `Failed to verify transaction integrity: ${err?.message || "Unknown error"}`,
+      reason: `Failed to verify transaction integrity: ${(err instanceof Error ? err.message : String(err)) || "Unknown error"}`,
     };
   }
 }
@@ -170,7 +170,7 @@ export function validateImageBuffer(
     return { valid: false, error: "File exceeds the maximum allowed size of 5 MB." };
   }
 
-  if (!ALLOWED_IMAGE_MIME_TYPES.includes(mimeType as any)) {
+  if (!(ALLOWED_IMAGE_MIME_TYPES as readonly string[]).includes(mimeType)) {
     return {
       valid: false,
       error: "Unsupported image format. Please upload PNG, JPG, WEBP, or GIF.",

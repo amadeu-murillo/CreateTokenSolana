@@ -4,13 +4,16 @@ import { SolanaCluster, getRpcEndpoint } from "@/lib/constants";
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, getMint } from "@solana/spl-token";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { fetchDigitalAsset, mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
-import { publicKey as umiPublicKey } from "@metaplex-foundation/umi";
+import { publicKey as umiPublicKey, Umi } from "@metaplex-foundation/umi";
 import { isValidPublicKey } from "@/lib/security";
 import { getSolanaConnection } from "@/lib/services/solanaHelpers";
 
+export const dynamic = "force-dynamic";
+
+
 const metadataCache = new Map<string, { name: string; symbol: string; uri: string }>();
 
-async function getTokenMetadata(umi: any, mint: string) {
+async function getTokenMetadata(umi: Umi, mint: string) {
   if (metadataCache.has(mint)) {
     return metadataCache.get(mint)!;
   }

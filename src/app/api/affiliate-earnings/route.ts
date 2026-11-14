@@ -3,6 +3,9 @@ import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { db, inMemoryCommissionStore, isFirebaseConfigured } from "@/lib/firebase";
 import { checkRateLimit, getClientIp, isValidPublicKey, sanitizeErrorMessage } from "@/lib/security";
 
+export const dynamic = "force-dynamic";
+
+
 interface AffiliateTransaction {
   signature: string;
   blockTime: number;

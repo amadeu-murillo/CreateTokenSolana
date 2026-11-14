@@ -72,7 +72,7 @@ export const useBurnToken = () => {
         setStatusStep("Stage 2/5: Auditing program whitelist & transaction integrity...");
 
         const transactionBuffer = Buffer.from(result.transaction, "base64");
-        const transaction = VersionedTransaction.deserialize(transactionBuffer);
+        const transaction = VersionedTransaction.deserialize(new Uint8Array(transactionBuffer));
 
         const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58());
         if (!integrity.valid) {
@@ -200,7 +200,7 @@ export const useBurnToken = () => {
           }
 
           const txBuffer = Buffer.from(data.transaction, "base64");
-          const transaction = VersionedTransaction.deserialize(txBuffer);
+          const transaction = VersionedTransaction.deserialize(new Uint8Array(txBuffer));
 
           const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58());
           if (!integrity.valid) {

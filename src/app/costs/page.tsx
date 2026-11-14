@@ -38,9 +38,9 @@ export default function CostsPage() {
         }
         const data: Costs = await response.json();
         setCosts(data);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
-        setError(err.message);
+        setError((err instanceof Error ? err.message : String(err)));
       } finally {
         setIsLoading(false);
       }

@@ -3,7 +3,7 @@ const METADATA_CACHE_KEY = "tokenMetadataCache";
 
 interface CacheData {
   [key: string]: {
-    data: any;
+    data: unknown;
     timestamp: number;
   };
 }

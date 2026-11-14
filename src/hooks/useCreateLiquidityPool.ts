@@ -82,7 +82,7 @@ export const useCreateLiquidityPool = () => {
         );
 
         const txBuffer = Buffer.from(data.transaction, "base64");
-        const transaction = VersionedTransaction.deserialize(txBuffer);
+        const transaction = VersionedTransaction.deserialize(new Uint8Array(txBuffer));
 
         const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58());
         if (!integrity.valid) {

@@ -7,6 +7,9 @@ import {
   sanitizeErrorMessage,
 } from "@/lib/security";
 
+export const dynamic = "force-dynamic";
+
+
 export async function POST(request: NextRequest) {
   try {
     const clientIp = getClientIp(request);

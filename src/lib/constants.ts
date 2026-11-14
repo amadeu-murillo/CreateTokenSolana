@@ -5,10 +5,22 @@ export type SolanaCluster = "mainnet-beta" | "devnet";
 /**
  * RF-01: Developer wallet address that receives service fees across ALL platform operations.
  */
-export const DEV_WALLET_ADDRESS_STRING =
-  process.env.NEXT_PUBLIC_DEV_WALLET_ADDRESS || "CP6teSg2LUxQsSBBtwZ9xjG2aZjjznhfCvGED9LNgjrJ";
+const DEFAULT_DEV_WALLET = "CP6teSg2LUxQsSBBtwZ9xjG2aZjjznhfCvGED9LNgjrJ";
 
-export const DEV_WALLET_ADDRESS = new PublicKey(DEV_WALLET_ADDRESS_STRING);
+function resolveSafeDevWallet(): PublicKey {
+  const raw = (process.env.NEXT_PUBLIC_DEV_WALLET_ADDRESS || "").trim();
+  if (raw) {
+    try {
+      return new PublicKey(raw);
+    } catch {
+      // Fallback to default valid dev wallet if env var is malformed
+    }
+  }
+  return new PublicKey(DEFAULT_DEV_WALLET);
+}
+
+export const DEV_WALLET_ADDRESS = resolveSafeDevWallet();
+export const DEV_WALLET_ADDRESS_STRING = DEV_WALLET_ADDRESS.toBase58();
 
 /**
  * RF-02: Cluster-aware RPC endpoints (Mainnet-Beta default and Devnet optional).

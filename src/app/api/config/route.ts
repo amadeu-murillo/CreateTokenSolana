@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { DEV_WALLET_ADDRESS, RPC_ENDPOINT } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
+
 /**
  * RF06: Configuração de Rede e Taxa de Serviço.
  * Mascara chaves privadas de API caso presentes na query string do RPC_ENDPOINT.

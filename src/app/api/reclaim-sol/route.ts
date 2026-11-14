@@ -29,6 +29,9 @@ import {
   getSolanaConnection,
 } from "@/lib/services/solanaHelpers";
 
+export const dynamic = "force-dynamic";
+
+
 interface ReclaimAccountItem {
   pubkey: string;
   programId: string;

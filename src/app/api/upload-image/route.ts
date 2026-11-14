@@ -4,6 +4,9 @@ import { SolanaCluster } from "@/lib/constants";
 import { checkRateLimit, getClientIp, validateImageBuffer } from "@/lib/security";
 import { uploadImageToArweave } from "@/lib/services/arweaveService";
 
+export const dynamic = "force-dynamic";
+
+
 // Configured with environment variables and working fallback credentials so Devnet & local testing work out-of-the-box
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "dgurmzcht",
