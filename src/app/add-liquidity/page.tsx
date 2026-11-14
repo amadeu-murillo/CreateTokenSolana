@@ -122,9 +122,8 @@ export default function AddLiquidityPage() {
   );
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  // Withdraw Liquidity in SOL states
+  // Withdraw Liquidity in SOL states (selected directly from connected wallet)
   const [withdrawPercentage, setWithdrawPercentage] = useState<number>(100);
-  const [withdrawLpMint, setWithdrawLpMint] = useState<string>("");
   const [derivedWsolVault, setDerivedWsolVault] = useState<string>("");
   const [detectedVaultSol, setDetectedVaultSol] = useState<number | null>(null);
   const [isCheckingVault, setIsCheckingVault] = useState<boolean>(false);
@@ -152,6 +151,27 @@ export default function AddLiquidityPage() {
     [userTokens, selectedTokenMint]
   );
 
+  // Automatically resolve the underlying baseMint & lpMint from the selected wallet token
+  const resolvedWithdrawBaseMint = useMemo(() => {
+    if (!selectedToken) return selectedTokenMint;
+    if (selectedToken.isLpToken && selectedToken.pairedBaseMint) {
+      return selectedToken.pairedBaseMint;
+    }
+    return selectedToken.mint;
+  }, [selectedToken, selectedTokenMint]);
+
+  const resolvedWithdrawLpMint = useMemo(() => {
+    if (!selectedToken) return undefined;
+    if (selectedToken.isLpToken) {
+      return selectedToken.mint;
+    }
+    if (selectedToken.pairedLpMint) {
+      const hasLpInWallet = userTokens.some((t) => t.mint === selectedToken.pairedLpMint);
+      if (hasLpInWallet) return selectedToken.pairedLpMint;
+    }
+    return undefined;
+  }, [selectedToken, userTokens]);
+
   useEffect(() => {
     if (!publicKey || !connection) {
       setSolBalance(null);
@@ -171,9 +191,9 @@ export default function AddLiquidityPage() {
     };
   }, [publicKey, connection, cluster, poolResult, removeResult]);
 
-  // Inspect on-chain deterministic WSOL liquidity vault balance when a token is selected
+  // Inspect on-chain deterministic WSOL liquidity vault balance when a token is selected from the wallet
   useEffect(() => {
-    if (!publicKey || !selectedTokenMint || !connection) {
+    if (!publicKey || !resolvedWithdrawBaseMint || !connection) {
       setDerivedWsolVault("");
       setDetectedVaultSol(null);
       return;
@@ -182,7 +202,7 @@ export default function AddLiquidityPage() {
     (async () => {
       setIsCheckingVault(true);
       try {
-        const wsolVaultSeed = `lp_wsol_${selectedTokenMint.slice(0, 16)}`;
+        const wsolVaultSeed = `lp_wsol_${resolvedWithdrawBaseMint.slice(0, 16)}`;
         const vaultPubkey = await PublicKey.createWithSeed(
           publicKey,
           wsolVaultSeed,
@@ -213,7 +233,7 @@ export default function AddLiquidityPage() {
     return () => {
       mounted = false;
     };
-  }, [publicKey, selectedTokenMint, connection, poolResult, removeResult]);
+  }, [publicKey, resolvedWithdrawBaseMint, connection, poolResult, removeResult]);
 
   useEffect(() => {
     if (!selectedToken || !connection) {
@@ -297,8 +317,8 @@ export default function AddLiquidityPage() {
 
     const snapshot: SnapshotTokenDossier = {
       mint: selectedToken.mint,
-      name: selectedToken.name || "Custom Token",
-      symbol: selectedToken.symbol || "TOKEN",
+      name: selectedToken.name || "Wallet Token",
+      symbol: selectedToken.symbol || selectedToken.mint.slice(0, 6),
       logoURI: selectedToken.logoURI || "/favicon.ico",
       decimals: mintDecimals,
       standard:
@@ -335,20 +355,17 @@ export default function AddLiquidityPage() {
 
     if (res) {
       setTokenDossierSnapshot(snapshot);
-      if (res.lpMintAddress) {
-        setWithdrawLpMint(res.lpMintAddress);
-      }
       refreshTokens();
     }
   };
 
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTokenMint) return;
+    if (!resolvedWithdrawBaseMint) return;
 
     const res = await removeLiquidity({
-      baseMint: selectedTokenMint,
-      lpMint: withdrawLpMint.trim() || undefined,
+      baseMint: resolvedWithdrawBaseMint,
+      lpMint: resolvedWithdrawLpMint,
       withdrawPercentage,
       network: cluster,
     });
@@ -359,9 +376,6 @@ export default function AddLiquidityPage() {
   };
 
   const handleSwitchToWithdrawFromDossier = () => {
-    if (poolResult?.lpMintAddress) {
-      setWithdrawLpMint(poolResult.lpMintAddress);
-    }
     resetPoolState();
     setActiveMode("withdraw");
   };
@@ -431,8 +445,8 @@ export default function AddLiquidityPage() {
         </h1>
         <p className={styles.pageDescription}>
           {activeMode === "add"
-            ? `Initialize an on-chain Liquidity Pool & LP Token Mint on Solana (${cluster}). Locks your Base Token and ${quoteToken} into deterministic Pool Vaults, mints LP tokens to your wallet, and displays the complete Token & Pool Dossier.`
-            : `Unwrap your WSOL liquidity vault back into native SOL directly to your wallet on Solana (${cluster}). Standardized ${SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL service fee routed atomically to Dev Wallet (${devWalletBase58.slice(0, 6)}...${devWalletBase58.slice(-4)}).`}
+            ? `Initialize an on-chain Liquidity Pool & LP Token Mint on Solana (${cluster}). Select your token directly from your connected wallet, deposit initial ${quoteToken}, and receive LP tokens.`
+            : `Select your token or LP token directly from your connected wallet—no symbol or address typing needed. Unwraps your WSOL liquidity vault back into native SOL with a ${SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL fee routed to Dev Wallet (${devWalletBase58.slice(0, 6)}...${devWalletBase58.slice(-4)}).`}
         </p>
 
         {/* Mode Switcher Bar */}
@@ -586,8 +600,8 @@ export default function AddLiquidityPage() {
                 <CardHeader>
                   <CardTitle>Withdraw Liquidity in SOL ({cluster})</CardTitle>
                   <CardDescription>
-                    Recover your deposited SOL liquidity from your deterministic WSOL Pool Vault (or
-                    active WSOL account) directly as native SOL. Standardized Service Fee:{" "}
+                    Click any token or LP token directly from your connected wallet below—no symbol
+                    or manual address required. Standardized Service Fee:{" "}
                     <strong>{SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL</strong>.
                   </CardDescription>
                 </CardHeader>
@@ -609,15 +623,27 @@ export default function AddLiquidityPage() {
                       operationTitle={`Withdrawing ${withdrawPercentage}% SOL Liquidity on ${cluster}`}
                     />
 
-                    {/* 1. Select Base Token */}
+                    {/* 1. Direct Wallet Token Selection (Cards + Dropdown, zero symbol input) */}
                     <div className={styles.field}>
                       <div className={styles.labelRow}>
-                        <Label>1. Select Token Paired with SOL</Label>
-                        {solBalance !== null && (
-                          <span className={styles.balanceTag}>
-                            Wallet SOL: {solBalance.toFixed(4)} SOL
-                          </span>
-                        )}
+                        <Label>
+                          1. Select Token or LP Token Directly from Your Connected Wallet
+                        </Label>
+                        <div className={styles.presetButtons}>
+                          {solBalance !== null && (
+                            <span className={styles.balanceTag}>
+                              Wallet SOL: {solBalance.toFixed(4)} SOL
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={refreshTokens}
+                            disabled={isLoadingTokens || isRemovingLiquidity}
+                            className={styles.presetBtn}
+                          >
+                            ↻ Refresh Wallet
+                          </button>
+                        </div>
                       </div>
                       <TokenSelector
                         tokens={userTokens}
@@ -625,16 +651,19 @@ export default function AddLiquidityPage() {
                         onSelectToken={(mint) => setSelectedTokenMint(mint)}
                         isLoading={isLoadingTokens}
                         disabled={isRemovingLiquidity}
+                        autoSelectFirst={true}
+                        showQuickWalletCards={true}
                       />
                     </div>
 
-                    {/* Deterministic WSOL Vault Inspection Card */}
-                    {selectedTokenMint && (
+                    {/* Automatic On-Chain Vault & LP Resolution Card */}
+                    {resolvedWithdrawBaseMint && (
                       <div className={styles.vaultStatusCard}>
                         <div className={styles.vaultStatusHeader}>
                           <strong>
-                            Deterministic WSOL Liquidity Vault (
-                            {selectedToken?.symbol || "Selected Token"})
+                            Auto-Detected WSOL Liquidity Vault (Mint:{" "}
+                            {resolvedWithdrawBaseMint.slice(0, 6)}...
+                            {resolvedWithdrawBaseMint.slice(-4)})
                           </strong>
                           <span className={styles.balanceTag}>
                             {isCheckingVault
@@ -646,7 +675,13 @@ export default function AddLiquidityPage() {
                         </div>
                         {derivedWsolVault && (
                           <span className={styles.vaultAddressMono}>
-                            Vault Address: {derivedWsolVault}
+                            WSOL Vault Account: {derivedWsolVault}
+                          </span>
+                        )}
+                        {resolvedWithdrawLpMint && (
+                          <span className={styles.vaultAddressMono}>
+                            Linked LP Token in Wallet: {resolvedWithdrawLpMint} (Auto-burned
+                            proportionally)
                           </span>
                         )}
                       </div>
@@ -675,29 +710,7 @@ export default function AddLiquidityPage() {
                       </div>
                     </div>
 
-                    {/* 3. Optional LP Token Mint to Burn Proportionally */}
-                    <div className={styles.field}>
-                      <div className={styles.labelRow}>
-                        <Label htmlFor="withdrawLpMint">
-                          3. LP Token Mint Address (Optional — Auto-Burns Proportional LP)
-                        </Label>
-                      </div>
-                      <Input
-                        id="withdrawLpMint"
-                        type="text"
-                        placeholder="Paste LP Mint Address if you want to burn LP tokens simultaneously"
-                        value={withdrawLpMint}
-                        onChange={(e) => setWithdrawLpMint(e.target.value)}
-                        disabled={isRemovingLiquidity}
-                      />
-                      <span className={styles.helperText}>
-                        Note: If your LP tokens were already burned permanently at{" "}
-                        <Link href="/burn">/burn</Link>, only unlocked WSOL balances can be
-                        withdrawn.
-                      </span>
-                    </div>
-
-                    {/* 4. Live SOL Withdrawal Simulator */}
+                    {/* 3. Live SOL Withdrawal Simulator */}
                     <div className={styles.simulatorBox}>
                       <h4 className={styles.simulatorTitle}>
                         Live SOL Liquidity Withdrawal Breakdown
@@ -733,7 +746,7 @@ export default function AddLiquidityPage() {
                     <Button
                       type="submit"
                       className="w-full"
-                      disabled={isRemovingLiquidity || !selectedTokenMint || !publicKey}
+                      disabled={isRemovingLiquidity || !resolvedWithdrawBaseMint || !publicKey}
                     >
                       {isRemovingLiquidity
                         ? removeStatusStep || "Withdrawing SOL Liquidity..."
@@ -989,15 +1002,15 @@ export default function AddLiquidityPage() {
               <CardHeader>
                 <CardTitle>Configure Liquidity Pair ({cluster})</CardTitle>
                 <CardDescription>
-                  Select your token, deposit initial {quoteToken} liquidity, and mint your LP tokens
-                  in a single atomic transaction.
+                  Select your token directly from your connected wallet, deposit initial{" "}
+                  {quoteToken} liquidity, and mint your LP tokens in a single atomic transaction.
                 </CardDescription>
 
                 {/* Live Pre-Flight Readiness Checklist */}
                 <div className={styles.readinessBar}>
                   <span className={styles.readyStepDone}>1. AMM Selected ✓</span>
                   <span className={isTokenReady ? styles.readyStepDone : styles.readyStepPending}>
-                    2. Base Token {isTokenReady ? `(${selectedToken?.symbol}) ✓` : "Pending"}
+                    2. Wallet Token {isTokenReady ? "Selected ✓" : "Pending"}
                   </span>
                   <span className={areAmountsReady ? styles.readyStepDone : styles.readyStepPending}>
                     3. Liquidity Amounts {areAmountsReady ? "✓" : "Pending"}
@@ -1019,7 +1032,7 @@ export default function AddLiquidityPage() {
                     isActive={isCreatingPool}
                     currentStepIndex={progressStep}
                     statusMessage={statusStep}
-                    operationTitle={`Initializing ${selectedToken?.symbol || "Token"}/${quoteToken} Pool on ${cluster}`}
+                    operationTitle={`Initializing Liquidity Pool on ${cluster}`}
                   />
 
                   {/* 1. DEX Protocol */}
@@ -1062,14 +1075,13 @@ export default function AddLiquidityPage() {
                     </div>
                   </div>
 
-                  {/* 2. Base Token Selection */}
+                  {/* 2. Base Token Selection Directly from Wallet */}
                   <div className={styles.field}>
                     <div className={styles.labelRow}>
-                      <Label>2. Base Token (From Your Wallet)</Label>
+                      <Label>2. Select Token Directly from Your Connected Wallet</Label>
                       {selectedToken && (
                         <span className={styles.balanceTag}>
-                          Available: {parseFloat(selectedToken.amount).toLocaleString()}{" "}
-                          {selectedToken.symbol}
+                          Available: {parseFloat(selectedToken.amount).toLocaleString()}
                         </span>
                       )}
                     </div>
@@ -1082,6 +1094,8 @@ export default function AddLiquidityPage() {
                       }}
                       isLoading={isLoadingTokens}
                       disabled={isCreatingPool}
+                      autoSelectFirst={true}
+                      showQuickWalletCards={true}
                     />
                   </div>
 
@@ -1109,9 +1123,7 @@ export default function AddLiquidityPage() {
                   <div className={styles.fieldGrid}>
                     <div className={styles.field}>
                       <div className={styles.labelRow}>
-                        <Label htmlFor="baseAmount">
-                          {selectedToken?.symbol || "Base Token"} Amount
-                        </Label>
+                        <Label htmlFor="baseAmount">Token Amount to Deposit</Label>
                         <div className={styles.presetButtons}>
                           {ALLOCATION_PRESETS.map((preset) => (
                             <button
@@ -1284,16 +1296,15 @@ export default function AddLiquidityPage() {
               <CardTitle className={styles.cardTitle}>
                 {activeMode === "add"
                   ? "On-Chain Pool & Dossier Architecture"
-                  : "How SOL Liquidity Withdrawal Works"}
+                  : "Direct Wallet SOL Withdrawal"}
               </CardTitle>
             </CardHeader>
             <CardContent className={styles.infoContent}>
               {activeMode === "add" ? (
                 <ul className={styles.tokenList}>
                   <li>
-                    <strong>Complete Post-Launch Dossier:</strong> Immediately after confirmation,
-                    your screen displays all Token metrics, Pool valuation, Vault ATAs, and LP Mint
-                    links in a clean dashboard.
+                    <strong>1-Click Wallet Selection:</strong> Click any token directly from your
+                    connected wallet—no need to type a symbol or paste a contract address.
                   </li>
                   <li>
                     <strong>Real On-Chain LP Mint:</strong> Creates a deterministic Pool Authority
@@ -1318,9 +1329,9 @@ export default function AddLiquidityPage() {
               ) : (
                 <ul className={styles.tokenList}>
                   <li>
-                    <strong>Native SOL Unwrapping:</strong> Closes or partially unwraps your
-                    deterministic WSOL Pool Vault so your SOL is returned directly as native SOL in
-                    your wallet.
+                    <strong>Zero Symbol or Address Typing:</strong> Simply click your token or LP
+                    token directly from your connected wallet list; the vault and LP mint are
+                    resolved automatically.
                   </li>
                   <li>
                     <strong>Partial or Full Exit (25% – 100%):</strong> Choose whether to withdraw a
@@ -1333,8 +1344,8 @@ export default function AddLiquidityPage() {
                     atomically to{" "}
                     <code>
                       {devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}
-                    </code>{" "}
-                    (with 10% affiliate split if referred).
+                    </code>
+                    .
                   </li>
                 </ul>
               )}

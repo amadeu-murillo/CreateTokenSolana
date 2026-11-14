@@ -128,6 +128,26 @@ export const useCreateLiquidityPool = () => {
         setProgressStep(5);
         setStatusStep("Stage 5/5: Liquidity Pool & LP Tokens confirmed! Loading complete dossier...");
 
+        // Cache LP Mint -> Base Mint mapping in localStorage so Withdraw Liquidity & Burn recognize LP tokens automatically from the wallet
+        try {
+          const rawMap = localStorage.getItem("createdLpPoolsMap");
+          const parsedMap = rawMap ? JSON.parse(rawMap) : {};
+          parsedMap[data.lpMintAddress] = {
+            lpMintAddress: data.lpMintAddress,
+            baseMint: params.baseMint,
+            quoteToken: params.quoteToken,
+            poolAddress: data.poolAddress,
+            quoteAmount: params.quoteAmount,
+            lpTokensMinted: data.lpTokensMinted || "100",
+            network: cluster,
+            createdAt: Date.now(),
+          };
+          parsedMap[params.baseMint] = parsedMap[data.lpMintAddress];
+          localStorage.setItem("createdLpPoolsMap", JSON.stringify(parsedMap));
+        } catch {
+          // Ignore storage errors
+        }
+
         if (affiliateRef && affiliateRef !== publicKey.toBase58()) {
           fetch("/api/record-commission", {
             method: "POST",

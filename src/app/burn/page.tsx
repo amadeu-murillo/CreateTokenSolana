@@ -68,9 +68,9 @@ const FlameIcon = () => (
 const tutorialSteps = [
   {
     icon: <TokenIcon />,
-    title: "1. Select Standard or LP Token",
+    title: "1. Click Token Directly from Wallet",
     description:
-      "Choose any SPL, Token-2022, or LP token from your connected wallet. Burning LP tokens permanently locks pool liquidity.",
+      "All SPL, Token-2022, and LP tokens in your connected wallet appear automatically as clickable cards—no symbol or contract address typing required.",
   },
   {
     icon: <FlameIcon />,
@@ -86,7 +86,7 @@ type NotificationState = {
 } | null;
 
 interface LastBurnReceipt {
-  symbol: string;
+  displayName: string;
   mint: string;
   burnedAmount: number;
   remainingBalance: number;
@@ -128,6 +128,14 @@ export default function BurnPage() {
   const pctBurned =
     walletBalance > 0 ? Math.min(100, (numericAmount / walletBalance) * 100) : 0;
 
+  const selectedTokenDisplayLabel = useMemo(() => {
+    if (!selectedToken) return "Selected Wallet Token";
+    if (selectedToken.name && selectedToken.name !== "Custom Token") {
+      return selectedToken.name;
+    }
+    return `Token (${selectedToken.mint.slice(0, 6)}...${selectedToken.mint.slice(-4)})`;
+  }, [selectedToken]);
+
   const handlePresetClick = (ratio: number) => {
     if (!selectedToken) return;
     if (ratio >= 1) {
@@ -152,7 +160,7 @@ export default function BurnPage() {
       );
       if (signature) {
         setLastBurnReceipt({
-          symbol: selectedToken.symbol || "TOKEN",
+          displayName: selectedTokenDisplayLabel,
           mint: selectedToken.mint,
           burnedAmount: numericAmount,
           remainingBalance,
@@ -160,7 +168,7 @@ export default function BurnPage() {
         });
         setNotification({
           type: "success",
-          message: `Success! ${numericAmount.toLocaleString()} ${selectedToken.symbol || "tokens"} permanently burned on ${cluster}.`,
+          message: `Success! ${numericAmount.toLocaleString()} units of ${selectedTokenDisplayLabel} permanently burned on ${cluster}.`,
           txId: signature,
         });
         setAmount("");
@@ -202,8 +210,9 @@ export default function BurnPage() {
 
         <h1 className={styles.pageTitle}>On-Chain Token & LP Burner</h1>
         <p className={styles.pageDescription}>
-          Permanently destroy SPL, Token-2022, or LP tokens from circulation on Solana ({cluster})
-          using verifiable <code>burnChecked</code> instructions.
+          Click any token or LP token directly from your connected wallet—no symbol or manual
+          address entry needed. Permanently destroys tokens on Solana ({cluster}) via{" "}
+          <code>burnChecked</code>.
         </p>
       </header>
 
@@ -211,11 +220,11 @@ export default function BurnPage() {
         <div className={styles.formContainer}>
           <Card>
             <CardHeader>
-              <CardTitle>Configure Deflationary Token Burn ({cluster})</CardTitle>
+              <CardTitle>Select Wallet Token to Burn ({cluster})</CardTitle>
               <CardDescription>
-                Select a token or LP token from your wallet and choose the exact amount to destroy.
-                Service Fee: <strong>{SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL</strong> routed to
-                Dev Wallet{" "}
+                Choose your token or LP token directly from your connected wallet below and set the
+                amount to destroy. Service Fee:{" "}
+                <strong>{SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL</strong> routed to Dev Wallet{" "}
                 <code>
                   {devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}
                 </code>
@@ -237,11 +246,23 @@ export default function BurnPage() {
                   isActive={isLoading}
                   currentStepIndex={progressStep}
                   statusMessage={statusStep}
-                  operationTitle={`Burning ${selectedToken?.symbol || "Tokens"} on ${cluster}`}
+                  operationTitle={`Burning ${selectedTokenDisplayLabel} on ${cluster}`}
                 />
 
                 <div className={styles.field}>
-                  <Label htmlFor="token-select">1. Select Token or LP Token from Wallet</Label>
+                  <div className={styles.amountHeader}>
+                    <Label htmlFor="token-select">
+                      1. Select Token or LP Token Directly from Your Wallet
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={refreshTokens}
+                      disabled={isLoadingUserTokens || isLoading}
+                      className={styles.presetBtn}
+                    >
+                      ↻ Refresh Wallet
+                    </button>
+                  </div>
                   <TokenSelector
                     tokens={userTokens}
                     selectedTokenMint={selectedTokenMint}
@@ -252,6 +273,8 @@ export default function BurnPage() {
                     }}
                     isLoading={isLoadingUserTokens}
                     disabled={isLoading}
+                    autoSelectFirst={true}
+                    showQuickWalletCards={true}
                   />
                 </div>
 
@@ -259,12 +282,10 @@ export default function BurnPage() {
                   <>
                     <div className={styles.field}>
                       <div className={styles.amountHeader}>
-                        <Label htmlFor="amount">
-                          2. Amount of {selectedToken.symbol} to Burn
-                        </Label>
+                        <Label htmlFor="amount">2. Amount to Burn</Label>
                         <div className={styles.presetRow}>
                           <span className={styles.balance}>
-                            Balance: {walletBalance.toLocaleString()} {selectedToken.symbol}
+                            Wallet Balance: {walletBalance.toLocaleString()}
                           </span>
                           {BURN_PRESETS.map((preset) => (
                             <button
@@ -312,20 +333,18 @@ export default function BurnPage() {
                       <div className={styles.impactGrid}>
                         <div className={styles.impactMetric}>
                           <span>Current Wallet Balance</span>
-                          <strong>
-                            {walletBalance.toLocaleString()} {selectedToken.symbol}
-                          </strong>
+                          <strong>{walletBalance.toLocaleString()}</strong>
                         </div>
                         <div className={styles.impactMetric}>
                           <span>Amount to Destroy</span>
                           <strong className={styles.textRose}>
-                            -{numericAmount.toLocaleString()} {selectedToken.symbol}
+                            -{numericAmount.toLocaleString()}
                           </strong>
                         </div>
                         <div className={styles.impactMetric}>
                           <span>Remaining Balance</span>
                           <strong className={styles.textEmerald}>
-                            {remainingBalance.toLocaleString()} {selectedToken.symbol}
+                            {remainingBalance.toLocaleString()}
                           </strong>
                         </div>
                         <div className={styles.impactMetric}>
@@ -341,15 +360,16 @@ export default function BurnPage() {
                   <div className={styles.burnReceiptBox}>
                     <strong>✓ Verified On-Chain Burn Certificate</strong>
                     <div className={styles.burnReceiptRow}>
-                      <span>Tokens Permanently Destroyed:</span>
+                      <span>Wallet Asset Destroyed:</span>
                       <strong className={styles.textRose}>
-                        {lastBurnReceipt.burnedAmount.toLocaleString()} {lastBurnReceipt.symbol}
+                        {lastBurnReceipt.burnedAmount.toLocaleString()} (
+                        {lastBurnReceipt.displayName})
                       </strong>
                     </div>
                     <div className={styles.burnReceiptRow}>
                       <span>Remaining Wallet Balance:</span>
                       <strong className={styles.textEmerald}>
-                        {lastBurnReceipt.remainingBalance.toLocaleString()} {lastBurnReceipt.symbol}
+                        {lastBurnReceipt.remainingBalance.toLocaleString()}
                       </strong>
                     </div>
                     <div className={styles.burnReceiptRow}>
@@ -381,7 +401,7 @@ export default function BurnPage() {
                 >
                   {isLoading
                     ? statusStep || "Executing On-Chain Burn..."
-                    : `🔥 Burn ${numericAmount > 0 ? numericAmount.toLocaleString() : ""} ${selectedToken?.symbol || "Tokens"} (Fee: ${SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL)`}
+                    : `🔥 Burn ${numericAmount > 0 ? numericAmount.toLocaleString() : "Selected"} Wallet Tokens (Fee: ${SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL)`}
                 </Button>
               </CardFooter>
             </form>

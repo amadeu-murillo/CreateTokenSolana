@@ -29,6 +29,9 @@ export interface UserToken {
   symbol?: string;
   logoURI?: string;
   programId: string;
+  isLpToken?: boolean;
+  pairedBaseMint?: string;
+  pairedLpMint?: string;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -98,6 +101,14 @@ export const useUserTokens = () => {
 
     setIsLoading(true);
     try {
+      let lpPoolsMap: Record<string, any> = {};
+      try {
+        const rawLp = localStorage.getItem("createdLpPoolsMap");
+        if (rawLp) lpPoolsMap = JSON.parse(rawLp);
+      } catch {
+        lpPoolsMap = {};
+      }
+
       const [tokenAccounts, token2022Accounts] = await Promise.all([
         connection.getParsedTokenAccountsByOwner(
           publicKey,
@@ -131,8 +142,25 @@ export const useUserTokens = () => {
         const batch = allAccounts.slice(i, i + BATCH_SIZE);
         const batchPromises = batch.map(async (accountInfo) => {
           const { mint, tokenAmount } = accountInfo.account.data.parsed.info;
-          const tokenData = tokenMap.get(mint);
+          const lpEntry = lpPoolsMap[mint];
 
+          // Check if this mint is a known LP Token from a pool created by the user
+          if (lpEntry && lpEntry.lpMintAddress === mint) {
+            return {
+              mint,
+              amount: tokenAmount.uiAmountString,
+              decimals: tokenAmount.decimals,
+              name: `LP Pool Token (${lpEntry.baseMint.slice(0, 4)}.../${lpEntry.quoteToken || "SOL"})`,
+              symbol: "LP-SOL",
+              logoURI: "/favicon.ico",
+              programId: accountInfo.programId,
+              isLpToken: true,
+              pairedBaseMint: lpEntry.baseMint,
+              pairedLpMint: mint,
+            };
+          }
+
+          const tokenData = tokenMap.get(mint);
           if (tokenData) {
             return {
               mint,
@@ -142,6 +170,7 @@ export const useUserTokens = () => {
               symbol: tokenData.symbol,
               logoURI: tokenData.logoURI,
               programId: accountInfo.programId,
+              pairedLpMint: lpEntry?.lpMintAddress,
             };
           }
 
@@ -153,6 +182,7 @@ export const useUserTokens = () => {
               decimals: tokenAmount.decimals,
               ...cachedToken.data,
               programId: accountInfo.programId,
+              pairedLpMint: lpEntry?.lpMintAddress,
             };
           }
 
@@ -175,6 +205,7 @@ export const useUserTokens = () => {
               decimals: tokenAmount.decimals,
               ...metadata,
               programId: accountInfo.programId,
+              pairedLpMint: lpEntry?.lpMintAddress,
             };
           } catch {
             // 2. Fallback: If Token-2022, check Native Token-2022 Metadata Extension on the Mint account!
@@ -200,6 +231,7 @@ export const useUserTokens = () => {
                     decimals: tokenAmount.decimals,
                     ...metadata,
                     programId: accountInfo.programId,
+                    pairedLpMint: lpEntry?.lpMintAddress,
                   };
                 }
               } catch {
@@ -207,14 +239,16 @@ export const useUserTokens = () => {
               }
             }
 
+            const shortMint = `${mint.slice(0, 4)}...${mint.slice(-4)}`;
             return {
               mint,
               amount: tokenAmount.uiAmountString,
               decimals: tokenAmount.decimals,
-              name: cachedToken?.data?.name || "Custom Token",
-              symbol: cachedToken?.data?.symbol || mint.substring(0, 6).toUpperCase(),
-              logoURI: cachedToken?.data?.logoURI || "",
+              name: cachedToken?.data?.name || `Wallet Token (${shortMint})`,
+              symbol: cachedToken?.data?.symbol || shortMint,
+              logoURI: cachedToken?.data?.logoURI || "/favicon.ico",
               programId: accountInfo.programId,
+              pairedLpMint: lpEntry?.lpMintAddress,
             };
           }
         });
@@ -245,7 +279,7 @@ export const useUserTokens = () => {
               decimals: Number(lastDossier.decimals ?? 9),
               name: lastDossier.name || "New Token",
               symbol: lastDossier.symbol || "TOKEN",
-              logoURI: lastDossier.imageUrl || "",
+              logoURI: lastDossier.imageUrl || "/favicon.ico",
               programId:
                 lastDossier.tokenStandard === "token-2022"
                   ? TOKEN_2022_PROGRAM_ID.toBase58()
