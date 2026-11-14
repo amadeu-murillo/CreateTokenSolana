@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { WalletProvider, useCluster } from "../context/WalletContext";
-import { LanguageProvider, useLanguage, AppLocale } from "../context/LanguageContext";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import ConnectWallet from "./ConnectWallet";
@@ -64,90 +63,25 @@ function AffiliateTracker() {
   return null;
 }
 
-function LanguageSwitcherControls() {
-  const { locale, setLocale } = useLanguage();
-  const options: Array<{ code: AppLocale; label: string }> = [
-    { code: "pt", label: "🇧🇷 PT" },
-    { code: "en", label: "🇺🇸 EN" },
-    { code: "es", label: "🇪🇸 ES" },
-  ];
-
-  return (
-    <div className={styles.langSwitcher} role="group" aria-label="Language Selector">
-      {options.map((opt) => (
-        <button
-          key={opt.code}
-          type="button"
-          onClick={() => setLocale(opt.code)}
-          className={locale === opt.code ? styles.langBtnActive : styles.langBtn}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function NetworkSwitcherPill() {
-  const { cluster, setCluster } = useCluster();
-  const { t } = useLanguage();
-
-  return (
-    <div className={styles.networkSwitcher} role="group" aria-label="Solana Network Selector">
-      <button
-        type="button"
-        onClick={() => setCluster("mainnet-beta")}
-        className={`${styles.networkBtn} ${
-          cluster === "mainnet-beta" ? styles.networkBtnMainnet : ""
-        }`}
-      >
-        <span className={styles.networkDotMainnet} />
-        {t.network.mainnetShort}
-      </button>
-      <button
-        type="button"
-        onClick={() => setCluster("devnet")}
-        className={`${styles.networkBtn} ${
-          cluster === "devnet" ? styles.networkBtnDevnet : ""
-        }`}
-      >
-        <span className={styles.networkDotDevnet} />
-        {t.network.devnetShort}
-      </button>
-    </div>
-  );
-}
-
-/**
- * Unmistakable Global Network Banner below the navbar so the user always knows
- * whether they are operating on Mainnet-Beta (Real SOL) or Devnet (Test Sandbox).
- */
-function GlobalNetworkStatusBanner() {
+function NetworkAndFaucetControls() {
   const { cluster, setCluster } = useCluster();
   const { publicKey } = useWallet();
   const { connection } = useConnection();
-  const { t } = useLanguage();
   const [faucetLoading, setFaucetLoading] = useState(false);
   const [faucetStatus, setFaucetStatus] = useState<string | null>(null);
 
-  const isDevnet = cluster === "devnet";
-
   const handleRequestAirdrop = async () => {
-    if (!publicKey || !connection) {
-      window.open("https://faucet.solana.com/", "_blank", "noopener,noreferrer");
-      return;
-    }
+    if (!publicKey || !connection) return;
     setFaucetLoading(true);
     setFaucetStatus(null);
     try {
       const sig = await connection.requestAirdrop(publicKey, 1 * LAMPORTS_PER_SOL);
-      const { blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash("confirmed");
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
       await connection.confirmTransaction(
         { signature: sig, blockhash, lastValidBlockHeight },
         "confirmed"
       );
-      setFaucetStatus(t.network.faucetSuccess);
+      setFaucetStatus("+1 SOL Added!");
       setTimeout(() => setFaucetStatus(null), 4000);
     } catch {
       window.open("https://faucet.solana.com/", "_blank", "noopener,noreferrer");
@@ -157,89 +91,67 @@ function GlobalNetworkStatusBanner() {
   };
 
   return (
-    <div className={isDevnet ? styles.networkBannerDevnet : styles.networkBannerMainnet}>
-      <div className={styles.networkBannerInner}>
-        <div className={styles.bannerStatusLeft}>
-          <span className={isDevnet ? styles.bannerPillDevnet : styles.bannerPillMainnet}>
-            {isDevnet ? "🟠 DEVNET SANDBOX" : "🟢 MAINNET LIVE"}
-          </span>
-          <strong>
-            {isDevnet ? t.network.devnetBannerTitle : t.network.mainnetBannerTitle}:
-          </strong>
-          <span>{isDevnet ? t.network.devnetBannerDesc : t.network.mainnetBannerDesc}</span>
-        </div>
-
-        <div className={styles.bannerActionsRight}>
-          {isDevnet ? (
-            <>
-              <button
-                type="button"
-                onClick={handleRequestAirdrop}
-                disabled={faucetLoading}
-                className={styles.bannerFaucetBtn}
-              >
-                {faucetLoading
-                  ? t.network.faucetLoading
-                  : faucetStatus || t.network.faucetBtn}
-              </button>
-              <button
-                type="button"
-                onClick={() => setCluster("mainnet-beta")}
-                className={styles.bannerSwitchBtnDevnet}
-              >
-                {t.network.switchToMainnet}
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setCluster("devnet")}
-              className={styles.bannerSwitchBtnMainnet}
-            >
-              {t.network.switchToDevnet}
-            </button>
-          )}
-        </div>
+    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+      <div className={styles.networkSwitcher} role="group" aria-label="Solana Network Selector">
+        <button
+          type="button"
+          onClick={() => setCluster("mainnet-beta")}
+          className={`${styles.networkBtn} ${
+            cluster === "mainnet-beta" ? styles.networkBtnMainnet : ""
+          }`}
+        >
+          <span className={styles.networkDotMainnet} />
+          Mainnet
+        </button>
+        <button
+          type="button"
+          onClick={() => setCluster("devnet")}
+          className={`${styles.networkBtn} ${
+            cluster === "devnet" ? styles.networkBtnDevnet : ""
+          }`}
+        >
+          <span className={styles.networkDotDevnet} />
+          Devnet
+        </button>
       </div>
+
+      {cluster === "devnet" && publicKey && (
+        <button
+          type="button"
+          onClick={handleRequestAirdrop}
+          disabled={faucetLoading}
+          title="Request 1 Devnet SOL for testing"
+          style={{
+            padding: "0.35rem 0.65rem",
+            borderRadius: "8px",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            background: "rgba(245, 158, 11, 0.14)",
+            border: "1px solid rgba(245, 158, 11, 0.35)",
+            color: "#fbbf24",
+            cursor: faucetLoading ? "wait" : "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {faucetLoading ? "Airdropping..." : faucetStatus || "+1 Devnet SOL"}
+        </button>
+      )}
     </div>
   );
 }
 
-function NavLinks({ onLinkClick, mobile = false }: { onLinkClick?: () => void; mobile?: boolean }) {
+const navLinks = [
+  { href: "/", icon: <IconPlusCircle className={styles.navIcon} />, label: "Create Token" },
+  { href: "/add-liquidity", icon: <IconLayers className={styles.navIcon} />, label: "Liquidity Pool" },
+  { href: "/burn", icon: <IconFlame className={styles.navIcon} />, label: "Burn" },
+  { href: "/airdrop", icon: <IconSend className={styles.navIcon} />, label: "Airdrop" },
+  { href: "/dashboard", icon: <IconSettings className={styles.navIcon} />, label: "Manage" },
+  { href: "/afiliates", icon: <IconDollarSign className={styles.navIcon} />, label: "Affiliates" },
+  { href: "/documentacao", icon: <IconBookOpen className={styles.navIcon} />, label: "Docs" },
+];
+
+function NavLinks({ onLinkClick }: { onLinkClick?: () => void }) {
   const pathname = usePathname();
-  const { t } = useLanguage();
-
-  const navLinks = [
-    { href: "/", icon: <IconPlusCircle className={styles.navIcon} />, label: t.nav.createToken },
-    { href: "/add-liquidity", icon: <IconLayers className={styles.navIcon} />, label: t.nav.liquidityPool },
-    { href: "/burn", icon: <IconFlame className={styles.navIcon} />, label: t.nav.burn },
-    { href: "/airdrop", icon: <IconSend className={styles.navIcon} />, label: t.nav.airdrop },
-    { href: "/dashboard", icon: <IconSettings className={styles.navIcon} />, label: t.nav.manage },
-    { href: "/afiliates", icon: <IconDollarSign className={styles.navIcon} />, label: t.nav.affiliates },
-    { href: "/documentacao", icon: <IconBookOpen className={styles.navIcon} />, label: t.nav.docs },
-  ];
-
-  if (mobile) {
-    return (
-      <>
-        {navLinks.map((link) => {
-          const isActive =
-            pathname === link.href || (link.href === "/" && pathname === "/create");
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`${styles.mobileNavLink} ${isActive ? styles.active : ""}`}
-              onClick={onLinkClick}
-            >
-              {link.icon}
-              <span>{link.label}</span>
-            </Link>
-          );
-        })}
-      </>
-    );
-  }
 
   return (
     <nav className={styles.nav} aria-label="Primary Navigation">
@@ -302,11 +214,11 @@ function TrustFooter() {
               <IconPlusCircle />
             </div>
             <div>
-              <h5>Modular Pricing & 30% Affiliate Split</h5>
+              <h5>Standardized {feeText} Dev Fee</h5>
               <p>
-                Transparent modular fees routed atomically on-chain to Dev Wallet (
-                {devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}) with 30% instant
-                referral payouts.
+                Every platform service routes a flat {feeText} fee atomically on-chain to Dev Wallet
+                ({devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}) with 10% instant
+                referral splits.
               </p>
             </div>
           </div>
@@ -338,22 +250,21 @@ function TrustFooter() {
               <span className={styles.statusDotOnline} />
               <span>
                 Connected to Solana{" "}
-                <strong>{cluster === "devnet" ? "Devnet (Sandbox)" : "Mainnet-Beta (Live)"}</strong>{" "}
-                RPC
+                <strong>{cluster === "devnet" ? "Devnet" : "Mainnet-Beta"}</strong> RPC
               </span>
             </div>
           </div>
 
           <div className={styles.footerColumn}>
-            <h4 className={styles.footerColumnTitle}>Platform Services</h4>
+            <h4 className={styles.footerColumnTitle}>Platform Services ({feeText})</h4>
             <Link href="/" className={styles.footerLink}>
-              Token Creator (Modular 0.10–0.55 SOL)
+              Token Creator (0.90 SOL Fee)
             </Link>
             <Link href="/add-liquidity" className={styles.footerLink}>
               Liquidity Pool ({feeText} Fee)
             </Link>
             <Link href="/burn" className={styles.footerLink}>
-              Burn Tokens & Reclaim SOL
+              Burn Tokens & LP ({feeText} Fee)
             </Link>
             <Link href="/airdrop" className={styles.footerLink}>
               Mass Airdrop ({feeText} / Batch)
@@ -366,7 +277,7 @@ function TrustFooter() {
           <div className={styles.footerColumn}>
             <h4 className={styles.footerColumnTitle}>Resources & Transparency</h4>
             <Link href="/afiliates" className={styles.footerLink}>
-              Affiliate Program (30% Instant SOL)
+              Affiliate Program (10% SOL)
             </Link>
             <Link href="/costs" className={styles.footerLink}>
               Transparent Fee Schedule
@@ -443,10 +354,9 @@ function TrustFooter() {
   );
 }
 
-function InnerAppShell({ children }: { children: ReactNode }) {
+export default function AppShell({ children }: { children: ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const { cluster } = useCluster();
 
   const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
@@ -455,66 +365,66 @@ function InnerAppShell({ children }: { children: ReactNode }) {
     closeMobileMenu();
   }, [pathname]);
 
-  const isDevnet = cluster === "devnet";
-
   return (
-    <div className={styles.wrapper} data-cluster={cluster}>
-      <header className={isDevnet ? styles.headerDevnet : styles.header}>
-        <div className={`${styles.container} ${styles.headerContainer}`}>
-          <div className={styles.navContainer}>
-            <Link href="/" className={styles.logoLink} onClick={closeMobileMenu}>
-              <span className={styles.logoText}>CreateToken</span>
-            </Link>
-            <NavLinks onLinkClick={closeMobileMenu} />
-          </div>
+    <WalletProvider>
+      <Suspense fallback={null}>
+        <AffiliateTracker />
+      </Suspense>
+      <div className={styles.wrapper}>
+        <header className={styles.header}>
+          <div className={`${styles.container} ${styles.headerContainer}`}>
+            <div className={styles.navContainer}>
+              <Link href="/" className={styles.logoLink} onClick={closeMobileMenu}>
+                <span className={styles.logoText}>CreateToken</span>
+              </Link>
+              <NavLinks onLinkClick={closeMobileMenu} />
+            </div>
 
-          <div className={styles.rightItemsContainer}>
-            <LanguageSwitcherControls />
-            <NetworkSwitcherPill />
-            <div className={styles.desktopWalletWrapper}>
+            <div className={styles.rightItemsContainer}>
+              <NetworkAndFaucetControls />
+              <div className={styles.desktopWalletWrapper}>
+                <ConnectWallet />
+              </div>
+              <ThemeSwitcher />
+              <button
+                className={styles.mobileMenuButton}
+                onClick={toggleMobileMenu}
+                aria-label="Toggle Menu"
+                aria-expanded={isMobileMenuOpen}
+              >
+                {isMobileMenuOpen ? <IconX /> : <IconMenu />}
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {isMobileMenuOpen && (
+          <div className={styles.mobileNav}>
+            <div className={styles.mobileWalletRow}>
               <ConnectWallet />
             </div>
-            <ThemeSwitcher />
-            <button
-              className={styles.mobileMenuButton}
-              onClick={toggleMobileMenu}
-              aria-label="Toggle Menu"
-              aria-expanded={isMobileMenuOpen}
-            >
-              {isMobileMenuOpen ? <IconX /> : <IconMenu />}
-            </button>
+            {navLinks.map((link) => {
+              const isActive =
+                pathname === link.href || (link.href === "/" && pathname === "/create");
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`${styles.mobileNavLink} ${isActive ? styles.active : ""}`}
+                  onClick={closeMobileMenu}
+                >
+                  {link.icon}
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
           </div>
-        </div>
-      </header>
+        )}
 
-      {/* High-Visibility Mainnet vs Devnet Banner */}
-      <GlobalNetworkStatusBanner />
+        <main className={`${styles.container} ${styles.main}`}>{children}</main>
 
-      {isMobileMenuOpen && (
-        <div className={styles.mobileNav}>
-          <div className={styles.mobileWalletRow}>
-            <ConnectWallet />
-          </div>
-          <NavLinks onLinkClick={closeMobileMenu} mobile />
-        </div>
-      )}
-
-      <main className={`${styles.container} ${styles.main}`}>{children}</main>
-
-      <TrustFooter />
-    </div>
-  );
-}
-
-export default function AppShell({ children }: { children: ReactNode }) {
-  return (
-    <LanguageProvider>
-      <WalletProvider>
-        <Suspense fallback={null}>
-          <AffiliateTracker />
-        </Suspense>
-        <InnerAppShell>{children}</InnerAppShell>
-      </WalletProvider>
-    </LanguageProvider>
+        <TrustFooter />
+      </div>
+    </WalletProvider>
   );
 }

@@ -8,7 +8,6 @@ import { z } from "zod";
 import { useCreateToken } from "@/hooks/useCreateToken";
 import { useArweaveUpload } from "@/hooks/useArweaveUpload";
 import { useCluster } from "@/context/WalletContext";
-import { useLanguage } from "@/context/LanguageContext";
 import {
   MODULAR_FEE_BASE_CREATE_SOL,
   MODULAR_FEE_REVOKE_FREEZE_SOL,
@@ -94,21 +93,15 @@ const formatNumber = (value: string) => {
   }
 };
 
+const STEPS = [
+  { id: 1, title: "1. Token Identity" },
+  { id: 2, title: "2. Logo & Socials" },
+  { id: 3, title: "3. Security & Mint" },
+];
+
 export default function TokenForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const { cluster, setCluster } = useCluster();
-  const { t } = useLanguage();
-  const isDevnet = cluster === "devnet";
-
-  const STEPS = useMemo(
-    () => [
-      { id: 1, title: t.form.step1 },
-      { id: 2, title: t.form.step2 },
-      { id: 3, title: t.form.step3 },
-    ],
-    [t]
-  );
-
   const {
     createToken,
     isLoading: isCreatingToken,
@@ -145,6 +138,7 @@ export default function TokenForm() {
       website: "",
       twitter: "",
       instagram: "",
+      // Phase 1: Revoke Freeze (+0.10), Revoke Mint (+0.10), and Immutable Metadata (+0.05) ON by default!
       mintAuthority: false,
       freezeAuthority: false,
       isMetadataMutable: false,
@@ -187,6 +181,7 @@ export default function TokenForm() {
     [modularOptions]
   );
 
+  // Broadcast live modular selections to CostSummary in the sidebar
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.dispatchEvent(
@@ -267,17 +262,11 @@ export default function TokenForm() {
 
   return (
     <div className={styles.formGrid}>
-      <div
-        className={styles.formWrapper}
-        style={{
-          borderColor: isDevnet ? "rgba(245, 158, 11, 0.55)" : undefined,
-          boxShadow: isDevnet ? "0 12px 36px rgba(245, 158, 11, 0.12)" : undefined,
-        }}
-      >
+      <div className={styles.formWrapper}>
         {/* Top Network & Live Modular Fee Bar Inside Form Card */}
         <div className={styles.formTopBar}>
           <div className={styles.networkInlineGroup}>
-            <span className={styles.networkLabel}>{t.form.targetNetwork}</span>
+            <span className={styles.networkLabel}>Target Network:</span>
             <div className={styles.networkSegment}>
               <button
                 type="button"
@@ -285,7 +274,7 @@ export default function TokenForm() {
                 className={cluster === "mainnet-beta" ? styles.networkSegmentActive : ""}
               >
                 <span className={styles.dotMainnet} />
-                {t.network.mainnetShort}
+                Mainnet-Beta (Default)
               </button>
               <button
                 type="button"
@@ -293,13 +282,13 @@ export default function TokenForm() {
                 className={cluster === "devnet" ? styles.networkSegmentDevnet : ""}
               >
                 <span className={styles.dotDevnet} />
-                {t.network.devnetShort}
+                Devnet (Test)
               </button>
             </div>
           </div>
 
           <div className={styles.feePill}>
-            <span>{t.form.totalModularFee}</span>
+            <span>Total Modular Fee:</span>
             <strong>{liveModularTotalSol.toFixed(2)} SOL</strong>
           </div>
         </div>
@@ -345,9 +334,7 @@ export default function TokenForm() {
             <section className={styles.formSection}>
               <div className={styles.fieldGrid}>
                 <div className={styles.field}>
-                  <Label htmlFor="name">
-                    {t.form.tokenName} (Base: {MODULAR_FEE_BASE_CREATE_SOL.toFixed(2)} SOL)
-                  </Label>
+                  <Label htmlFor="name">Token Name (Base: {MODULAR_FEE_BASE_CREATE_SOL.toFixed(2)} SOL)</Label>
                   <Controller
                     name="name"
                     control={control}
@@ -359,7 +346,7 @@ export default function TokenForm() {
                 </div>
 
                 <div className={styles.field}>
-                  <Label htmlFor="symbol">{t.form.tokenSymbol}</Label>
+                  <Label htmlFor="symbol">Token Symbol (Ticker)</Label>
                   <Controller
                     name="symbol"
                     control={control}
@@ -379,7 +366,7 @@ export default function TokenForm() {
 
               <div className={styles.fieldGrid}>
                 <div className={styles.field}>
-                  <Label htmlFor="decimals">{t.form.decimals}</Label>
+                  <Label htmlFor="decimals">Decimals (0 – 9)</Label>
                   <Controller
                     name="decimals"
                     control={control}
@@ -401,7 +388,7 @@ export default function TokenForm() {
                 </div>
 
                 <div className={styles.field}>
-                  <Label htmlFor="supply">{t.form.supply}</Label>
+                  <Label htmlFor="supply">Initial Total Supply</Label>
                   <Controller
                     name="supply"
                     control={control}
@@ -426,7 +413,7 @@ export default function TokenForm() {
           {currentStep === 2 && (
             <section className={styles.formSection}>
               <div className={styles.field}>
-                <Label>{t.form.storagePipeline}</Label>
+                <Label>Metadata & Image Storage Pipeline</Label>
                 <Controller
                   name="storageProvider"
                   control={control}
@@ -452,7 +439,7 @@ export default function TokenForm() {
               </div>
 
               <div className={styles.field}>
-                <Label htmlFor="imageUrl">{t.form.logoLabel}</Label>
+                <Label htmlFor="imageUrl">Token Logo Image (PNG, JPG, WEBP, GIF — Max 5MB)</Label>
                 <div
                   {...getRootProps()}
                   className={`${styles.dropzone} ${isDragActive ? styles.dropzoneActive : ""} ${
@@ -463,7 +450,7 @@ export default function TokenForm() {
                   {isUploading ? (
                     <div className={styles.uploadingState}>
                       <div className={styles.spinner}></div>
-                      <p>{t.form.uploadingImg}</p>
+                      <p>Uploading & verifying token image...</p>
                       <ProgressBar progress={uploadProgress} />
                     </div>
                   ) : watchedFields.imageUrl ? (
@@ -474,7 +461,7 @@ export default function TokenForm() {
                       </button>
                     </div>
                   ) : (
-                    <p>{t.form.dropzonePrompt}</p>
+                    <p>Drag & drop your token logo here, or click to select a file</p>
                   )}
                 </div>
                 {watchedFields.imageUrl && (
@@ -487,7 +474,7 @@ export default function TokenForm() {
               </div>
 
               <div className={styles.field}>
-                <Label htmlFor="description">{t.form.description}</Label>
+                <Label htmlFor="description">Description (Optional)</Label>
                 <Controller
                   name="description"
                   control={control}
@@ -503,7 +490,7 @@ export default function TokenForm() {
 
               <div className={styles.fieldGrid}>
                 <div className={styles.field}>
-                  <Label htmlFor="website">{t.form.website}</Label>
+                  <Label htmlFor="website">Website URL (Optional)</Label>
                   <Controller
                     name="website"
                     control={control}
@@ -513,7 +500,7 @@ export default function TokenForm() {
                   />
                 </div>
                 <div className={styles.field}>
-                  <Label htmlFor="twitter">{t.form.twitter}</Label>
+                  <Label htmlFor="twitter">X / Twitter (Optional)</Label>
                   <Controller
                     name="twitter"
                     control={control}
@@ -521,7 +508,7 @@ export default function TokenForm() {
                   />
                 </div>
                 <div className={styles.field}>
-                  <Label htmlFor="instagram">{t.form.instagram}</Label>
+                  <Label htmlFor="instagram">Instagram (Optional)</Label>
                   <Controller
                     name="instagram"
                     control={control}
@@ -532,12 +519,17 @@ export default function TokenForm() {
                 </div>
               </div>
 
+              {/* Phase 1: Custom Creator Info Upsell Toggle (+0.05 SOL) */}
               <div className={styles.authorityOption}>
                 <div className={styles.authorityText}>
                   <Label htmlFor="customCreatorEnabled">
-                    {t.form.customCreatorTitle} (+{MODULAR_FEE_CUSTOM_CREATOR_SOL.toFixed(2)} SOL)
+                    Customizar &quot;Creator Info&quot; nos Metadados (+
+                    {MODULAR_FEE_CUSTOM_CREATOR_SOL.toFixed(2)} SOL)
                   </Label>
-                  <p>{t.form.customCreatorDesc}</p>
+                  <p>
+                    Substitui a assinatura padrão nos metadados pelo nome e site oficial do seu
+                    projeto/estúdio.
+                  </p>
                 </div>
                 <Controller
                   name="customCreator.enabled"
@@ -559,7 +551,7 @@ export default function TokenForm() {
               {watchedFields.customCreator?.enabled && (
                 <div className={styles.fieldGrid}>
                   <div className={styles.field}>
-                    <Label htmlFor="customCreatorName">{t.form.creatorName}</Label>
+                    <Label htmlFor="customCreatorName">Creator / Studio Name</Label>
                     <Controller
                       name="customCreator.name"
                       control={control}
@@ -573,7 +565,7 @@ export default function TokenForm() {
                     />
                   </div>
                   <div className={styles.field}>
-                    <Label htmlFor="customCreatorWebsite">{t.form.creatorUrl}</Label>
+                    <Label htmlFor="customCreatorWebsite">Creator Official URL</Label>
                     <Controller
                       name="customCreator.website"
                       control={control}
@@ -594,7 +586,7 @@ export default function TokenForm() {
           {currentStep === 3 && (
             <section className={styles.formSection}>
               <div className={styles.field}>
-                <Label>{t.form.tokenStandard}</Label>
+                <Label>Solana Token Program Standard</Label>
                 <Controller
                   name="tokenStandard"
                   control={control}
@@ -605,14 +597,14 @@ export default function TokenForm() {
                         className={field.value === "spl" ? styles.active : ""}
                         onClick={() => field.onChange("spl")}
                       >
-                        {t.form.standardSpl}
+                        Standard SPL (Universal Wallet & DEX Support)
                       </button>
                       <button
                         type="button"
                         className={field.value === "token-2022" ? styles.active : ""}
                         onClick={() => field.onChange("token-2022")}
                       >
-                        {t.form.standard2022} (+{MODULAR_FEE_TRANSFER_FEE_EXT_SOL.toFixed(2)} SOL)
+                        Token-2022 (+{MODULAR_FEE_TRANSFER_FEE_EXT_SOL.toFixed(2)} SOL Tax Token Ext)
                       </button>
                     </div>
                   )}
@@ -694,15 +686,22 @@ export default function TokenForm() {
                 </div>
               )}
 
+              {/* Phase 1: Modular Security & Authority Revocation Toggles (ON by Default) */}
               <div className={styles.authoritySection}>
-                <h3 className={styles.authorityTitle}>{t.form.securityTitle}</h3>
+                <h3 className={styles.authorityTitle}>
+                  Blindagem On-Chain & RugCheck 100/100 (Upsell Modular)
+                </h3>
                 <div className={styles.authorityOptionsGrid}>
+                  {/* 1. Revoke Freeze Authority (+0.10 SOL - Default ON) */}
                   <div className={styles.authorityOption}>
                     <div className={styles.authorityText}>
                       <Label htmlFor="revokeFreezeToggle">
-                        {t.form.revokeFreezeTitle} (+{MODULAR_FEE_REVOKE_FREEZE_SOL.toFixed(2)} SOL)
+                        Revogar Freeze Authority (+{MODULAR_FEE_REVOKE_FREEZE_SOL.toFixed(2)} SOL — Recomendado)
                       </Label>
-                      <p>{t.form.revokeFreezeDesc}</p>
+                      <p>
+                        Obrigatório para criar Pool de Liquidez na Raydium/Meteora e negociar na
+                        Jupiter (+50 pts no RugCheck).
+                      </p>
                     </div>
                     <Controller
                       name="freezeAuthority"
@@ -721,12 +720,16 @@ export default function TokenForm() {
                     />
                   </div>
 
+                  {/* 2. Revoke Mint Authority (+0.10 SOL - Default ON) */}
                   <div className={styles.authorityOption}>
                     <div className={styles.authorityText}>
                       <Label htmlFor="revokeMintToggle">
-                        {t.form.revokeMintTitle} (+{MODULAR_FEE_REVOKE_MINT_SOL.toFixed(2)} SOL)
+                        Revogar Mint Authority (+{MODULAR_FEE_REVOKE_MINT_SOL.toFixed(2)} SOL — Recomendado)
                       </Label>
-                      <p>{t.form.revokeMintDesc}</p>
+                      <p>
+                        Torna o Supply 100% fixo e impossibilita emissão de novos tokens (+35 pts no
+                        RugCheck).
+                      </p>
                     </div>
                     <Controller
                       name="mintAuthority"
@@ -745,12 +748,17 @@ export default function TokenForm() {
                     />
                   </div>
 
+                  {/* 3. Immutable Metadata (+0.05 SOL - Default ON) */}
                   <div className={styles.authorityOption}>
                     <div className={styles.authorityText}>
                       <Label htmlFor="immutableMetadataToggle">
-                        {t.form.immutableTitle} (+{MODULAR_FEE_IMMUTABLE_METADATA_SOL.toFixed(2)} SOL)
+                        Metadados Imutáveis / Immutable (+
+                        {MODULAR_FEE_IMMUTABLE_METADATA_SOL.toFixed(2)} SOL)
                       </Label>
-                      <p>{t.form.immutableDesc}</p>
+                      <p>
+                        Trava permanentemente nome, símbolo e imagem nos exploradores (+15 pts no
+                        RugCheck).
+                      </p>
                     </div>
                     <Controller
                       name="isMetadataMutable"
@@ -781,12 +789,12 @@ export default function TokenForm() {
                 onClick={prevStep}
                 disabled={isCreatingToken}
               >
-                {t.form.backBtn}
+                ← Back
               </Button>
             )}
             {currentStep < STEPS.length && (
               <Button type="button" onClick={nextStep} disabled={isCreatingToken}>
-                {t.form.continueBtn}
+                Continue →
               </Button>
             )}
             {currentStep === STEPS.length && (
@@ -797,9 +805,9 @@ export default function TokenForm() {
                     <span>{statusStep || "Verifying & Signing Transaction..."}</span>
                   </div>
                 ) : isUploading ? (
-                  t.form.uploadingImg
+                  "Uploading Token Image..."
                 ) : (
-                  `${isDevnet ? t.form.submitDevnet : t.form.submitMainnet} (${liveModularTotalSol.toFixed(2)} SOL)`
+                  `Create Token on ${cluster === "devnet" ? "Devnet" : "Mainnet"} (Total: ${liveModularTotalSol.toFixed(2)} SOL)`
                 )}
               </Button>
             )}

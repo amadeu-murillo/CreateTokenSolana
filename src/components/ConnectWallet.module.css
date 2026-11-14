@@ -1,264 +1,179 @@
+/* --- CONTAINER PRINCIPAL --- */
 .container {
   position: relative;
   display: flex;
   align-items: center;
 }
 
+/* Placeholder para evitar erro de hidratação no SSR */
 .placeholderButton {
-  width: 158px;
-  height: 42px;
-  background-color: hsl(var(--muted));
-  border-radius: var(--radius);
+    width: 150px;
+    height: 40px;
+    background-color: hsl(var(--muted));
+    border-radius: var(--radius);
 }
 
-/* Primary Connect Wallet Button */
+/* --- BOTÃO DE CONEXÃO (ESTILO PADRÃO DA LIB) --- */
 .connectButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem;
-  height: 42px;
-  padding: 0 1.15rem;
-  border-radius: var(--radius);
-  border: 1px solid rgba(20, 241, 149, 0.4);
-  background: linear-gradient(135deg, #9945ff 0%, #00d1ff 52%, #14f195 100%);
-  color: #06101e;
-  font-weight: 800;
-  font-size: 0.86rem;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  box-shadow: 0 6px 20px rgba(153, 69, 255, 0.28);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  white-space: nowrap;
+    background-image: var(--primary-gradient) !important;
+    transition: all 0.2s ease-in-out !important;
+    border-radius: var(--radius) !important;
+    font-weight: 500 !important;
 }
-
 .connectButton:hover:not(:disabled) {
-  transform: translateY(-2px);
-  filter: brightness(1.07);
-  box-shadow: 0 10px 26px rgba(20, 241, 149, 0.32);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px hsla(var(--primary), 0.2) !important;
 }
 
-.connectButton:disabled {
-  opacity: 0.65;
-  cursor: wait;
+/* --- BOTÃO QUANDO A CARTEIRA ESTÁ CONECTADA --- */
+.connectedButton {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    font-family: monospace;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-/* Connected Wallet Button */
-.connectedButtonMainnet,
-.connectedButtonDevnet {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  height: 42px;
-  padding: 0 0.85rem;
-  background-color: hsl(var(--card));
-  border-radius: var(--radius);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: hsl(var(--foreground));
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.connectedButtonMainnet {
-  border: 1.5px solid rgba(20, 241, 149, 0.5);
-  box-shadow: 0 0 16px rgba(20, 241, 149, 0.12);
-}
-
-.connectedButtonMainnet:hover {
-  border-color: #14f195;
-  background-color: hsla(var(--muted), 0.85);
-}
-
-.connectedButtonDevnet {
-  border: 1.5px solid rgba(245, 158, 11, 0.65);
-  box-shadow: 0 0 16px rgba(245, 158, 11, 0.16);
-}
-
-.connectedButtonDevnet:hover {
-  border-color: #fbbf24;
-  background-color: hsla(var(--muted), 0.85);
-}
-
-.solBalanceChip {
-  padding: 0.18rem 0.48rem;
-  border-radius: 6px;
-  background: hsla(var(--muted), 0.9);
-  color: #14f195;
-  font-size: 0.74rem;
-  font-weight: 700;
+.connectedButton:hover {
+    border-color: hsl(var(--primary));
+    background-color: hsl(var(--muted));
 }
 
 .walletIcon {
-  border-radius: 50%;
-  flex-shrink: 0;
+    border-radius: 50%;
 }
 
+/* --- INDICADOR DE STATUS --- */
 .statusIndicator {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  flex-shrink: 0;
+  transition: background-color 0.3s ease;
 }
 
-.statusConnectedMainnet {
-  background-color: #10b981;
-  box-shadow: 0 0 8px #10b981;
+/* Indicador para carteira CONECTADA (verde) */
+.statusConnected {
+  background-color: #10b981; /* Verde sucesso */
+  animation: pulseConnected 2s infinite;
 }
 
-.statusConnectedDevnet {
-  background-color: #f59e0b;
-  box-shadow: 0 0 8px #f59e0b;
+@keyframes pulseConnected {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
 
+/* Indicador para carteira CONECTANDO (amarelo) */
 .statusConnecting {
-  background-color: #f59e0b;
+  background-color: #f59e0b; /* Amarelo/âmbar */
+  animation: pulseConnecting 1.5s infinite;
 }
 
-/* Dropdown Menu */
+@keyframes pulseConnecting {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+}
+
+
+/* --- MENU DROPDOWN --- */
 .dropdown {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  width: 295px;
-  background-color: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42);
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-  padding: 1rem;
-  animation: fadeInScaleUp 0.18s ease-out forwards;
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 280px;
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    animation: fadeInScaleUp 0.2s ease-out forwards;
 }
 
 @keyframes fadeInScaleUp {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+    from {
+        opacity: 0;
+        transform: translateY(-5px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .dropdownHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.65rem;
-  font-weight: 700;
-  padding-bottom: 0.65rem;
-  border-bottom: 1px solid hsl(var(--border));
-}
-
-.dropdownWalletTitle {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.88rem;
-}
-
-.networkMiniBadgeMainnet,
-.networkMiniBadgeDevnet {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.66rem;
-  font-weight: 800;
-  padding: 0.15rem 0.48rem;
-  border-radius: 999px;
-  text-transform: uppercase;
-}
-
-.networkMiniBadgeMainnet {
-  background: rgba(20, 241, 149, 0.16);
-  color: #14f195;
-  border: 1px solid rgba(20, 241, 149, 0.4);
-}
-
-.networkMiniBadgeDevnet {
-  background: rgba(245, 158, 11, 0.18);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.45);
-}
-
-.balanceBox {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.55rem 0.75rem;
-  border-radius: calc(var(--radius) * 0.75);
-  background: hsla(var(--muted), 0.55);
-  border: 1px solid hsl(var(--border));
-  font-size: 0.78rem;
-}
-
-.balanceBox strong {
-  font-family: "JetBrains Mono", monospace;
-  color: #14f195;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 600;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid hsl(var(--border));
 }
 
 .dropdownAddress {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  background-color: hsl(var(--muted));
-  padding: 0.55rem 0.75rem;
-  border-radius: calc(var(--radius) * 0.75);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.75rem;
-  word-break: break-all;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    background-color: hsl(var(--muted));
+    padding: 0.5rem 0.75rem;
+    border-radius: calc(var(--radius) * 0.75);
+    font-family: monospace;
+    font-size: 0.8rem;
+    word-break: break-all;
 }
 
-.dropdownActions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+.dropdownAddress button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: hsl(var(--muted-foreground));
+    transition: color 0.2s ease;
 }
 
-.menuActionBtn {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  width: 100%;
-  padding: 0.6rem 0.75rem;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: calc(var(--radius) * 0.75);
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: hsl(var(--foreground));
-  cursor: pointer;
-  text-decoration: none;
-  transition: all 0.15s ease;
-}
-
-.menuActionBtn:hover {
-  background-color: hsl(var(--muted));
-  border-color: hsl(var(--border));
+.dropdownAddress button:hover {
+    color: hsl(var(--primary));
 }
 
 .disconnectButton {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  width: 100%;
-  padding: 0.6rem 0.75rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #ff4d8d;
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-align: left;
-  border-radius: calc(var(--radius) * 0.75);
-  transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: hsl(var(--destructive));
+    font-weight: 500;
+    text-align: left;
+    border-radius: calc(var(--radius) * 0.75);
+    transition: background-color 0.2s ease;
 }
 
 .disconnectButton:hover {
-  background-color: rgba(255, 77, 141, 0.12);
+    background-color: hsla(var(--destructive), 0.1);
 }
+

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import styles from "./CostSummary.module.css";
-import { useLanguage } from "@/context/LanguageContext";
 import {
   DEV_WALLET_ADDRESS,
   ModularPricingOptions,
@@ -53,7 +52,6 @@ export default function CostSummary({
   operation = "createToken",
   modularOptions,
 }: CostSummaryProps) {
-  const { t } = useLanguage();
   const [liveModularOptions, setLiveModularOptions] = useState<ModularPricingOptions>(
     modularOptions || DEFAULT_MODULAR_OPTIONS
   );
@@ -64,6 +62,7 @@ export default function CostSummary({
     }
   }, [modularOptions]);
 
+  // Listen to real-time modular toggle updates dispatched by TokenForm
   useEffect(() => {
     const handleModularUpdate = (event: Event) => {
       const customEvent = event as CustomEvent<ModularPricingOptions>;
@@ -80,15 +79,6 @@ export default function CostSummary({
     const networkRentSol = 0.015;
     const grandTotalSol = totalSol + networkRentSol;
 
-    const localizedLabelMap: Record<string, string> = {
-      base: t.costs.baseCreate,
-      revokeFreeze: t.costs.revokeFreeze,
-      revokeMint: t.costs.revokeMint,
-      immutable: t.costs.immutable,
-      customCreator: t.costs.customCreator,
-      transferFeeExt: t.costs.transferFeeExt,
-    };
-
     return (
       <div className={styles.card}>
         <div className={styles.breakdownList}>
@@ -98,7 +88,7 @@ export default function CostSummary({
               className={item.active ? styles.breakdownRow : styles.breakdownRowInactive}
             >
               <span>
-                {item.active ? "✓" : "○"} {localizedLabelMap[item.key] || item.label}
+                {item.active ? "✓" : "○"} {item.label}
               </span>
               <strong>+{item.sol.toFixed(2)} SOL</strong>
             </div>
@@ -106,25 +96,25 @@ export default function CostSummary({
         </div>
 
         <div className={`${styles.item} ${styles.total}`}>
-          <p>{t.costs.totalModular}</p>
+          <p>Total Taxa Modular:</p>
           <p>{totalSol.toFixed(2)} SOL</p>
         </div>
 
         <div className={styles.item} style={{ fontSize: "0.78rem", opacity: 0.85 }}>
-          <span>{t.costs.networkRent}</span>
+          <span>Rent da Rede Solana (Estimado):</span>
           <span>~{networkRentSol.toFixed(3)} SOL</span>
         </div>
 
         <div className={styles.item} style={{ fontSize: "0.84rem", fontWeight: 700 }}>
-          <span>{t.costs.estimatedWalletTotal}</span>
+          <span>Total Estimado na Carteira:</span>
           <span style={{ color: "#34d399", fontFamily: "JetBrains Mono, monospace" }}>
             ~{grandTotalSol.toFixed(3)} SOL
           </span>
         </div>
 
         <p className={styles.disclaimer}>
-          {t.costs.atomicDisclaimer} ({devWalletBase58.slice(0, 6)}...
-          {devWalletBase58.slice(-4)}).
+          Cobrança atômica na mesma transação para Dev Wallet ({devWalletBase58.slice(0, 6)}...
+          {devWalletBase58.slice(-4)}) com split instantâneo de 30% para afiliados.
         </p>
       </div>
     );
@@ -140,14 +130,14 @@ export default function CostSummary({
         <p>{devFee.toFixed(2)} SOL</p>
       </div>
       <div className={styles.item} style={{ marginTop: "0.25rem", fontSize: "0.82rem" }}>
-        <span>{t.costs.estimatedWalletTotal}</span>
+        <span>Estimated Total (+ Network Rent):</span>
         <span style={{ fontFamily: "JetBrains Mono, monospace", color: "#34d399" }}>
           ~{estimatedTotal.toFixed(2)} SOL
         </span>
       </div>
       <p className={styles.disclaimer}>
-        {t.costs.atomicDisclaimer} ({devWalletBase58.slice(0, 6)}...
-        {devWalletBase58.slice(-4)}).
+        Atomic fee routed on-chain to Dev Wallet ({devWalletBase58.slice(0, 6)}...
+        {devWalletBase58.slice(-4)}) with 30% instant affiliate split when referred.
       </p>
     </div>
   );
