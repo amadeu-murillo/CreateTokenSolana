@@ -409,7 +409,7 @@ export default function BurnPage() {
         </div>
 
         <div className={styles.sidebar}>
-          <CostSummary />
+          <CostSummary operation="burnToken" />
 
           <h3 className={styles.sidebarTitle}>How Token & LP Burning Works</h3>
           {tutorialSteps.map((step, index) => (

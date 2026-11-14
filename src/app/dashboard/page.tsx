@@ -475,7 +475,7 @@ export default function DashboardPage() {
         </main>
 
         <aside className={styles.sidebar}>
-          <CostSummary />
+          <CostSummary operation="manageAuthority" />
 
           {guideSections.map((section, index) => (
             <Card key={index} className={styles.guideCard}>

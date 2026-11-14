@@ -2,13 +2,19 @@ import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import { useCluster } from "@/context/WalletContext";
-import { AFFILIATE_COMMISSION_RATE, SERVICE_FEE_REMOVE_LP_SOL } from "@/lib/constants";
+import {
+  AFFILIATE_COMMISSION_RATE,
+  SERVICE_FEE_REMOVE_LP_SOL,
+  SolanaCluster,
+} from "@/lib/constants";
 import { verifyTransactionIntegrity } from "@/lib/security";
 import { parseSolanaError } from "./useErrorHandler";
 
 export interface RemoveLiquidityResult {
   signature: string;
   baseMint: string;
+  wsolVaultAddress: string;
+  withdrawnSol: number;
   withdrawPercentage: number;
   estimatedSolReturned: string;
   serviceFeeSol: number;
@@ -23,7 +29,7 @@ export const useRemoveLiquidity = () => {
   const [statusStep, setStatusStep] = useState<string | null>(null);
   const [progressStep, setProgressStep] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
-  const [withdrawResult, setWithdrawResult] = useState<RemoveLiquidityResult | null>(null);
+  const [removeResult, setRemoveResult] = useState<RemoveLiquidityResult | null>(null);
 
   const removeLiquidity = useCallback(
     async (params: {
@@ -31,6 +37,7 @@ export const useRemoveLiquidity = () => {
       lpMint?: string;
       withdrawPercentage: number;
       programId?: string;
+      network?: SolanaCluster;
     }): Promise<RemoveLiquidityResult | null> => {
       if (!publicKey || !sendTransaction) {
         setError("Please connect your Solana wallet to withdraw liquidity.");
@@ -41,9 +48,11 @@ export const useRemoveLiquidity = () => {
         return null;
       }
 
+      const targetNetwork = params.network || cluster;
+
       setIsLoading(true);
       setError(null);
-      setWithdrawResult(null);
+      setRemoveResult(null);
       setProgressStep(1);
       setStatusStep("Stage 1/5: Preparing SOL liquidity withdrawal & WSOL unwrap instructions...");
 
@@ -62,7 +71,7 @@ export const useRemoveLiquidity = () => {
             ...params,
             wallet: publicKey.toBase58(),
             affiliate: affiliateRef,
-            network: cluster,
+            network: targetNetwork,
           }),
         });
 
@@ -131,20 +140,24 @@ export const useRemoveLiquidity = () => {
               transactionSignature: signature,
               tokenCreatorWallet: publicKey.toBase58(),
               mintAddress: params.baseMint,
-              network: cluster,
+              network: targetNetwork,
             }),
           }).catch(() => {});
         }
 
+        const parsedSol = parseFloat(String(data.estimatedSolReturned || "0")) || 0;
+
         const finalResult: RemoveLiquidityResult = {
           signature,
           baseMint: params.baseMint,
+          wsolVaultAddress: String(data.wsolVaultAddress || params.baseMint),
+          withdrawnSol: typeof data.withdrawnSol === "number" ? data.withdrawnSol : parsedSol,
           withdrawPercentage: params.withdrawPercentage,
-          estimatedSolReturned: data.estimatedSolReturned || "SOL Unwrapped",
+          estimatedSolReturned: String(data.estimatedSolReturned || parsedSol.toFixed(4)),
           serviceFeeSol: SERVICE_FEE_REMOVE_LP_SOL,
         };
 
-        setWithdrawResult(finalResult);
+        setRemoveResult(finalResult);
         return finalResult;
       } catch (err) {
         setError(parseSolanaError(err, "withdraw SOL liquidity"));
@@ -160,7 +173,7 @@ export const useRemoveLiquidity = () => {
 
   const reset = useCallback(() => {
     setError(null);
-    setWithdrawResult(null);
+    setRemoveResult(null);
     setStatusStep(null);
     setProgressStep(0);
   }, []);
@@ -171,7 +184,8 @@ export const useRemoveLiquidity = () => {
     statusStep,
     progressStep,
     error,
-    withdrawResult,
+    removeResult,
+    withdrawResult: removeResult,
     reset,
   };
 };

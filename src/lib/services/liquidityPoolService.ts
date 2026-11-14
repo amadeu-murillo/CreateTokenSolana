@@ -81,6 +81,8 @@ export interface RemoveLiquidityInput {
 export interface RemoveLiquidityOutput {
   transaction: string;
   baseMint: string;
+  wsolVaultAddress: string;
+  withdrawnSol: number;
   withdrawPercentage: number;
   estimatedSolReturned: string;
   estimatedBaseReturned: string;
@@ -659,6 +661,8 @@ export async function removeLiquidityTransaction(
   return {
     transaction: base64Transaction,
     baseMint,
+    wsolVaultAddress: wsolVaultAddress.toBase58(),
+    withdrawnSol: Number((estimatedSolReturnedLamports / LAMPORTS_PER_SOL).toFixed(6)),
     withdrawPercentage: pct,
     estimatedSolReturned: (estimatedSolReturnedLamports / LAMPORTS_PER_SOL).toFixed(4),
     estimatedBaseReturned: `${pct}% of Pool Position`,

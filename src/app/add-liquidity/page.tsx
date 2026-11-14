@@ -1289,7 +1289,7 @@ export default function AddLiquidityPage() {
         </main>
 
         <aside className={styles.sidebar}>
-          <CostSummary />
+          <CostSummary operation={activeMode === "add" ? "createLiquidityPool" : "removeLiquidity"} />
 
           <Card>
             <CardHeader>

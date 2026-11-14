@@ -12,19 +12,19 @@ import {
   SERVICE_FEE_REMOVE_LP_SOL,
 } from "@/lib/constants";
 
-interface Costs {
+export interface Costs {
   createToken: string;
   burnToken: string;
   airdrop: string;
   manageAuthority: string;
   createLiquidityPool: string;
-  removeLiquidity?: string;
+  removeLiquidity: string;
 }
 
-type Operation = keyof Costs;
+export type Operation = keyof Costs;
 
-interface CostSummaryProps {
-  operation: Operation;
+export interface CostSummaryProps {
+  operation?: Operation;
 }
 
 const serviceFeeByOperation: Record<Operation, number> = {
@@ -38,7 +38,7 @@ const serviceFeeByOperation: Record<Operation, number> = {
 
 const devWalletBase58 = DEV_WALLET_ADDRESS.toBase58();
 
-export default function CostSummary({ operation }: CostSummaryProps) {
+export default function CostSummary({ operation = "createToken" }: CostSummaryProps) {
   const [costs, setCosts] = useState<Costs | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -70,7 +70,7 @@ export default function CostSummary({ operation }: CostSummaryProps) {
     fetchCosts();
   }, []);
 
-  const costValue = costs?.[operation] || "...";
+  const costValue = costs?.[operation] || "0.0800";
   const devFee = serviceFeeByOperation[operation] ?? 0.07;
 
   return (

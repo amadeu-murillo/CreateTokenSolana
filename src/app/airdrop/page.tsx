@@ -520,7 +520,7 @@ export default function AirdropPage() {
         </div>
 
         <aside className={styles.sidebar}>
-          <CostSummary />
+          <CostSummary operation="airdrop" />
 
           <h3 className={styles.sidebarTitle}>How Multi-Send Works</h3>
           {tutorialSteps.map((step, index) => (

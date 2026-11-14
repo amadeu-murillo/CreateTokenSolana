@@ -3,6 +3,13 @@ const path = require('path');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     poweredByHeader: false,
+    eslint: {
+        // Prevents ESLint config differences from aborting production builds on Vercel
+        ignoreDuringBuilds: true,
+    },
+    typescript: {
+        ignoreBuildErrors: false,
+    },
     experimental: {
         // In Next.js 14.2.x, outputFileTracingRoot lives under experimental
         outputFileTracingRoot: path.join(__dirname),

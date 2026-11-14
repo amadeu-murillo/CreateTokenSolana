@@ -1,25 +1,25 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import styles from './Costs.module.css';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from "react";
+import styles from "./Costs.module.css";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-// Interface para definir a estrutura dos custos
 interface Costs {
   createToken: string;
   burnToken: string;
   airdrop: string;
   manageAuthority: string;
   createLiquidityPool: string;
+  removeLiquidity?: string;
 }
 
-// Mapeamento de chaves de operação para nomes legíveis
 const costLabels: Record<keyof Costs, string> = {
-  createToken: "Token Creation",
-  burnToken: "Token Burn",
-  airdrop: "Airdrop (per batch)",
-  manageAuthority: "Manage Authority",
-  createLiquidityPool: "Liquidity Pool Creation",
+  createToken: "Token Creation (0.90 SOL Fee)",
+  burnToken: "Token Burn (0.07 SOL Fee)",
+  airdrop: "Mass Airdrop (0.07 SOL / Batch)",
+  manageAuthority: "Revoke Authority (0.07 SOL Fee)",
+  createLiquidityPool: "Create Liquidity Pool (0.07 SOL Fee)",
+  removeLiquidity: "Withdraw Liquidity in SOL (0.05 SOL Fee)",
 };
 
 export default function CostsPage() {
@@ -28,14 +28,13 @@ export default function CostsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Função para buscar os custos da API
     const fetchCosts = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch('/api/costs');
+        const response = await fetch("/api/costs");
         if (!response.ok) {
-          throw new Error('Failed to fetch costs from the server.');
+          throw new Error("Failed to fetch costs from the server.");
         }
         const data: Costs = await response.json();
         setCosts(data);
@@ -56,7 +55,8 @@ export default function CostsPage() {
         <CardHeader>
           <CardTitle className={styles.title}>Cost Summary</CardTitle>
           <CardDescription>
-            Estimated costs for various operations on the Solana network. These values include our service fee and an estimate for network fees, which can fluctuate.
+            Estimated costs for all operations on the Solana network, including our platform
+            service fee and estimated Solana network rent.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -66,10 +66,9 @@ export default function CostsPage() {
             <div className={styles.error}>Error: {error}</div>
           ) : costs ? (
             <div className={styles.costList}>
-              {/* Mapeia e exibe cada custo retornado pela API */}
               {(Object.keys(costs) as Array<keyof Costs>).map((key) => (
                 <div key={key} className={styles.costItem}>
-                  <span>{costLabels[key]}</span>
+                  <span>{costLabels[key] || key}</span>
                   <span className={styles.costValue}>~{costs[key]} SOL</span>
                 </div>
               ))}
