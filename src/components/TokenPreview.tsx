@@ -1,4 +1,8 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useCluster } from "@/context/WalletContext";
 import styles from "@/components/TokenPreview.module.css";
 
 export interface TokenPreviewProps {
@@ -6,10 +10,13 @@ export interface TokenPreviewProps {
   symbol: string;
   imageUrl: string;
   supply: string;
+  decimals?: number;
+  description?: string;
   tokenStandard: "spl" | "token-2022";
   mintAuthority?: boolean;
   freezeAuthority?: boolean;
   isMetadataMutable?: boolean;
+  transferFeeBps?: number;
 }
 
 const TokenPreview = ({
@@ -17,16 +24,29 @@ const TokenPreview = ({
   symbol,
   imageUrl,
   supply,
+  decimals = 9,
+  description,
   tokenStandard,
   mintAuthority = false,
   freezeAuthority = false,
   isMetadataMutable = false,
+  transferFeeBps = 0,
 }: TokenPreviewProps) => {
+  const { cluster } = useCluster();
+  const isDevnet = cluster === "devnet";
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [imageUrl]);
+
   const formattedSupply = new Intl.NumberFormat("en-US").format(
     Number(String(supply || "0").replace(/\D/g, "")) || 0
   );
 
-  // Phase 1: Calculate dynamic RugCheck Score (0 to 100)
+  const cleanTicker = (symbol || "TOKEN").trim().toUpperCase().slice(0, 10);
+  const monogram = cleanTicker.slice(0, 3) || "SPL";
+
   const isFreezeRevoked = !freezeAuthority;
   const isMintRevoked = !mintAuthority;
   const isImmutable = !isMetadataMutable;
@@ -51,44 +71,84 @@ const TokenPreview = ({
         ? styles.progressFillWarning
         : styles.progressFillDanger;
 
+  const hasValidImage = Boolean(imageUrl && imageUrl.trim() !== "" && !imageLoadFailed);
+
   return (
     <Card className={styles.previewCard}>
       <CardHeader>
-        <CardTitle>Token Preview & RugCheck Audit</CardTitle>
+        <CardTitle>Simulador de Carteira &amp; Auditoria</CardTitle>
         <CardDescription>
-          Live preview of how your token appears in wallets, DexScreener, and RugCheck scanners.
+          Visualização reativa em tempo real de como seu ativo será exibido na Phantom, Solflare e
+          DexScreener.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className={styles.tokenDisplay}>
-          <img
-            src={imageUrl || "https://placehold.co/80x80/24293E/FFFFFF?text=?"}
-            alt="Token Preview"
-            className={styles.tokenImage}
-            onError={(e) => {
-              (e.target as HTMLImageElement).src =
-                "https://placehold.co/80x80/24293E/FFFFFF?text=?";
-            }}
-          />
-          <div className={styles.tokenInfo}>
-            <div className={styles.nameAndBadge}>
-              <p className={styles.tokenName}>{name || "My Token"}</p>
-              <span className={styles.tokenBadge}>
-                {tokenStandard === "token-2022" ? "Token-2022" : "SPL"}
-              </span>
+        <div className={styles.walletSimCard}>
+          <div className={styles.walletSimHeader}>
+            <span>SOLANA WALLET ASSET PREVIEW</span>
+            <span className={isDevnet ? styles.networkBadgeDevnet : styles.networkBadgeMainnet}>
+              {isDevnet ? "DEVNET SANDBOX" : "MAINNET-BETA"}
+            </span>
+          </div>
+
+          <div className={styles.tokenDisplay}>
+            {hasValidImage ? (
+              <img
+                src={imageUrl}
+                alt={name || "Token Preview"}
+                className={styles.tokenImage}
+                onError={() => setImageLoadFailed(true)}
+              />
+            ) : (
+              <div className={styles.tokenPlaceholder} aria-label="Token Logo Placeholder">
+                {monogram}
+              </div>
+            )}
+
+            <div className={styles.tokenInfo}>
+              <div className={styles.nameAndBadge}>
+                <p className={styles.tokenName}>{name.trim() || "Nome do Token"}</p>
+                <span className={styles.tokenBadge}>
+                  {tokenStandard === "token-2022" ? "Token-2022" : "SPL"}
+                </span>
+              </div>
+              <p className={styles.tokenSymbol}>${cleanTicker}</p>
             </div>
-            <p className={styles.tokenSymbol}>{symbol || "MTK"}</p>
+
+            <div className={styles.tokenSupply}>
+              <p className={styles.supplyValue}>{formattedSupply}</p>
+              <p className={styles.supplyLabel}>Supply ({decimals} dec)</p>
+            </div>
           </div>
-          <div className={styles.tokenSupply}>
-            <p className={styles.supplyValue}>{formattedSupply}</p>
-            <p className={styles.supplyLabel}>Total Supply</p>
+
+          <div className={styles.metaSpecGrid}>
+            <div className={styles.metaSpecItem}>
+              <span>Decimais</span>
+              <strong>{Number.isFinite(decimals) ? decimals : 9}</strong>
+            </div>
+            <div className={styles.metaSpecItem}>
+              <span>Taxa Transfer</span>
+              <strong>
+                {tokenStandard === "token-2022" && transferFeeBps > 0
+                  ? `${(transferFeeBps / 100).toFixed(2)}%`
+                  : "0.00%"}
+              </strong>
+            </div>
+            <div className={styles.metaSpecItem}>
+              <span>Metadados</span>
+              <strong>{isImmutable ? "Imutável" : "Mutável"}</strong>
+            </div>
           </div>
+
+          {description && description.trim().length > 0 && (
+            <p className={styles.descriptionPreview}>{description.trim()}</p>
+          )}
         </div>
 
-        {/* Phase 1: Dynamic Auditoria & RugCheck Score (0 to 100%) */}
+        {/* Dynamic Auditoria & RugCheck Score (0 to 100%) */}
         <div className={styles.rugCheckBox}>
           <div className={styles.rugCheckHeader}>
-            <span className={styles.rugCheckTitle}>🛡️ Auditoria & RugCheck Score</span>
+            <span className={styles.rugCheckTitle}>🛡️ Auditoria &amp; RugCheck Score</span>
             <span className={badgeClass}>{rugCheckScore}/100</span>
           </div>
 

@@ -119,11 +119,12 @@ function NetworkSwitcherPill() {
 }
 
 /**
- * Unmistakable Global Network Banner below the navbar so the user always knows
- * whether they are operating on Mainnet-Beta (Real SOL) or Devnet (Test Sandbox).
+ * Floating Web3 Control Dock positioned directly underneath the top Navbar.
+ * Keeps the Mainnet/Devnet Switcher, Network Status, Devnet Faucet, and Connect Wallet Button
+ * permanently floating and accessible across all screen sizes without crowding the navbar.
  */
-function GlobalNetworkStatusBanner() {
-  const { cluster, setCluster } = useCluster();
+function FloatingUnderNavbarDock() {
+  const { cluster } = useCluster();
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   const { t } = useLanguage();
@@ -157,48 +158,43 @@ function GlobalNetworkStatusBanner() {
   };
 
   return (
-    <div className={isDevnet ? styles.networkBannerDevnet : styles.networkBannerMainnet}>
-      <div className={styles.networkBannerInner}>
-        <div className={styles.bannerStatusLeft}>
-          <span className={isDevnet ? styles.bannerPillDevnet : styles.bannerPillMainnet}>
-            {isDevnet ? "🟠 DEVNET SANDBOX" : "🟢 MAINNET LIVE"}
-          </span>
-          <strong>
-            {isDevnet ? t.network.devnetBannerTitle : t.network.mainnetBannerTitle}:
-          </strong>
-          <span>{isDevnet ? t.network.devnetBannerDesc : t.network.mainnetBannerDesc}</span>
+    <div className={styles.floatingDockOuter} role="region" aria-label="Controles de Rede e Carteira">
+      <div
+        className={`${styles.floatingDockBar} ${
+          isDevnet ? styles.floatingDockBarDevnet : styles.floatingDockBarMainnet
+        }`}
+      >
+        {/* Left: Mainnet / Devnet Floating Buttons + Active Status */}
+        <div className={styles.floatingDockLeft}>
+          <NetworkSwitcherPill />
+
+          <div className={styles.floatingNetworkHint}>
+            <span className={isDevnet ? styles.bannerPillDevnet : styles.bannerPillMainnet}>
+              {isDevnet ? "🟠 DEVNET SANDBOX" : "🟢 MAINNET LIVE"}
+            </span>
+            <span className={styles.floatingHintText}>
+              {isDevnet ? t.network.devnetBannerTitle : t.network.mainnetBannerTitle}
+            </span>
+          </div>
         </div>
 
-        <div className={styles.bannerActionsRight}>
-          {isDevnet ? (
-            <>
-              <button
-                type="button"
-                onClick={handleRequestAirdrop}
-                disabled={faucetLoading}
-                className={styles.bannerFaucetBtn}
-              >
-                {faucetLoading
-                  ? t.network.faucetLoading
-                  : faucetStatus || t.network.faucetBtn}
-              </button>
-              <button
-                type="button"
-                onClick={() => setCluster("mainnet-beta")}
-                className={styles.bannerSwitchBtnDevnet}
-              >
-                {t.network.switchToMainnet}
-              </button>
-            </>
-          ) : (
+        {/* Right: Optional Devnet Faucet + Floating Connect Wallet Button */}
+        <div className={styles.floatingDockRight}>
+          {isDevnet && (
             <button
               type="button"
-              onClick={() => setCluster("devnet")}
-              className={styles.bannerSwitchBtnMainnet}
+              onClick={handleRequestAirdrop}
+              disabled={faucetLoading}
+              className={styles.bannerFaucetBtn}
             >
-              {t.network.switchToDevnet}
+              {faucetLoading
+                ? t.network.faucetLoading
+                : faucetStatus || t.network.faucetBtn}
             </button>
           )}
+          <div className={styles.floatingWalletBox}>
+            <ConnectWallet />
+          </div>
         </div>
       </div>
     </div>
@@ -276,7 +272,7 @@ function TrustFooter() {
               <IconShield />
             </div>
             <div>
-              <h5>100% Non-Custodial & Program-Whitelisted</h5>
+              <h5>100% Non-Custodial &amp; Program-Whitelisted</h5>
               <p>
                 Every transaction is verified against our client-side Solana program whitelist and
                 simulated before your wallet signs.
@@ -302,7 +298,7 @@ function TrustFooter() {
               <IconPlusCircle />
             </div>
             <div>
-              <h5>Modular Pricing & 30% Affiliate Split</h5>
+              <h5>Modular Pricing &amp; 30% Affiliate Split</h5>
               <p>
                 Transparent modular fees routed atomically on-chain to Dev Wallet (
                 {devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}) with 30% instant
@@ -316,7 +312,7 @@ function TrustFooter() {
               <IconSettings />
             </div>
             <div>
-              <h5>Mainnet-Beta Default & Devnet Ready</h5>
+              <h5>Mainnet-Beta Default &amp; Devnet Ready</h5>
               <p>
                 Defaults to Solana Mainnet-Beta for production launches, with 1-click switching to
                 Solana Devnet for testing.
@@ -329,9 +325,14 @@ function TrustFooter() {
           <div className={styles.footerBranding}>
             <Link href="/" className={styles.logoLink}>
               <span className={styles.logoText}>CreateTokenSolana</span>
+              {cluster === "devnet" && (
+                <span className={styles.devnetHeaderBadge} title="Rede de Testes Solana Devnet Ativa">
+                  ● DEVNET
+                </span>
+              )}
             </Link>
             <p className={styles.footerTagline}>
-              Swiss-engineered non-custodial launchpad for creating SPL & Token-2022 assets,
+              Swiss-engineered non-custodial launchpad for creating SPL &amp; Token-2022 assets,
               initializing AMM liquidity pools, and managing token authorities on Solana.
             </p>
             <div className={styles.networkStatusBadge}>
@@ -353,7 +354,7 @@ function TrustFooter() {
               Liquidity Pool ({feeText} Fee)
             </Link>
             <Link href="/burn" className={styles.footerLink}>
-              Burn Tokens & Reclaim SOL
+              Burn Tokens &amp; Reclaim SOL
             </Link>
             <Link href="/airdrop" className={styles.footerLink}>
               Mass Airdrop ({feeText} / Batch)
@@ -364,7 +365,7 @@ function TrustFooter() {
           </div>
 
           <div className={styles.footerColumn}>
-            <h4 className={styles.footerColumnTitle}>Resources & Transparency</h4>
+            <h4 className={styles.footerColumnTitle}>Resources &amp; Transparency</h4>
             <Link href="/afiliates" className={styles.footerLink}>
               Affiliate Program (30% Instant SOL)
             </Link>
@@ -458,22 +459,24 @@ function InnerAppShell({ children }: { children: ReactNode }) {
   const isDevnet = cluster === "devnet";
 
   return (
-    <div className={styles.wrapper} data-cluster={cluster}>
+    <div className={styles.wrapper} data-cluster={cluster} data-network={cluster}>
+      {/* Clean Top Navigation Header */}
       <header className={isDevnet ? styles.headerDevnet : styles.header}>
         <div className={`${styles.container} ${styles.headerContainer}`}>
           <div className={styles.navContainer}>
             <Link href="/" className={styles.logoLink} onClick={closeMobileMenu}>
-              <span className={styles.logoText}>CreateToken</span>
+              <span className={styles.logoText}>CreateTokenSolana</span>
+              {isDevnet && (
+                <span className={styles.devnetHeaderBadge} title="Rede de Testes Solana Devnet Ativa">
+                  ● DEVNET
+                </span>
+              )}
             </Link>
             <NavLinks onLinkClick={closeMobileMenu} />
           </div>
 
           <div className={styles.rightItemsContainer}>
             <LanguageSwitcherControls />
-            <NetworkSwitcherPill />
-            <div className={styles.desktopWalletWrapper}>
-              <ConnectWallet />
-            </div>
             <ThemeSwitcher />
             <button
               className={styles.mobileMenuButton}
@@ -487,17 +490,14 @@ function InnerAppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      {/* High-Visibility Mainnet vs Devnet Banner */}
-      <GlobalNetworkStatusBanner />
-
       {isMobileMenuOpen && (
         <div className={styles.mobileNav}>
-          <div className={styles.mobileWalletRow}>
-            <ConnectWallet />
-          </div>
           <NavLinks onLinkClick={closeMobileMenu} mobile />
         </div>
       )}
+
+      {/* Floating Sticky Control Bar Below Navbar: Mainnet/Devnet Buttons + Connect Wallet Button */}
+      <FloatingUnderNavbarDock />
 
       <main className={`${styles.container} ${styles.main}`}>{children}</main>
 

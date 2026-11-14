@@ -90,7 +90,7 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   return (
     <ClusterContext.Provider value={contextValue}>
-      <ConnectionProvider endpoint={endpoint}>
+      <ConnectionProvider endpoint={endpoint} config={{ commitment: "confirmed", disableRetryOnRateLimit: true, confirmTransactionInitialTimeout: 45000 }}>
         <SolanaWalletProvider wallets={wallets} autoConnect>
           <WalletModalProvider>{children}</WalletModalProvider>
         </SolanaWalletProvider>

@@ -277,6 +277,22 @@ const TokenManagementCard = ({
   );
 };
 
+const AuthorityCardSkeleton = () => (
+  <div className={styles.skeletonCard} aria-busy="true" aria-label="Carregando estrutura do token">
+    <div className={styles.skeletonHeaderRow}>
+      <div className={styles.skeletonCircle} />
+      <div className={styles.skeletonLines}>
+        <div className={styles.skeletonBarLg} />
+        <div className={styles.skeletonBarSm} />
+      </div>
+    </div>
+    <div className={styles.skeletonAuditRows}>
+      <div className={styles.skeletonAuditBox} />
+      <div className={styles.skeletonAuditBox} />
+    </div>
+  </div>
+);
+
 function DashboardPageInner() {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
@@ -381,7 +397,24 @@ function DashboardPageInner() {
 
   const renderContent = () => {
     if (!publicKey) return <InfoState message="Connect your wallet to inspect and manage token authorities." />;
-    if (isLoadingUserTokens) return <InfoState message="Loading your wallet tokens..." showSpinner />;
+    if (isLoadingUserTokens) {
+      return (
+        <div className={styles.skeletonContainer}>
+          <div className={styles.skeletonSelectorGrid}>
+            {[1, 2, 3].map((n) => (
+              <div key={n} className={styles.skeletonTokenChip}>
+                <div className={styles.skeletonCircle} style={{ width: 28, height: 28 }} />
+                <div className={styles.skeletonLines}>
+                  <div className={styles.skeletonBarLg} />
+                  <div className={styles.skeletonBarSm} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <AuthorityCardSkeleton />
+        </div>
+      );
+    }
 
     return (
       <div className={styles.managementContainer}>
@@ -403,7 +436,7 @@ function DashboardPageInner() {
           />
         </div>
 
-        {isFetchingInfo && <InfoState message="Inspecting on-chain mint account..." showSpinner />}
+        {isFetchingInfo && <AuthorityCardSkeleton />}
 
         {mintInfo && selectedToken && (
           <TokenManagementCard

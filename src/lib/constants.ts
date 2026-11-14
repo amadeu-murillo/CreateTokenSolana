@@ -28,12 +28,27 @@ export const DEV_WALLET_ADDRESS_STRING = DEV_WALLET_ADDRESS.toBase58();
 export const MAINNET_RPC_ENDPOINT =
   (typeof window === "undefined" ? process.env.SOLANA_RPC_URL : undefined) ||
   process.env.NEXT_PUBLIC_HELIUS_RPC_URL ||
-  "https://api.mainnet-beta.solana.com";
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+  "https://solana-rpc.publicnode.com";
+
+export const MAINNET_FALLBACK_RPC_ENDPOINTS: string[] = [
+  ...(process.env.NEXT_PUBLIC_HELIUS_RPC_URL ? [process.env.NEXT_PUBLIC_HELIUS_RPC_URL] : []),
+  ...(process.env.NEXT_PUBLIC_SOLANA_RPC_URL ? [process.env.NEXT_PUBLIC_SOLANA_RPC_URL] : []),
+  "https://solana-rpc.publicnode.com",
+  "https://rpc.ankr.com/solana",
+  "https://api.mainnet-beta.solana.com",
+];
 
 export const DEVNET_RPC_ENDPOINT =
   (typeof window === "undefined" ? process.env.SOLANA_DEVNET_RPC_URL : undefined) ||
   process.env.NEXT_PUBLIC_DEVNET_RPC_URL ||
   "https://api.devnet.solana.com";
+
+export const DEVNET_FALLBACK_RPC_ENDPOINTS: string[] = [
+  ...(process.env.NEXT_PUBLIC_DEVNET_RPC_URL ? [process.env.NEXT_PUBLIC_DEVNET_RPC_URL] : []),
+  "https://solana-devnet.publicnode.com",
+  "https://api.devnet.solana.com",
+];
 
 export const RPC_ENDPOINT = MAINNET_RPC_ENDPOINT;
 

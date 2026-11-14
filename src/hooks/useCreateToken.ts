@@ -51,13 +51,13 @@ export const useCreateToken = () => {
   const createToken = useCallback(
     async (tokenData: TokenData) => {
       if (!publicKey || !sendTransaction) {
-        const errorMessage = "Wallet not connected. Please connect your Solana wallet to continue.";
+        const errorMessage = "Carteira não conectada. Conecte sua carteira Solana para continuar.";
         setError(errorMessage);
         return null;
       }
 
       if (!connection) {
-        const errorMessage = "Connection to the Solana network was not established.";
+        const errorMessage = "Conexão com a rede Solana não estabelecida.";
         setError(errorMessage);
         return null;
       }
@@ -65,7 +65,7 @@ export const useCreateToken = () => {
       setIsLoading(true);
       setError(null);
       setProgressStep(1);
-      setStatusStep("Stage 1/5: Validating modular options & uploading metadata JSON...");
+      setStatusStep("1. Upload para Irys — Verificando URI descentralizada da imagem...");
 
       try {
         let affiliateRef: string | null = null;
@@ -85,6 +85,9 @@ export const useCreateToken = () => {
             Boolean(tokenData.transferFee && tokenData.transferFee.basisPoints > 0),
         });
 
+        setProgressStep(2);
+        setStatusStep("2. Upload de Metadados — Publicando JSON Metaplex e montando transação...");
+
         const apiPayload = {
           ...tokenData,
           wallet: publicKey.toBase58(),
@@ -101,13 +104,8 @@ export const useCreateToken = () => {
         const result = await response.json();
 
         if (!response.ok) {
-          throw new Error(result.error || "Failed to prepare the transaction on the server.");
+          throw new Error(result.error || "Falha ao preparar a transação no servidor.");
         }
-
-        setProgressStep(2);
-        setStatusStep(
-          "Stage 2/5: Verifying program whitelist & simulating transaction on Solana RPC..."
-        );
 
         const transactionBuffer = Buffer.from(result.transaction, "base64");
         const transaction = VersionedTransaction.deserialize(new Uint8Array(transactionBuffer));
@@ -115,7 +113,7 @@ export const useCreateToken = () => {
         const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58());
         if (!integrity.valid) {
           throw new Error(
-            integrity.reason || "Transaction failed client-side security verification."
+            integrity.reason || "A transação falhou na verificação de segurança client-side."
           );
         }
 
@@ -132,12 +130,12 @@ export const useCreateToken = () => {
             simulationResult.value.logs
           );
           throw new Error(
-            `Transaction simulation failed: ${JSON.stringify(simulationResult.value.err)}`
+            `Simulação falhou: ${JSON.stringify(simulationResult.value.err)}`
           );
         }
 
         setProgressStep(3);
-        setStatusStep("Stage 3/5: Waiting for signature approval in your Solana wallet...");
+        setStatusStep("3. Aguardando Assinatura — Confirme a transação na sua carteira...");
 
         const signature = await sendTransaction(transaction, connection, {
           skipPreflight: false,
@@ -145,7 +143,7 @@ export const useCreateToken = () => {
         });
 
         setProgressStep(4);
-        setStatusStep("Stage 4/5: Broadcasting & confirming block finality on Solana...");
+        setStatusStep("4. Confirmando na Rede — Aguardando finalidade do bloco na Solana...");
 
         const blockhashInfo =
           result.blockhash && result.lastValidBlockHeight
@@ -163,9 +161,6 @@ export const useCreateToken = () => {
           },
           "confirmed"
         );
-
-        setProgressStep(5);
-        setStatusStep("Stage 5/5: Token minted on-chain! Indexing metadata & preparing receipt...");
 
         const effectiveFeeSol = result.serviceFeeSol ?? expectedModularFeeSol;
 
@@ -207,7 +202,6 @@ export const useCreateToken = () => {
           }
         }
 
-        // Phase 2: Record the 30% on-chain affiliate commission in Firebase / in-memory store
         if (affiliateRef && affiliateRef.trim() !== publicKey.toBase58()) {
           fetch("/api/record-commission", {
             method: "POST",
@@ -230,7 +224,7 @@ export const useCreateToken = () => {
         );
         return { signature, mintAddress: result.mintAddress };
       } catch (err) {
-        const friendlyMessage = parseSolanaError(err, "create the token");
+        const friendlyMessage = parseSolanaError(err, "criar o token");
         setError(friendlyMessage);
         return null;
       } finally {

@@ -520,3 +520,25 @@
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+
+
+.labelError {
+  color: #ef4444 !important;
+  font-weight: 600;
+}
+
+.inputError {
+  border-color: rgba(239, 68, 68, 0.75) !important;
+  background-color: rgba(239, 68, 68, 0.05) !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
+}
+
+.errorBanner {
+  padding: 0.75rem 0.95rem;
+  border-radius: 0.5rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  font-size: 0.8rem;
+  font-weight: 500;
+}

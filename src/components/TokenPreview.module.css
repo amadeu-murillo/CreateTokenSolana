@@ -1,31 +1,84 @@
 .previewCard {
-  border-style: solid;
-  border-width: 1px;
-  border-color: hsl(var(--border));
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
-  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 15, 18, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  transition: all 0.2s ease;
 }
 
-.previewCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px hsla(var(--primary), 0.12);
+.walletSimCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.05rem;
+  border-radius: 0.75rem;
+  background: rgba(9, 9, 11, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.walletSimHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  font-family: "JetBrains Mono", monospace;
+  color: #71717a;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.networkBadgeMainnet,
+.networkBadgeDevnet {
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+}
+
+.networkBadgeMainnet {
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.networkBadgeDevnet {
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
 }
 
 .tokenDisplay {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background-color: hsla(var(--muted), 0.5);
-  border-radius: var(--radius);
+  gap: 0.9rem;
 }
 
 .tokenImage {
-  width: 60px;
-  height: 60px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid hsl(var(--primary));
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  flex-shrink: 0;
+  background: #18181b;
+}
+
+.tokenPlaceholder {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, rgba(39, 39, 42, 0.9), rgba(24, 24, 27, 0.9));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #a1a1aa;
   flex-shrink: 0;
 }
 
@@ -37,33 +90,37 @@
 .nameAndBadge {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.15rem;
+  gap: 0.45rem;
+  margin-bottom: 0.2rem;
 }
 
 .tokenName {
+  margin: 0;
   font-weight: 700;
-  font-size: 1.15rem;
-  color: hsl(var(--foreground));
+  font-size: 1.05rem;
+  color: #fafafa;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .tokenBadge {
-  background-color: hsla(var(--primary), 0.15);
-  color: hsl(var(--primary));
-  font-size: 0.65rem;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e4e4e7;
+  font-size: 0.64rem;
   font-weight: 700;
-  padding: 0.2rem 0.5rem;
+  padding: 0.14rem 0.45rem;
   border-radius: 999px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
 }
 
 .tokenSymbol {
-  font-size: 0.88rem;
-  color: hsl(var(--muted-foreground));
+  margin: 0;
+  font-size: 0.82rem;
+  color: #a1a1aa;
   text-transform: uppercase;
   font-family: "JetBrains Mono", monospace;
 }
@@ -73,27 +130,68 @@
 }
 
 .supplyValue {
+  margin: 0;
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 0.98rem;
   font-family: "JetBrains Mono", monospace;
-  color: hsl(var(--foreground));
+  color: #fafafa;
 }
 
 .supplyLabel {
-  font-size: 0.72rem;
-  color: hsl(var(--muted-foreground));
+  margin: 0;
+  font-size: 0.7rem;
+  color: #71717a;
+}
+
+.metaSpecGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.metaSpecItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.metaSpecItem span {
+  font-size: 0.65rem;
+  color: #71717a;
+  text-transform: uppercase;
+}
+
+.metaSpecItem strong {
+  font-size: 0.76rem;
+  font-family: "JetBrains Mono", monospace;
+  color: #e4e4e7;
+}
+
+.descriptionPreview {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #a1a1aa;
+  line-height: 1.45;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* Phase 1: RugCheck Score & Audit Simulator Card */
 .rugCheckBox {
-  margin-top: 1.1rem;
-  padding: 1rem 1.1rem;
-  border-radius: var(--radius);
-  background: hsla(var(--background), 0.75);
-  border: 1px solid hsl(var(--border));
+  margin-top: 1rem;
+  padding: 0.95rem 1.05rem;
+  border-radius: 0.75rem;
+  background: rgba(9, 9, 11, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.7rem;
 }
 
 .rugCheckHeader {
@@ -105,97 +203,97 @@
 }
 
 .rugCheckTitle {
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: hsl(var(--muted-foreground));
+  color: #a1a1aa;
 }
 
 .scoreBadgeSafe,
 .scoreBadgeWarning,
 .scoreBadgeDanger {
   font-family: "JetBrains Mono", monospace;
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 700;
-  padding: 0.25rem 0.65rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 999px;
 }
 
 .scoreBadgeSafe {
-  background: rgba(20, 241, 149, 0.15);
-  border: 1px solid rgba(20, 241, 149, 0.45);
+  background: rgba(20, 241, 149, 0.14);
+  border: 1px solid rgba(20, 241, 149, 0.4);
   color: #14f195;
 }
 
 .scoreBadgeWarning {
-  background: rgba(245, 158, 11, 0.16);
-  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
   color: #fbbf24;
 }
 
 .scoreBadgeDanger {
-  background: rgba(255, 77, 141, 0.16);
-  border: 1px solid rgba(255, 77, 141, 0.45);
-  color: #ff4d8d;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
 }
 
 .progressTrack {
   width: 100%;
-  height: 8px;
+  height: 6px;
   border-radius: 999px;
-  background: hsla(var(--muted), 0.9);
+  background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
 .progressFillSafe {
   height: 100%;
   background: linear-gradient(90deg, #10b981, #14f195);
-  transition: width 0.3s ease;
+  transition: width 0.25s ease;
 }
 
 .progressFillWarning {
   height: 100%;
   background: linear-gradient(90deg, #f59e0b, #fbbf24);
-  transition: width 0.3s ease;
+  transition: width 0.25s ease;
 }
 
 .progressFillDanger {
   height: 100%;
-  background: linear-gradient(90deg, #ef4444, #ff4d8d);
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, #ef4444, #f87171);
+  transition: width 0.25s ease;
 }
 
 .alertsList {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.42rem;
 }
 
 .alertSafe,
 .alertWarning,
 .alertCritical {
-  padding: 0.55rem 0.75rem;
-  border-radius: calc(var(--radius) * 0.75);
-  font-size: 0.78rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.5rem;
+  font-size: 0.76rem;
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.42;
 }
 
 .alertSafe {
-  background: rgba(20, 241, 149, 0.1);
-  border: 1px solid rgba(20, 241, 149, 0.32);
+  background: rgba(20, 241, 149, 0.09);
+  border: 1px solid rgba(20, 241, 149, 0.28);
   color: #34d399;
 }
 
 .alertWarning {
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
   color: #fbbf24;
 }
 
 .alertCritical {
-  background: rgba(255, 77, 141, 0.12);
-  border: 1px solid rgba(255, 77, 141, 0.38);
-  color: #ff4d8d;
+  background: rgba(239, 68, 68, 0.11);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
 }

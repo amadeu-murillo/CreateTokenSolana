@@ -262,3 +262,40 @@
 .disconnectButton:hover {
   background-color: rgba(255, 77, 141, 0.12);
 }
+
+
+@media (max-width: 640px) {
+  .placeholderButton {
+    width: 118px;
+    height: 36px;
+  }
+
+  .connectButton {
+    height: 36px;
+    padding: 0 0.68rem;
+    font-size: 0.74rem;
+    gap: 0.35rem;
+  }
+
+  .connectedButtonMainnet,
+  .connectedButtonDevnet {
+    height: 36px;
+    padding: 0 0.58rem;
+    font-size: 0.72rem;
+    gap: 0.38rem;
+  }
+
+  .solBalanceChip {
+    display: none;
+  }
+
+  .dropdown {
+    position: fixed;
+    top: 4.35rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    width: auto;
+    max-width: 340px;
+    margin-left: auto;
+  }
+}

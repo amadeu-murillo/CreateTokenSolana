@@ -487,6 +487,15 @@ function BurnPageContent() {
                   />
                 </div>
 
+                {isLoadingUserTokens && !selectedToken && (
+                  <div className={styles.skeletonImpactCard} aria-busy="true">
+                    <div className={styles.skeletonMetricBox} />
+                    <div className={styles.skeletonMetricBox} />
+                    <div className={styles.skeletonMetricBox} />
+                    <div className={styles.skeletonMetricBox} />
+                  </div>
+                )}
+
                 {selectedToken && (
                   <>
                     <div className={styles.field}>

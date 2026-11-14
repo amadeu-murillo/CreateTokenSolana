@@ -1,35 +1,76 @@
-import React from 'react';
-import styles from './ManageAuthorityModal.module.css';
-import { Button } from './ui/button';
+"use client";
 
-interface Props {
-    isOpen: boolean;
-    onClose: () => void;
-    onConfirm: () => void;
-    title: string;
-    description: string;
-    isLoading: boolean;
+import React, { useEffect } from "react";
+import styles from "./ManageAuthorityModal.module.css";
+import { Button } from "./ui/button";
+
+export interface ManageAuthorityModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  description: string;
+  isLoading: boolean;
 }
 
-const ManageAuthorityModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, title, description, isLoading }) => {
-    if (!isOpen) return null;
+const ManageAuthorityModal: React.FC<ManageAuthorityModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  description,
+  isLoading,
+}) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isLoading) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isLoading, onClose]);
 
-    return (
-        <div className={styles.overlay} onClick={onClose}>
-            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-                <h3 className={styles.title}>{title}</h3>
-                <p className={styles.description}>{description}</p>
-                <div className={styles.actions}>
-                    <Button onClick={onClose} className={styles.cancelButton} disabled={isLoading}>
-                        Cancel
-                    </Button>
-                    <Button onClick={onConfirm} className={styles.confirmButton} disabled={isLoading}>
-                        {isLoading ? 'Confirming...' : 'Confirm and Remove'}
-                    </Button>
-                </div>
-            </div>
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className={styles.overlay}
+      onClick={() => {
+        if (!isLoading) onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="manage-authority-modal-title"
+    >
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <span className={styles.badgeDanger}>⚠️ Ação Irreversível On-Chain</span>
+        <h3 id="manage-authority-modal-title" className={styles.title}>
+          {title}
+        </h3>
+        <p className={styles.description}>{description}</p>
+        <div className={styles.actions}>
+          <Button
+            type="button"
+            onClick={onClose}
+            className={styles.cancelButton}
+            disabled={isLoading}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={onConfirm}
+            className={styles.confirmButton}
+            disabled={isLoading}
+          >
+            {isLoading ? "Assinando e Confirmando..." : "Confirmar e Revogar"}
+          </Button>
         </div>
-    );
+      </div>
+    </div>
+  );
 };
 
 export default ManageAuthorityModal;

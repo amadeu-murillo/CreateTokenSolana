@@ -264,7 +264,7 @@ function AddLiquidityPageInner() {
     return () => {
       mounted = false;
     };
-  }, [selectedToken, connection]);
+  }, [selectedToken?.mint, selectedToken?.programId, connection]);
 
   const numericBase = parseFloat(baseAmount) || 0;
   const numericQuote = parseFloat(quoteAmount) || 0;

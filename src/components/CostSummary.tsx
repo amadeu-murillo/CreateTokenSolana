@@ -5,6 +5,7 @@ import styles from "./CostSummary.module.css";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   DEV_WALLET_ADDRESS,
+  ESTIMATED_ATA_RENT_SOL,
   ModularPricingOptions,
   calculateModularTokenCreationFee,
   SERVICE_FEE_BURN_TOKEN_SOL,
@@ -37,6 +38,14 @@ const DEFAULT_MODULAR_OPTIONS: ModularPricingOptions = {
   customCreatorInfo: false,
   hasTransferFeeExtension: false,
 };
+
+/**
+ * Transparent Solana Protocol Constants (No Magic Numbers):
+ * - Account Rent Exemption (~0.00204 SOL per account/ATA on Solana)
+ * - Base Solana Signature Network Fee (~0.00001 SOL = 10,000 lamports)
+ */
+const SOLANA_ACCOUNT_RENT_SOL = Number(ESTIMATED_ATA_RENT_SOL.toFixed(4)); // ~0.002 SOL
+const SOLANA_NETWORK_TX_FEE_SOL = 0.00001;
 
 const serviceFeeByOperation: Record<Operation, number> = {
   createToken: 0.35,
@@ -75,24 +84,50 @@ export default function CostSummary({
     return () => window.removeEventListener("modular-fee-update", handleModularUpdate);
   }, []);
 
-  if (operation === "createToken") {
-    const { totalSol, items } = calculateModularTokenCreationFee(liveModularOptions);
-    const networkRentSol = 0.015;
-    const grandTotalSol = totalSol + networkRentSol;
+  const isCreateToken = operation === "createToken";
+  const modularCalculation = calculateModularTokenCreationFee(liveModularOptions);
 
-    const localizedLabelMap: Record<string, string> = {
-      base: t.costs.baseCreate,
-      revokeFreeze: t.costs.revokeFreeze,
-      revokeMint: t.costs.revokeMint,
-      immutable: t.costs.immutable,
-      customCreator: t.costs.customCreator,
-      transferFeeExt: t.costs.transferFeeExt,
-    };
+  const activeServiceFeeSol = isCreateToken
+    ? modularCalculation.totalSol
+    : (serviceFeeByOperation[operation] ?? 0.05);
 
-    return (
-      <div className={styles.card}>
+  const estimatedTotalSol =
+    activeServiceFeeSol + SOLANA_ACCOUNT_RENT_SOL + SOLANA_NETWORK_TX_FEE_SOL;
+
+  const localizedLabelMap: Record<string, string> = {
+    base: t.costs.baseCreate,
+    revokeFreeze: t.costs.revokeFreeze,
+    revokeMint: t.costs.revokeMint,
+    immutable: t.costs.immutable,
+    customCreator: t.costs.customCreator,
+    transferFeeExt: t.costs.transferFeeExt,
+  };
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.headerRow}>
+        <span className={styles.headerTitle}>Transparência de Custos On-Chain</span>
+        <span className={styles.headerBadge}>100% Atômico</span>
+      </div>
+
+      <ul className={styles.costList}>
+        <li className={styles.costListItem}>
+          <span>Aluguel da rede (Rent):</span>
+          <span className={styles.costValueMono}>~{SOLANA_ACCOUNT_RENT_SOL.toFixed(3)} SOL</span>
+        </li>
+        <li className={styles.costListItem}>
+          <span>Taxa da rede:</span>
+          <span className={styles.costValueMono}>~{SOLANA_NETWORK_TX_FEE_SOL.toFixed(5)} SOL</span>
+        </li>
+        <li className={styles.costListItem}>
+          <span>Taxa de serviço:</span>
+          <span className={styles.costValueMono}>{activeServiceFeeSol.toFixed(2)} SOL</span>
+        </li>
+      </ul>
+
+      {isCreateToken && (
         <div className={styles.breakdownList}>
-          {items.map((item) => (
+          {modularCalculation.items.map((item) => (
             <div
               key={item.key}
               className={item.active ? styles.breakdownRow : styles.breakdownRowInactive}
@@ -104,47 +139,18 @@ export default function CostSummary({
             </div>
           ))}
         </div>
+      )}
 
-        <div className={`${styles.item} ${styles.total}`}>
-          <p>{t.costs.totalModular}</p>
-          <p>{totalSol.toFixed(2)} SOL</p>
+      <div className={styles.estimatedTotalBox}>
+        <div className={styles.estimatedTotalLabel}>
+          <strong>Total Estimado</strong>
+          <span>Assinatura única na carteira</span>
         </div>
-
-        <div className={styles.item} style={{ fontSize: "0.78rem", opacity: 0.85 }}>
-          <span>{t.costs.networkRent}</span>
-          <span>~{networkRentSol.toFixed(3)} SOL</span>
-        </div>
-
-        <div className={styles.item} style={{ fontSize: "0.84rem", fontWeight: 700 }}>
-          <span>{t.costs.estimatedWalletTotal}</span>
-          <span style={{ color: "#34d399", fontFamily: "JetBrains Mono, monospace" }}>
-            ~{grandTotalSol.toFixed(3)} SOL
-          </span>
-        </div>
-
-        <p className={styles.disclaimer}>
-          {t.costs.atomicDisclaimer} ({devWalletBase58.slice(0, 6)}...
-          {devWalletBase58.slice(-4)}).
-        </p>
-      </div>
-    );
-  }
-
-  const devFee = serviceFeeByOperation[operation] ?? 0.07;
-  const estimatedTotal = devFee + 0.01;
-
-  return (
-    <div className={styles.card}>
-      <div className={`${styles.item} ${styles.total}`}>
-        <p>Service Fee (Dev Wallet):</p>
-        <p>{devFee.toFixed(2)} SOL</p>
-      </div>
-      <div className={styles.item} style={{ marginTop: "0.25rem", fontSize: "0.82rem" }}>
-        <span>{t.costs.estimatedWalletTotal}</span>
-        <span style={{ fontFamily: "JetBrains Mono, monospace", color: "#34d399" }}>
-          ~{estimatedTotal.toFixed(2)} SOL
+        <span className={styles.estimatedTotalValue}>
+          ~{estimatedTotalSol.toFixed(4)} SOL
         </span>
       </div>
+
       <p className={styles.disclaimer}>
         {t.costs.atomicDisclaimer} ({devWalletBase58.slice(0, 6)}...
         {devWalletBase58.slice(-4)}).

@@ -113,8 +113,23 @@ export const TokenSelector = ({
         />
       </Suspense>
 
+      {/* Minimalist Skeleton Loaders while useUserTokens isLoading === true (Zero Layout Shift) */}
+      {showQuickWalletCards && isLoading && (
+        <div className={styles.skeletonStrip} aria-busy="true" aria-label="Carregando tokens da carteira">
+          {[1, 2, 3].map((item) => (
+            <div key={item} className={styles.skeletonChip}>
+              <div className={styles.skeletonAvatar} />
+              <div className={styles.skeletonTextGroup}>
+                <div className={styles.skeletonLinePrimary} />
+                <div className={styles.skeletonLineSecondary} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 1-Click Direct Wallet Token Cards (No typing or symbol input required) */}
-      {showQuickWalletCards && tokens.length > 0 && (
+      {showQuickWalletCards && !isLoading && tokens.length > 0 && (
         <div className={styles.walletCardsStrip}>
           {tokens.map((token) => {
             const isSelected = token.mint === selectedTokenMint;
@@ -172,7 +187,13 @@ export const TokenSelector = ({
           disabled={disabled || isLoading}
         >
           {isLoading ? (
-            <span>Loading tokens directly from your connected wallet...</span>
+            <div className={styles.skeletonSelectorBar}>
+              <div className={styles.skeletonAvatar} />
+              <div className={styles.skeletonTextGroup}>
+                <div className={styles.skeletonLinePrimary} />
+                <div className={styles.skeletonLineSecondary} />
+              </div>
+            </div>
           ) : selectedToken ? (
             <div className={styles.tokenDisplay}>
               <Image
