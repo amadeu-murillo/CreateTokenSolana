@@ -24,8 +24,7 @@ import {
   getRpcEndpoint,
   getSolscanUrl,
 } from "@/lib/constants";
-
-require("@solana/wallet-adapter-react-ui/styles.css");
+import "@solana/wallet-adapter-react-ui/styles.css";
 
 interface ClusterContextValue {
   cluster: SolanaCluster;
