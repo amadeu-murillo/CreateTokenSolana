@@ -26,15 +26,13 @@ import { useUserTokens } from "@/hooks/useUserTokens";
 import { useCreateLiquidityPool } from "@/hooks/useCreateLiquidityPool";
 import { useRemoveLiquidity } from "@/hooks/useRemoveLiquidity";
 import {
-  DEV_WALLET_ADDRESS,
+  MODULAR_FEE_JITO_BUNDLE_SOL,
   SERVICE_FEE_CREATE_LP_DEVNET_SOL,
   SERVICE_FEE_CREATE_LP_SOL,
   SERVICE_FEE_REMOVE_LP_SOL,
 } from "@/lib/constants";
 import { QuoteAsset, SupportedDex } from "@/types/api";
 import styles from "./AddLiquidity.module.css";
-
-const devWalletBase58 = DEV_WALLET_ADDRESS.toBase58();
 
 const ALLOCATION_PRESETS = [
   { label: "25%", ratio: 0.25 },
@@ -68,7 +66,8 @@ function AddLiquidityPageInner() {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   const { cluster, setCluster, getExplorerUrl } = useCluster();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const isPt = locale === "pt" || locale === "pt-BR";
   const { tokens: userTokens, isLoading: isLoadingTokens, refreshTokens } = useUserTokens();
 
   const {
@@ -111,13 +110,25 @@ function AddLiquidityPageInner() {
   );
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // Phase 4.1: Raydium CPMM Creator Swap Fee state
+  const [creatorFeeEnabled, setCreatorFeeEnabled] = useState<boolean>(true);
+  const [creatorFeeBps, setCreatorFeeBps] = useState<number>(10); // 0.10% creator fee
+
+  // Phase 3: Jito Anti-Sniper Bundle toggle on Pool Launch
+  const [jitoPoolBundleEnabled, setJitoPoolBundleEnabled] = useState<boolean>(false);
+  const [jitoFirstBuySol, setJitoFirstBuySol] = useState<string>("0.1");
+  const [jitoTipSol, setJitoTipSol] = useState<string>("0.002");
+
   const [withdrawPercentage, setWithdrawPercentage] = useState<number>(100);
   const [derivedWsolVault, setDerivedWsolVault] = useState<string>("");
   const [detectedVaultSol, setDetectedVaultSol] = useState<number | null>(null);
   const [isCheckingVault, setIsCheckingVault] = useState<boolean>(false);
 
-  const activeLpFeeSol =
+  const baseLpFeeSol =
     cluster === "devnet" ? SERVICE_FEE_CREATE_LP_DEVNET_SOL : SERVICE_FEE_CREATE_LP_SOL;
+  const activeLpFeeSol = Number(
+    (baseLpFeeSol + (jitoPoolBundleEnabled ? MODULAR_FEE_JITO_BUNDLE_SOL : 0)).toFixed(2)
+  );
 
   const feeTiers = useMemo(
     () => [
@@ -913,7 +924,7 @@ function AddLiquidityPageInner() {
                       >
                         <div className={styles.dexHeader}>
                           <strong>Raydium CPMM Vault</strong>
-                          <span className={styles.dexBadge}>SPL & Token-2022</span>
+                          <span className={styles.dexBadge}>SPL & Token-2022 + Creator Fee</span>
                         </div>
                         <p>{t.liquidityPage.raydiumDesc}</p>
                       </button>
@@ -933,6 +944,58 @@ function AddLiquidityPageInner() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Phase 4.1: Native Raydium CPMM Creator Swap Fee */}
+                  {dex === "raydium-cpmm" && (
+                    <div
+                      style={{
+                        padding: "0.85rem 1rem",
+                        borderRadius: "0.75rem",
+                        border: "1px solid rgba(20, 241, 149, 0.35)",
+                        background: "rgba(20, 241, 149, 0.06)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "0.75rem",
+                      }}
+                    >
+                      <div>
+                        <strong style={{ fontSize: "0.88rem", color: "#14f195" }}>
+                          💎 {isPt ? "Raydium CPMM Creator Swap Fee (Receita Passiva por Swap)" : "Raydium CPMM Creator Swap Fee (Passive Swap Revenue)"}
+                        </strong>
+                        <p style={{ fontSize: "0.78rem", color: "hsl(var(--muted-foreground))", marginTop: "0.15rem" }}>
+                          {isPt
+                            ? "Receba automaticamente uma fração das taxas de cada swap no pool (suportado para SPL e Token-2022)."
+                            : "Automatically earn a fraction of swap fees on every trade in the pool (supported for SPL & Token-2022)."}
+                        </p>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                        <select
+                          value={creatorFeeBps}
+                          onChange={(e) => setCreatorFeeBps(Number(e.target.value))}
+                          disabled={!creatorFeeEnabled}
+                          style={{
+                            padding: "0.35rem 0.6rem",
+                            borderRadius: "0.5rem",
+                            background: "#09090b",
+                            color: "#f8fafc",
+                            border: "1px solid rgba(255,255,255,0.2)",
+                            fontSize: "0.78rem",
+                          }}
+                        >
+                          <option value={5}>0.05% Creator Share</option>
+                          <option value={10}>0.10% Creator Share</option>
+                          <option value={25}>0.25% Creator Share</option>
+                        </select>
+                        <input
+                          type="checkbox"
+                          checked={creatorFeeEnabled}
+                          onChange={(e) => setCreatorFeeEnabled(e.target.checked)}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div className={styles.field}>
                     <div className={styles.labelRow}>
@@ -1043,6 +1106,60 @@ function AddLiquidityPageInner() {
                         </span>
                       )}
                     </div>
+                  </div>
+
+                  {/* Phase 3: Optional Jito Atomic Bundle on Liquidity Launch */}
+                  <div
+                    style={{
+                      padding: "0.85rem 1rem",
+                      borderRadius: "0.75rem",
+                      border: "1px solid rgba(153, 69, 255, 0.4)",
+                      background: "rgba(153, 69, 255, 0.08)",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
+                      <div>
+                        <strong style={{ fontSize: "0.88rem", color: "#c4b5fd" }}>
+                          ⚡ {isPt ? `Jito Atomic Bundle: Pool + 1ª Compra Anti-Sniper (+${MODULAR_FEE_JITO_BUNDLE_SOL.toFixed(2)} SOL)` : `Jito Atomic Bundle: Pool + Anti-Sniper First Buy (+${MODULAR_FEE_JITO_BUNDLE_SOL.toFixed(2)} SOL)`}
+                        </strong>
+                        <p style={{ fontSize: "0.78rem", color: "hsl(var(--muted-foreground))" }}>
+                          {isPt
+                            ? "Executa a criação do Pool + sua 1ª Compra no mesmo pacote Jito no Bloco Zero."
+                            : "Executes Pool Initialization + your First Buy in the same Block-Zero Jito bundle."}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={jitoPoolBundleEnabled}
+                        onChange={(e) => setJitoPoolBundleEnabled(e.target.checked)}
+                      />
+                    </div>
+
+                    {jitoPoolBundleEnabled && (
+                      <div className={styles.fieldGrid} style={{ marginTop: "0.75rem" }}>
+                        <div className={styles.field}>
+                          <Label>{isPt ? "1ª Compra do Criador (SOL)" : "Creator First Buy (SOL)"}</Label>
+                          <Input
+                            type="number"
+                            step="0.05"
+                            min="0.01"
+                            value={jitoFirstBuySol}
+                            onChange={(e) => setJitoFirstBuySol(e.target.value)}
+                          />
+                        </div>
+                        <div className={styles.field}>
+                          <Label>{isPt ? "Gorjeta Jito (0.001–0.01 SOL)" : "Jito Validator Tip (SOL)"}</Label>
+                          <Input
+                            type="number"
+                            step="0.001"
+                            min="0.001"
+                            max="0.01"
+                            value={jitoTipSol}
+                            onChange={(e) => setJitoTipSol(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className={styles.fieldGrid}>

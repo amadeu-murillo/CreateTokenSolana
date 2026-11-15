@@ -21,6 +21,18 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/affiliates",
+        destination: "/afiliates",
+      },
+      {
+        source: "/docs",
+        destination: "/documentacao",
+      },
+    ];
+  },
   webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...(config.resolve.alias || {}),

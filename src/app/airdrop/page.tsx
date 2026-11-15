@@ -2,11 +2,13 @@
 
 import React, { Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { PublicKey } from "@solana/web3.js";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { useAirdrop } from "@/hooks/useAirdrop";
 import { useUserTokens } from "@/hooks/useUserTokens";
 import { useCluster } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -20,7 +22,11 @@ import { TokenSelector } from "@/components/TokenSelector";
 import Notification from "@/components/ui/Notification";
 import TransactionStatusStepper from "@/components/TransactionStatusStepper";
 import CostSummary from "@/components/CostSummary";
-import { DEV_WALLET_ADDRESS, SERVICE_FEE_AIRDROP_SOL } from "@/lib/constants";
+import {
+  DEV_WALLET_ADDRESS,
+  SERVICE_FEE_AIRDROP_SOL,
+  SERVICE_FEE_SNAPSHOT_HOLDERS_SOL,
+} from "@/lib/constants";
 import styles from "./Airdrop.module.css";
 
 const devWalletBase58 = DEV_WALLET_ADDRESS.toBase58();
@@ -44,68 +50,43 @@ const SAMPLE_RECIPIENTS_CSV = [
   "4hSVN9aKqM1nXz8R5v2L9pW3xY7cE2fB6dN4mQ8jE3FE,5000",
 ].join("\n");
 
+const KNOWN_DEX_POOL_OWNERS = new Set([
+  "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1", // Raydium V4 Authority
+  "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C", // Raydium CPMM
+  "Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB", // Meteora DAMM
+]);
+
 const TokenIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <circle cx="12" cy="12" r="4" />
-  </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /></svg>
 );
-
 const UsersIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
 );
-
 const CheckIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <polyline points="20 6 9 17 4 12"></polyline>
-  </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
 );
 
 const TUTORIAL_ICONS = [<TokenIcon key="t" />, <UsersIcon key="u" />, <CheckIcon key="c" />];
 
 function AirdropPageInner() {
+  const { connection } = useConnection();
   const { cluster, setCluster } = useCluster();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const isPt = locale === "pt" || locale === "pt-BR";
+
   const [selectedTokenMint, setSelectedTokenMint] = useState("");
   const [recipientsText, setRecipientsText] = useState("");
   const [uniformAmount, setUniformAmount] = useState("1000");
   const [parsedResult, setParsedResult] = useState<ParsedResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Phase 6.1: On-Chain Holders Snapshot state
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const [snapshotMint, setSnapshotMint] = useState("");
+  const [snapshotLimit, setSnapshotLimit] = useState<number>(100);
+  const [isSnapshotting, setIsSnapshotting] = useState(false);
+  const [snapshotUsed, setSnapshotUsed] = useState(false);
+  const [snapshotError, setSnapshotError] = useState<string | null>(null);
 
   const { performAirdrop, isLoading, statusStep, progressStep, error, signature, reset } =
     useAirdrop();
@@ -115,6 +96,58 @@ function AirdropPageInner() {
     () => userTokens.find((tk) => tk.mint === selectedTokenMint) || null,
     [userTokens, selectedTokenMint]
   );
+
+  const handleRunHoldersSnapshot = async () => {
+    if (!connection || !snapshotMint.trim()) return;
+    setIsSnapshotting(true);
+    setSnapshotError(null);
+
+    try {
+      const targetMint = new PublicKey(snapshotMint.trim());
+      const largest = await connection.getTokenLargestAccounts(targetMint, "confirmed");
+      const nonZero = largest.value.filter((item) => Number(item.uiAmount || 0) > 0);
+
+      const resolvedOwners: string[] = [];
+      const amtPerHolder = parseFloat(uniformAmount) || 1000;
+
+      for (const acc of nonZero.slice(0, snapshotLimit)) {
+        try {
+          const parsedInfo = await connection.getParsedAccountInfo(acc.address, "confirmed");
+          const data = parsedInfo.value?.data;
+          if (data && "parsed" in data) {
+            const ownerAddr: string | undefined = data.parsed?.info?.owner;
+            if (
+              ownerAddr &&
+              !KNOWN_DEX_POOL_OWNERS.has(ownerAddr) &&
+              !resolvedOwners.includes(ownerAddr)
+            ) {
+              resolvedOwners.push(ownerAddr);
+            }
+          }
+        } catch {
+          // Skip unresolvable token account
+        }
+      }
+
+      if (resolvedOwners.length === 0) {
+        throw new Error(
+          isPt
+            ? "Nenhum holder elegível encontrado para este Mint nesta rede."
+            : "No eligible holders found for this Mint on the active network."
+        );
+      }
+
+      const lines = resolvedOwners.map((addr) => `${addr},${amtPerHolder}`);
+      setRecipientsText(lines.join("\n"));
+      setSnapshotUsed(true);
+    } catch (err) {
+      setSnapshotError(
+        err instanceof Error ? err.message : "Failed to snapshot token holders."
+      );
+    } finally {
+      setIsSnapshotting(false);
+    }
+  };
 
   const parseRecipients = (text: string): ParsedResult => {
     const lines = text
@@ -222,13 +255,15 @@ function AirdropPageInner() {
     setSelectedTokenMint("");
     setRecipientsText("");
     setParsedResult(null);
+    setSnapshotUsed(false);
     reset();
   };
 
   const BATCH_SIZE = 10;
   const numBatches =
     parsedResult && parsedResult.valid ? Math.ceil(parsedResult.valid.length / BATCH_SIZE) : 0;
-  const totalFee = (numBatches * SERVICE_FEE_AIRDROP_SOL).toFixed(2);
+  const snapshotAddonSol = snapshotUsed ? SERVICE_FEE_SNAPSHOT_HOLDERS_SOL : 0;
+  const totalFee = (numBatches * SERVICE_FEE_AIRDROP_SOL + snapshotAddonSol).toFixed(2);
   const walletTokenBalance = selectedToken ? parseFloat(selectedToken.amount) || 0 : 0;
   const hasEnoughTokenBalance =
     !selectedToken || !parsedResult || parsedResult.totalAmount <= walletTokenBalance;
@@ -335,6 +370,92 @@ function AirdropPageInner() {
                   />
                 </div>
 
+                {/* Phase 6.1: Automatic On-Chain Holders Snapshot Extractor */}
+                <div className={styles.field}>
+                  <div className={styles.toolbarRow}>
+                    <button
+                      type="button"
+                      onClick={() => setSnapshotOpen((prev) => !prev)}
+                      className={styles.toolChipBtn}
+                      style={{
+                        borderColor: "rgba(20, 241, 149, 0.45)",
+                        color: "#14f195",
+                        fontWeight: 700,
+                      }}
+                    >
+                      📸{" "}
+                      {isPt
+                        ? `Importar Holders de Qualquer Token (Snapshot On-Chain · +${SERVICE_FEE_SNAPSHOT_HOLDERS_SOL.toFixed(2)} SOL)`
+                        : `Import Holders from Any Token (On-Chain Snapshot · +${SERVICE_FEE_SNAPSHOT_HOLDERS_SOL.toFixed(2)} SOL)`}
+                    </button>
+                  </div>
+
+                  {snapshotOpen && (
+                    <div
+                      style={{
+                        padding: "0.95rem",
+                        borderRadius: "0.75rem",
+                        border: "1px solid rgba(20, 241, 149, 0.35)",
+                        background: "rgba(20, 241, 149, 0.06)",
+                        marginTop: "0.5rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.75rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", gap: "0.65rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+                        <div style={{ flex: 1, minWidth: "240px" }}>
+                          <Label htmlFor="snapshotMintInput">
+                            {isPt ? "Mint Address do Token Alvo" : "Target Token Mint Address"}
+                          </Label>
+                          <Input
+                            id="snapshotMintInput"
+                            placeholder="Ex: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+                            value={snapshotMint}
+                            onChange={(e) => setSnapshotMint(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label>{isPt ? "Limite de Top Carteiras" : "Max Top Holders"}</Label>
+                          <div style={{ display: "flex", gap: "0.35rem", marginTop: "0.35rem" }}>
+                            {[100, 500].map((lim) => (
+                              <button
+                                key={lim}
+                                type="button"
+                                onClick={() => setSnapshotLimit(lim)}
+                                className={styles.toolChipBtn}
+                                style={{
+                                  background:
+                                    snapshotLimit === lim ? "rgba(20, 241, 149, 0.2)" : undefined,
+                                  color: snapshotLimit === lim ? "#14f195" : undefined,
+                                }}
+                              >
+                                Top {lim}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={handleRunHoldersSnapshot}
+                          disabled={isSnapshotting || !snapshotMint.trim()}
+                        >
+                          {isSnapshotting
+                            ? isPt
+                              ? "Extraindo Holders..."
+                              : "Snapshotting..."
+                            : isPt
+                              ? "⚡ Extrair Snapshot On-Chain"
+                              : "⚡ Extract On-Chain Snapshot"}
+                        </Button>
+                      </div>
+                      {snapshotError && (
+                        <p style={{ color: "#fca5a5", fontSize: "0.8rem" }}>{snapshotError}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div className={styles.field}>
                   <div className={styles.toolbarRow}>
                     <Label htmlFor="recipients">{t.airdropPage.step2RecipientsLabel}</Label>
@@ -358,7 +479,10 @@ function AirdropPageInner() {
                       {recipientsText && (
                         <button
                           type="button"
-                          onClick={() => setRecipientsText("")}
+                          onClick={() => {
+                            setRecipientsText("");
+                            setSnapshotUsed(false);
+                          }}
                           disabled={isLoading}
                           className={styles.toolChipBtn}
                         >

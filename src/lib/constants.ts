@@ -1,11 +1,15 @@
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import {
+  AFFILIATE_COMMISSION_RATE as PRICING_AFFILIATE_RATE,
+  DEV_AFFILIATE_SHARE_RATE as PRICING_DEV_RATE,
+  ModularPricingBreakdownItem,
+  ModularPricingOptions,
+  OFFICIAL_DEV_WALLET_STRING,
+  PRICING_SOL,
+  calculateModularTokenCreationFee,
+} from "@/config/pricing";
 
 export type SolanaCluster = "mainnet-beta" | "devnet";
-
-/**
- * RF-01: Developer wallet address that receives service fees across ALL platform operations.
- */
-const DEFAULT_DEV_WALLET = "CP6teSg2LUxQsSBBtwZ9xjG2aZjjznhfCvGED9LNgjrJ";
 
 function resolveSafeDevWallet(): PublicKey {
   const raw = (process.env.NEXT_PUBLIC_DEV_WALLET_ADDRESS || "").trim();
@@ -16,23 +20,22 @@ function resolveSafeDevWallet(): PublicKey {
       // Fallback to default valid dev wallet if env var is malformed
     }
   }
-  return new PublicKey(DEFAULT_DEV_WALLET);
+  return new PublicKey(OFFICIAL_DEV_WALLET_STRING);
 }
 
 export const DEV_WALLET_ADDRESS = resolveSafeDevWallet();
 export const DEV_WALLET_ADDRESS_STRING = DEV_WALLET_ADDRESS.toBase58();
 
-/**
- * RF-02: Cluster-aware RPC endpoints (Mainnet-Beta default and Devnet optional).
- */
 export const MAINNET_RPC_ENDPOINT =
   (typeof window === "undefined" ? process.env.SOLANA_RPC_URL : undefined) ||
   process.env.NEXT_PUBLIC_HELIUS_RPC_URL ||
+  process.env.NEXT_PUBLIC_RPC_URL ||
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
   "https://solana-rpc.publicnode.com";
 
 export const MAINNET_FALLBACK_RPC_ENDPOINTS: string[] = [
   ...(process.env.NEXT_PUBLIC_HELIUS_RPC_URL ? [process.env.NEXT_PUBLIC_HELIUS_RPC_URL] : []),
+  ...(process.env.NEXT_PUBLIC_RPC_URL ? [process.env.NEXT_PUBLIC_RPC_URL] : []),
   ...(process.env.NEXT_PUBLIC_SOLANA_RPC_URL ? [process.env.NEXT_PUBLIC_SOLANA_RPC_URL] : []),
   "https://solana-rpc.publicnode.com",
   "https://rpc.ankr.com/solana",
@@ -65,126 +68,40 @@ export function getSolscanUrl(
   return `https://solscan.io/${type}/${identifier}${suffix}`;
 }
 
-/**
- * RF-03: Phase 1 Modular Pricing Upsell Schedule (in SOL):
- * - Base Token Creation Fee: 0.10 SOL
- * - Revoke Freeze Authority: +0.10 SOL (Default ON - Recommended)
- * - Revoke Mint Authority: +0.10 SOL (Default ON - Recommended)
- * - Immutable Metadata: +0.05 SOL (Default ON)
- * - Custom Creator Info in Metadata: +0.05 SOL (Optional Toggle)
- * - Tax Token / Transfer Fee Extension (Token-2022): +0.15 SOL (When Token-2022 Transfer Fee > 0)
- */
-export const MODULAR_FEE_BASE_CREATE_SOL = 0.10;
-export const MODULAR_FEE_REVOKE_FREEZE_SOL = 0.10;
-export const MODULAR_FEE_REVOKE_MINT_SOL = 0.10;
-export const MODULAR_FEE_IMMUTABLE_METADATA_SOL = 0.05;
-export const MODULAR_FEE_CUSTOM_CREATOR_SOL = 0.05;
-export const MODULAR_FEE_TRANSFER_FEE_EXT_SOL = 0.15;
+export const MODULAR_FEE_BASE_CREATE_SOL = PRICING_SOL.baseMint;
+export const MODULAR_FEE_REVOKE_FREEZE_SOL = PRICING_SOL.revokeFreeze;
+export const MODULAR_FEE_REVOKE_MINT_SOL = PRICING_SOL.revokeMint;
+export const MODULAR_FEE_IMMUTABLE_METADATA_SOL = PRICING_SOL.immutableMetadata;
+export const MODULAR_FEE_CUSTOM_CREATOR_SOL = PRICING_SOL.customCreator;
+export const MODULAR_FEE_TRANSFER_FEE_EXT_SOL = PRICING_SOL.transferFeeExt;
+export const MODULAR_FEE_SOULBOUND_EXT_SOL = PRICING_SOL.soulboundExt;
+export const MODULAR_FEE_PERMANENT_DELEGATE_EXT_SOL = PRICING_SOL.permanentDelegateExt;
+export const MODULAR_FEE_VANITY_MINT_SOL = PRICING_SOL.vanityCustom3To4Chars;
+export const MODULAR_FEE_JITO_BUNDLE_SOL = PRICING_SOL.jitoAtomicBundle;
 
-export interface ModularPricingOptions {
-  revokeFreeze: boolean;
-  revokeMint: boolean;
-  immutableMetadata: boolean;
-  customCreatorInfo: boolean;
-  hasTransferFeeExtension: boolean;
-}
+export type { ModularPricingOptions, ModularPricingBreakdownItem };
+export { calculateModularTokenCreationFee };
 
-export interface ModularPricingBreakdownItem {
-  key: string;
-  label: string;
-  sol: number;
-  active: boolean;
-}
-
-export function calculateModularTokenCreationFee(
-  options: ModularPricingOptions
-): {
-  totalSol: number;
-  totalLamports: number;
-  items: ModularPricingBreakdownItem[];
-} {
-  const items: ModularPricingBreakdownItem[] = [
-    {
-      key: "base",
-      label: "Taxa Base de Criação (Token Mint)",
-      sol: MODULAR_FEE_BASE_CREATE_SOL,
-      active: true,
-    },
-    {
-      key: "revokeFreeze",
-      label: "Revogar Freeze Authority (Pool Ready)",
-      sol: MODULAR_FEE_REVOKE_FREEZE_SOL,
-      active: Boolean(options.revokeFreeze),
-    },
-    {
-      key: "revokeMint",
-      label: "Revogar Mint Authority (Supply Fixo)",
-      sol: MODULAR_FEE_REVOKE_MINT_SOL,
-      active: Boolean(options.revokeMint),
-    },
-    {
-      key: "immutable",
-      label: "Metadados Imutáveis (Immutable)",
-      sol: MODULAR_FEE_IMMUTABLE_METADATA_SOL,
-      active: Boolean(options.immutableMetadata),
-    },
-    {
-      key: "customCreator",
-      label: "Customizar Creator Info (Metadados)",
-      sol: MODULAR_FEE_CUSTOM_CREATOR_SOL,
-      active: Boolean(options.customCreatorInfo),
-    },
-    {
-      key: "transferFeeExt",
-      label: "Extensão Tax Token / Transfer Fee (Token-2022)",
-      sol: MODULAR_FEE_TRANSFER_FEE_EXT_SOL,
-      active: Boolean(options.hasTransferFeeExtension),
-    },
-  ];
-
-  const rawTotalSol = items
-    .filter((item) => item.active)
-    .reduce((sum, item) => sum + item.sol, 0);
-
-  const totalSol = Number(rawTotalSol.toFixed(4));
-  const totalLamports = Math.round(totalSol * LAMPORTS_PER_SOL);
-
-  return { totalSol, totalLamports, items };
-}
-
-/**
- * Default recommended modular token creation fee (Base 0.10 + Freeze 0.10 + Mint 0.10 + Immutable 0.05 = 0.35 SOL).
- */
-export const STANDARD_SERVICE_FEE_SOL = 0.07;
+export const STANDARD_SERVICE_FEE_SOL = PRICING_SOL.createLiquidityPool;
 export const SERVICE_FEE_CREATE_TOKEN_SOL = 0.35;
-export const SERVICE_FEE_BURN_TOKEN_SOL = 0.07;
-export const SERVICE_FEE_AIRDROP_SOL = 0.07;
-export const SERVICE_FEE_MANAGE_AUTHORITY_SOL = 0.07;
-export const SERVICE_FEE_CREATE_LP_SOL = 0.07;
-export const SERVICE_FEE_CREATE_LP_DEVNET_SOL = 0.07;
-export const SERVICE_FEE_REMOVE_LP_SOL = 0.05;
+export const SERVICE_FEE_BURN_TOKEN_SOL = PRICING_SOL.burnStandard;
+export const SERVICE_FEE_BURN_AND_EARN_SOL = PRICING_SOL.burnAndEarnLockLp;
+export const SERVICE_FEE_AIRDROP_SOL = PRICING_SOL.massAirdropPerBatch;
+export const SERVICE_FEE_SNAPSHOT_HOLDERS_SOL = PRICING_SOL.holdersSnapshotAddon;
+export const SERVICE_FEE_MANAGE_AUTHORITY_SOL = PRICING_SOL.revokeAuthorityStandalone;
+export const SERVICE_FEE_CLAIM_WITHHELD_TAX_SOL = PRICING_SOL.claimWithheldTaxPerBatch;
+export const SERVICE_FEE_CREATE_LP_SOL = PRICING_SOL.createLiquidityPool;
+export const SERVICE_FEE_CREATE_LP_DEVNET_SOL = PRICING_SOL.createLiquidityPool;
+export const SERVICE_FEE_REMOVE_LP_SOL = PRICING_SOL.withdrawLiquiditySol;
 
-/**
- * Phase 2: Instant On-Chain Affiliate Split:
- * - 30% directly to Affiliate Wallet
- * - 70% directly to DEV_WALLET_ADDRESS
- */
-export const AFFILIATE_COMMISSION_RATE = 0.30;
-export const DEV_AFFILIATE_SHARE_RATE = 0.70;
+export const AFFILIATE_COMMISSION_RATE = PRICING_AFFILIATE_RATE;
+export const DEV_AFFILIATE_SHARE_RATE = PRICING_DEV_RATE;
 
-/**
- * Phase 4: Reclaim SOL (Close Empty Token Accounts) Constants:
- * - ~0.00203928 SOL rent reclaimed per empty SPL / Token-2022 account
- * - 15% service fee routed atomically to DEV_WALLET_ADDRESS
- */
 export const ESTIMATED_ATA_RENT_SOL = 0.00203928;
 export const ESTIMATED_ATA_RENT_LAMPORTS = 2_039_280;
-export const RECLAIM_SOL_SERVICE_FEE_RATE = 0.15;
+export const RECLAIM_SOL_SERVICE_FEE_RATE = PRICING_SOL.reclaimSolPlatformFeeRate;
 export const MAX_CLOSE_ACCOUNTS_PER_TX = 20;
 
-/**
- * Service Fees in Lamports.
- */
 export const STANDARD_SERVICE_FEE_LAMPORTS = Math.round(
   STANDARD_SERVICE_FEE_SOL * LAMPORTS_PER_SOL
 );
@@ -194,11 +111,20 @@ export const SERVICE_FEE_CREATE_TOKEN_LAMPORTS = Math.round(
 export const SERVICE_FEE_BURN_TOKEN_LAMPORTS = Math.round(
   SERVICE_FEE_BURN_TOKEN_SOL * LAMPORTS_PER_SOL
 );
+export const SERVICE_FEE_BURN_AND_EARN_LAMPORTS = Math.round(
+  SERVICE_FEE_BURN_AND_EARN_SOL * LAMPORTS_PER_SOL
+);
 export const SERVICE_FEE_AIRDROP_LAMPORTS = Math.round(
   SERVICE_FEE_AIRDROP_SOL * LAMPORTS_PER_SOL
 );
+export const SERVICE_FEE_SNAPSHOT_HOLDERS_LAMPORTS = Math.round(
+  SERVICE_FEE_SNAPSHOT_HOLDERS_SOL * LAMPORTS_PER_SOL
+);
 export const SERVICE_FEE_MANAGE_AUTHORITY_LAMPORTS = Math.round(
   SERVICE_FEE_MANAGE_AUTHORITY_SOL * LAMPORTS_PER_SOL
+);
+export const SERVICE_FEE_CLAIM_WITHHELD_TAX_LAMPORTS = Math.round(
+  SERVICE_FEE_CLAIM_WITHHELD_TAX_SOL * LAMPORTS_PER_SOL
 );
 export const SERVICE_FEE_CREATE_LP_LAMPORTS = Math.round(
   SERVICE_FEE_CREATE_LP_SOL * LAMPORTS_PER_SOL
@@ -216,9 +142,6 @@ export function getLpServiceFeeLamports(cluster: SolanaCluster = "mainnet-beta")
     : SERVICE_FEE_CREATE_LP_LAMPORTS;
 }
 
-/**
- * DEX Program IDs and Quote Token Mints for Mainnet-Beta & Devnet.
- */
 export const WSOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
 export const USDC_MINT_MAINNET = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 export const USDC_MINT_DEVNET = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
@@ -272,11 +195,8 @@ export function getClusterDexConfig(cluster: SolanaCluster = "mainnet-beta") {
   };
 }
 
-/**
- * Operational security limits.
- */
 export const MAX_AIRDROP_RECIPIENTS_PER_TX = 20;
-export const MAX_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+export const MAX_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 export const ALLOWED_IMAGE_MIME_TYPES = [
   "image/png",
   "image/jpeg",

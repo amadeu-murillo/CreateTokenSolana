@@ -295,7 +295,7 @@ function TrustFooter() {
               {t.nav.affiliates}
             </Link>
             <Link href="/costs" className={styles.footerLink}>
-              {t.costsPage.pageTitle}
+              {t.costsPage?.pageTitle || "Transparent Costs & Fees Table"}
             </Link>
             <Link href="/documentacao" className={styles.footerLink}>
               {t.nav.docs}

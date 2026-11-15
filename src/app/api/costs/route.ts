@@ -1,49 +1,31 @@
 import { NextResponse } from "next/server";
-import {
-  MODULAR_FEE_BASE_CREATE_SOL,
-  MODULAR_FEE_REVOKE_FREEZE_SOL,
-  MODULAR_FEE_REVOKE_MINT_SOL,
-  MODULAR_FEE_IMMUTABLE_METADATA_SOL,
-  MODULAR_FEE_CUSTOM_CREATOR_SOL,
-  MODULAR_FEE_TRANSFER_FEE_EXT_SOL,
-  SERVICE_FEE_CREATE_TOKEN_SOL,
-  SERVICE_FEE_BURN_TOKEN_SOL,
-  SERVICE_FEE_AIRDROP_SOL,
-  SERVICE_FEE_MANAGE_AUTHORITY_SOL,
-  SERVICE_FEE_CREATE_LP_SOL,
-  SERVICE_FEE_REMOVE_LP_SOL,
-} from "@/lib/constants";
+import { PRICING_SCHEDULE_TABLE, PRICING_SOL } from "@/config/pricing";
 
 export const dynamic = "force-dynamic";
 
-
 export async function GET() {
   try {
-    const networkCostInSol = 0.01;
+    const networkCostInSol = 0.00204;
 
     const costs = {
-      createToken: (networkCostInSol + SERVICE_FEE_CREATE_TOKEN_SOL).toFixed(4),
-      burnToken: (networkCostInSol + SERVICE_FEE_BURN_TOKEN_SOL).toFixed(4),
-      airdrop: (networkCostInSol + SERVICE_FEE_AIRDROP_SOL).toFixed(4),
-      manageAuthority: (networkCostInSol + SERVICE_FEE_MANAGE_AUTHORITY_SOL).toFixed(4),
-      createLiquidityPool: (networkCostInSol + SERVICE_FEE_CREATE_LP_SOL).toFixed(4),
-      removeLiquidity: (networkCostInSol + SERVICE_FEE_REMOVE_LP_SOL).toFixed(4),
-      modularBreakdown: {
-        baseCreate: MODULAR_FEE_BASE_CREATE_SOL.toFixed(2),
-        revokeFreeze: MODULAR_FEE_REVOKE_FREEZE_SOL.toFixed(2),
-        revokeMint: MODULAR_FEE_REVOKE_MINT_SOL.toFixed(2),
-        immutableMetadata: MODULAR_FEE_IMMUTABLE_METADATA_SOL.toFixed(2),
-        customCreator: MODULAR_FEE_CUSTOM_CREATOR_SOL.toFixed(2),
-        transferFeeExtension: MODULAR_FEE_TRANSFER_FEE_EXT_SOL.toFixed(2),
-      },
+      createToken: PRICING_SOL.baseMint.toFixed(2),
+      burnToken: PRICING_SOL.burnStandard.toFixed(2),
+      burnAndEarn: PRICING_SOL.burnAndEarnLockLp.toFixed(2),
+      airdrop: PRICING_SOL.massAirdropPerBatch.toFixed(2),
+      holdersSnapshot: PRICING_SOL.holdersSnapshotAddon.toFixed(2),
+      manageAuthority: PRICING_SOL.revokeAuthorityStandalone.toFixed(2),
+      claimWithheldTax: PRICING_SOL.claimWithheldTaxPerBatch.toFixed(2),
+      createLiquidityPool: PRICING_SOL.createLiquidityPool.toFixed(2),
+      removeLiquidity: PRICING_SOL.withdrawLiquiditySol.toFixed(2),
+      jitoAtomicBundle: PRICING_SOL.jitoAtomicBundle.toFixed(2),
+      vanityMint: PRICING_SOL.vanityCustom3To4Chars.toFixed(2),
+      networkRent: networkCostInSol.toFixed(5),
+      schedule: PRICING_SCHEDULE_TABLE,
     };
 
-    return NextResponse.json(costs);
+    return NextResponse.json(costs, { status: 200 });
   } catch (error) {
-    console.error("Error calculating costs:", error);
-    return NextResponse.json(
-      { error: "Internal server error while calculating costs." },
-      { status: 500 }
-    );
+    console.error("Error computing costs:", error);
+    return NextResponse.json({ error: "Failed to compute costs." }, { status: 500 });
   }
 }

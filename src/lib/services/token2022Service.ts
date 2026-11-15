@@ -10,7 +10,7 @@ import {
 } from "@solana/web3.js";
 import {
   TOKEN_2022_PROGRAM_ID,
-  createInitializeMintInstruction,
+  createInitializeMint2Instruction,
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   createMintToInstruction,
@@ -20,6 +20,8 @@ import {
   ExtensionType,
   createInitializeTransferFeeConfigInstruction,
   createInitializeMetadataPointerInstruction,
+  createInitializeNonTransferableMintInstruction,
+  createInitializePermanentDelegateInstruction,
 } from "@solana/spl-token";
 import {
   calculateModularTokenCreationFee,
@@ -49,6 +51,11 @@ export interface CreateToken2022Params {
     basisPoints: number;
     maxFee: number;
   };
+  soulbound?: boolean;
+  permanentDelegate?: boolean;
+  vanitySecretKey?: number[];
+  vanityCharLength?: number;
+  hasJitoBundle?: boolean;
   affiliate?: string | null;
   network?: SolanaCluster;
 }
@@ -155,18 +162,25 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     useNativeMetadataExtension = false,
     additionalMetadata = [],
     transferFee,
+    soulbound = false,
+    permanentDelegate = false,
+    vanitySecretKey,
+    vanityCharLength = 0,
+    hasJitoBundle = false,
     affiliate,
     network = "mainnet-beta",
   } = params;
 
   const userPublicKey = new PublicKey(wallet);
-  const mintKeypair = Keypair.generate();
+  const mintKeypair =
+    Array.isArray(vanitySecretKey) && vanitySecretKey.length === 64
+      ? Keypair.fromSecretKey(Uint8Array.from(vanitySecretKey))
+      : Keypair.generate();
   const connection = getSolanaConnection(network);
 
   const rawSupply = toRawTokenAmount(supply, decimals);
   const hasTransferFee = Boolean(transferFee && transferFee.basisPoints > 0);
 
-  // Phase 1: Calculate exact modular fee in lamports (including +0.15 SOL when Token-2022 Transfer Fee extension is active)
   const { totalLamports: modularFeeLamports, totalSol: modularFeeSol } =
     calculateModularTokenCreationFee({
       revokeFreeze: !freezeAuthority,
@@ -174,11 +188,21 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
       immutableMetadata: !isMetadataMutable,
       customCreatorInfo: Boolean(customCreatorInfo),
       hasTransferFeeExtension: hasTransferFee,
+      hasSoulboundExtension: Boolean(soulbound),
+      hasPermanentDelegateExtension: Boolean(permanentDelegate),
+      vanityCharLength,
+      hasJitoBundle,
     });
 
   const extensions: ExtensionType[] = [];
   if (hasTransferFee) {
     extensions.push(ExtensionType.TransferFeeConfig);
+  }
+  if (soulbound) {
+    extensions.push(ExtensionType.NonTransferable);
+  }
+  if (permanentDelegate) {
+    extensions.push(ExtensionType.PermanentDelegate);
   }
   if (useNativeMetadataExtension) {
     extensions.push(ExtensionType.MetadataPointer);
@@ -216,7 +240,7 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
   );
 
   const instructions: TransactionInstruction[] = [
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 520_000 }),
+    ComputeBudgetProgram.setComputeUnitLimit({ units: 550_000 }),
     ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
     ...buildServiceFeeInstructions(userPublicKey, modularFeeLamports, affiliate),
     SystemProgram.createAccount({
@@ -244,6 +268,25 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     );
   }
 
+  if (soulbound) {
+    instructions.push(
+      createInitializeNonTransferableMintInstruction(
+        mintKeypair.publicKey,
+        TOKEN_2022_PROGRAM_ID
+      )
+    );
+  }
+
+  if (permanentDelegate) {
+    instructions.push(
+      createInitializePermanentDelegateInstruction(
+        mintKeypair.publicKey,
+        userPublicKey,
+        TOKEN_2022_PROGRAM_ID
+      )
+    );
+  }
+
   if (useNativeMetadataExtension) {
     instructions.push(
       createInitializeMetadataPointerInstruction(
@@ -256,7 +299,7 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
   }
 
   instructions.push(
-    createInitializeMintInstruction(
+    createInitializeMint2Instruction(
       mintKeypair.publicKey,
       decimals,
       userPublicKey,
@@ -322,7 +365,6 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     )
   );
 
-  // Execute explicit on-chain authority revocations paid by the user
   if (!freezeAuthority) {
     instructions.push(
       createSetAuthorityInstruction(

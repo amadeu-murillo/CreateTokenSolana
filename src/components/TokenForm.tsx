@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,8 +16,16 @@ import {
   MODULAR_FEE_IMMUTABLE_METADATA_SOL,
   MODULAR_FEE_CUSTOM_CREATOR_SOL,
   MODULAR_FEE_TRANSFER_FEE_EXT_SOL,
+  MODULAR_FEE_SOULBOUND_EXT_SOL,
+  MODULAR_FEE_PERMANENT_DELEGATE_EXT_SOL,
+  MODULAR_FEE_VANITY_MINT_SOL,
+  MODULAR_FEE_JITO_BUNDLE_SOL,
   calculateModularTokenCreationFee,
 } from "@/lib/constants";
+import {
+  startVanityMintGenerator,
+  validateBase58Input,
+} from "@/workers/vanityMint.worker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,6 +85,17 @@ const tokenSchema = z.object({
       maxFee: z.number().min(0).optional(),
     })
     .optional(),
+  soulbound: z.boolean().optional(),
+  permanentDelegate: z.boolean().optional(),
+  jitoBundle: z
+    .object({
+      enabled: z.boolean(),
+      liquiditySol: z.number().min(0.01),
+      poolSupplyPercent: z.number().min(1).max(100),
+      firstBuySol: z.number().min(0),
+      jitoTipSol: z.number().min(0.001).max(0.05),
+    })
+    .optional(),
 });
 
 type TokenFormData = z.infer<typeof tokenSchema>;
@@ -104,6 +123,73 @@ export default function TokenForm() {
   const { cluster, setCluster } = useCluster();
   const { t } = useLanguage();
   const isDevnet = cluster === "devnet";
+
+  // Phase 2: Vanity Mint Address Generator state
+  const [vanityEnabled, setVanityEnabled] = useState(false);
+  const [vanityMode, setVanityMode] = useState<"prefix" | "suffix">("prefix");
+  const [vanityPattern, setVanityPattern] = useState("");
+  const [vanityCaseSensitive, setVanityCaseSensitive] = useState(false);
+  const [vanitySearching, setVanitySearching] = useState(false);
+  const [vanityStats, setVanityStats] = useState<{
+    tested: number;
+    keysPerSecond: number;
+    estimatedSeconds: number;
+  } | null>(null);
+  const [vanityFound, setVanityFound] = useState<{
+    publicKey: string;
+    secretKey: number[];
+    charLength: number;
+  } | null>(null);
+  const vanityControllerRef = useRef<{ stop: () => void } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      vanityControllerRef.current?.stop();
+    };
+  }, []);
+
+  const vanityValidation = useMemo(
+    () => validateBase58Input(vanityPattern.trim()),
+    [vanityPattern]
+  );
+
+  const handleStartVanitySearch = () => {
+    const cleaned = vanityPattern.trim();
+    if (!cleaned || !vanityValidation.valid) return;
+
+    vanityControllerRef.current?.stop();
+    setVanitySearching(true);
+    setVanityFound(null);
+    setVanityStats({ tested: 0, keysPerSecond: 0, estimatedSeconds: 1 });
+
+    vanityControllerRef.current = startVanityMintGenerator(
+      {
+        prefix: vanityMode === "prefix" ? cleaned : "",
+        suffix: vanityMode === "suffix" ? cleaned : "",
+        caseSensitive: vanityCaseSensitive,
+      },
+      (progress) => {
+        setVanityStats({
+          tested: progress.tested,
+          keysPerSecond: progress.keysPerSecond,
+          estimatedSeconds: progress.estimatedSeconds,
+        });
+      },
+      (found) => {
+        setVanitySearching(false);
+        setVanityFound({
+          publicKey: found.publicKey,
+          secretKey: found.secretKey,
+          charLength: cleaned.length,
+        });
+      }
+    );
+  };
+
+  const handleStopVanitySearch = () => {
+    vanityControllerRef.current?.stop();
+    setVanitySearching(false);
+  };
 
   const STEPS = useMemo(
     () => [
@@ -162,11 +248,23 @@ export default function TokenForm() {
         website: "",
       },
       transferFee: { basisPoints: 0, maxFee: 0 },
+      soulbound: false,
+      permanentDelegate: false,
+      jitoBundle: {
+        enabled: false,
+        liquiditySol: 1.0,
+        poolSupplyPercent: 80,
+        firstBuySol: 0.1,
+        jitoTipSol: 0.002,
+      },
     },
     mode: "onChange",
   });
 
   const watchedFields = watch();
+
+  const activeVanityCharLen =
+    vanityEnabled && vanityFound ? vanityFound.charLength : vanityEnabled ? vanityPattern.trim().length : 0;
 
   const modularOptions = useMemo(
     () => ({
@@ -177,6 +275,12 @@ export default function TokenForm() {
       hasTransferFeeExtension:
         watchedFields.tokenStandard === "token-2022" &&
         Boolean((watchedFields.transferFee?.basisPoints ?? 0) > 0),
+      hasSoulboundExtension:
+        watchedFields.tokenStandard === "token-2022" && Boolean(watchedFields.soulbound),
+      hasPermanentDelegateExtension:
+        watchedFields.tokenStandard === "token-2022" && Boolean(watchedFields.permanentDelegate),
+      vanityCharLength: activeVanityCharLen,
+      hasJitoBundle: Boolean(watchedFields.jitoBundle?.enabled),
     }),
     [
       watchedFields.freezeAuthority,
@@ -185,6 +289,10 @@ export default function TokenForm() {
       watchedFields.customCreator?.enabled,
       watchedFields.tokenStandard,
       watchedFields.transferFee?.basisPoints,
+      watchedFields.soulbound,
+      watchedFields.permanentDelegate,
+      activeVanityCharLen,
+      watchedFields.jitoBundle?.enabled,
     ]
   );
 
@@ -314,7 +422,6 @@ export default function TokenForm() {
     e.preventDefault();
     setClientValidationAlert(null);
 
-    // Strict client-side guard before calling createToken
     const rawSymbol = (watchedFields.symbol || "").trim();
     const rawDecimals = Number(watchedFields.decimals);
     const rawImage = (watchedFields.imageUrl || "").trim();
@@ -329,7 +436,12 @@ export default function TokenForm() {
       return;
     }
 
-    if (Number.isNaN(rawDecimals) || !Number.isInteger(rawDecimals) || rawDecimals < 0 || rawDecimals > 9) {
+    if (
+      Number.isNaN(rawDecimals) ||
+      !Number.isInteger(rawDecimals) ||
+      rawDecimals < 0 ||
+      rawDecimals > 9
+    ) {
       setFieldError("decimals", {
         type: "manual",
         message: "Os decimais devem ser um inteiro válido entre 0 e 9.",
@@ -362,6 +474,21 @@ export default function TokenForm() {
           basisPoints: data.transferFee?.basisPoints ?? 0,
           maxFee: data.transferFee?.maxFee ?? 0,
         },
+        soulbound: Boolean(data.soulbound),
+        permanentDelegate: Boolean(data.permanentDelegate),
+        vanitySecretKey:
+          vanityEnabled && vanityFound ? vanityFound.secretKey : undefined,
+        vanityCharLength:
+          vanityEnabled && vanityFound ? vanityFound.charLength : 0,
+        jitoBundle: data.jitoBundle?.enabled
+          ? {
+              enabled: true,
+              liquiditySol: Number(data.jitoBundle.liquiditySol) || 1.0,
+              poolSupplyPercent: Number(data.jitoBundle.poolSupplyPercent) || 80,
+              firstBuySol: Number(data.jitoBundle.firstBuySol) || 0.1,
+              jitoTipSol: Number(data.jitoBundle.jitoTipSol) || 0.002,
+            }
+          : undefined,
       };
       await createToken(tokenDataForApi);
     })(e);
@@ -450,7 +577,11 @@ export default function TokenForm() {
             isActive={isTransactionStepperVisible}
             currentStepIndex={activeStepperIndex}
             statusMessage={activeStepperMessage}
-            operationTitle={`Criando ${watchedFields.symbol || "Token"} na Solana (${cluster})`}
+            operationTitle={
+              watchedFields.jitoBundle?.enabled && isDevnet
+                ? `Devnet Sequencial (Jito Block Engine é exclusivo da Mainnet-Beta)`
+                : `Criando ${watchedFields.symbol || "Token"} na Solana (${cluster})`
+            }
           />
 
           {currentStep === 1 && (
@@ -518,7 +649,7 @@ export default function TokenForm() {
                     htmlFor="decimals"
                     className={errors.decimals ? styles.labelError : undefined}
                   >
-                    {t.form.decimals} (0 a 9)
+                    {t.form.decimals}
                   </Label>
                   <Controller
                     name="decimals"
@@ -569,6 +700,152 @@ export default function TokenForm() {
                   {errors.supply && <p className={styles.error}>{errors.supply.message}</p>}
                 </div>
               </div>
+
+              {/* Phase 2: Vanity Mint Address Generator (Web Worker / Non-Blocking) */}
+              <div className={styles.authorityOption} style={{ marginTop: "0.75rem" }}>
+                <div className={styles.authorityText}>
+                  <Label htmlFor="vanityMintToggle">
+                    ✨ Endereço de Contrato Personalizado (Vanity Mint Address)
+                  </Label>
+                  <p>
+                    1 a 2 caracteres: <strong>Grátis (+0.00 SOL)</strong> · 3 a 4 caracteres:{" "}
+                    <strong>+{MODULAR_FEE_VANITY_MINT_SOL.toFixed(2)} SOL</strong> (gerado localmente via Web Worker).
+                  </p>
+                </div>
+                <label className={styles.switch}>
+                  <input
+                    type="checkbox"
+                    id="vanityMintToggle"
+                    checked={vanityEnabled}
+                    onChange={(e) => {
+                      setVanityEnabled(e.target.checked);
+                      if (!e.target.checked) {
+                        handleStopVanitySearch();
+                      }
+                    }}
+                  />
+                  <span className={styles.slider}></span>
+                </label>
+              </div>
+
+              {vanityEnabled && (
+                <div
+                  className={styles.advancedContent}
+                  style={{
+                    padding: "1rem",
+                    borderRadius: "0.75rem",
+                    border: "1px solid rgba(20, 241, 149, 0.35)",
+                    background: "rgba(9, 9, 11, 0.65)",
+                  }}
+                >
+                  <div className={styles.fieldGrid}>
+                    <div className={styles.field}>
+                      <Label>Posição dos Caracteres</Label>
+                      <div className={styles.segmentedControl}>
+                        <button
+                          type="button"
+                          className={vanityMode === "prefix" ? styles.active : ""}
+                          onClick={() => setVanityMode("prefix")}
+                        >
+                          Começa com (Prefix)
+                        </button>
+                        <button
+                          type="button"
+                          className={vanityMode === "suffix" ? styles.active : ""}
+                          onClick={() => setVanityMode("suffix")}
+                        >
+                          Termina com (Suffix)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className={styles.field}>
+                      <Label htmlFor="vanityPattern">
+                        Caracteres Base58 (1–2 Grátis | 3–4: +0.05 SOL)
+                      </Label>
+                      <Input
+                        id="vanityPattern"
+                        placeholder="Ex: sol, pump, ai"
+                        maxLength={4}
+                        value={vanityPattern}
+                        onChange={(e) => {
+                          setVanityPattern(e.target.value);
+                          setVanityFound(null);
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {!vanityValidation.valid && (
+                    <p className={styles.error} style={{ marginTop: "0.4rem" }}>
+                      ⚠️ {vanityValidation.error}
+                    </p>
+                  )}
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: "0.75rem",
+                      marginTop: "0.75rem",
+                    }}
+                  >
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", fontSize: "0.82rem", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={vanityCaseSensitive}
+                        onChange={(e) => setVanityCaseSensitive(e.target.checked)}
+                      />
+                      <span>Diferenciar Maiúsculas/Minúsculas (Case-Sensitive)</span>
+                    </label>
+
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      {vanitySearching ? (
+                        <Button type="button" className="secondary" onClick={handleStopVanitySearch}>
+                          ⏹ Parar Busca
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          onClick={handleStartVanitySearch}
+                          disabled={!vanityPattern.trim() || !vanityValidation.valid}
+                        >
+                          🔍 Gerar Endereço Vanity
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {vanityStats && vanitySearching && (
+                    <p className={styles.fieldDescription} style={{ marginTop: "0.55rem" }}>
+                      ⚡ Testados: <strong>{vanityStats.tested.toLocaleString()}</strong> chaves · Velocidade:{" "}
+                      <strong>{vanityStats.keysPerSecond.toLocaleString()} chaves/s</strong> · Tempo est.: ~
+                      {vanityStats.estimatedSeconds}s
+                    </p>
+                  )}
+
+                  {vanityFound && (
+                    <div
+                      style={{
+                        marginTop: "0.65rem",
+                        padding: "0.6rem 0.85rem",
+                        borderRadius: "0.5rem",
+                        background: "rgba(20, 241, 149, 0.14)",
+                        border: "1px solid rgba(20, 241, 149, 0.45)",
+                        color: "#14f195",
+                        fontSize: "0.8rem",
+                        fontFamily: "monospace",
+                        wordBreak: "break-all",
+                      }}
+                    >
+                      ✓ Vanity Mint Encontrado ({vanityFound.charLength <= 2 ? "Grátis" : "+0.05 SOL"}):{" "}
+                      <strong>{vanityFound.publicKey}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
           )}
 
@@ -845,6 +1122,65 @@ export default function TokenForm() {
                     />
                     <p className={styles.fieldDescription}>Cap per transfer in whole tokens.</p>
                   </div>
+
+                  {/* Phase 5: New Token-2022 Extensions (+0.10 SOL each) */}
+                  <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
+                    <div className={styles.authorityOption}>
+                      <div className={styles.authorityText}>
+                        <Label htmlFor="soulboundToggle">
+                          🔒 Non-Transferable Token / Soulbound (+
+                          {MODULAR_FEE_SOULBOUND_EXT_SOL.toFixed(2)} SOL)
+                        </Label>
+                        <p>
+                          Usa <code>createInitializeNonTransferableMintInstruction</code> para criar tokens intransferíveis (badges KYC, reputação e governança).
+                        </p>
+                      </div>
+                      <Controller
+                        name="soulbound"
+                        control={control}
+                        render={({ field }) => (
+                          <label className={styles.switch}>
+                            <input
+                              type="checkbox"
+                              id="soulboundToggle"
+                              checked={Boolean(field.value)}
+                              onChange={(e) => field.onChange(e.target.checked)}
+                            />
+                            <span className={styles.slider}></span>
+                          </label>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
+                    <div className={styles.authorityOption}>
+                      <div className={styles.authorityText}>
+                        <Label htmlFor="permanentDelegateToggle">
+                          🏛️ Permanent Delegate (+
+                          {MODULAR_FEE_PERMANENT_DELEGATE_EXT_SOL.toFixed(2)} SOL)
+                        </Label>
+                        <p>
+                          Usa <code>createInitializePermanentDelegateInstruction</code> para stablecoins reguladas (atenção: reduz o score no RugCheck para memecoins).
+                        </p>
+                      </div>
+                      <Controller
+                        name="permanentDelegate"
+                        control={control}
+                        render={({ field }) => (
+                          <label className={styles.switch}>
+                            <input
+                              type="checkbox"
+                              id="permanentDelegateToggle"
+                              checked={Boolean(field.value)}
+                              onChange={(e) => field.onChange(e.target.checked)}
+                            />
+                            <span className={styles.slider}></span>
+                          </label>
+                        )}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -922,7 +1258,123 @@ export default function TokenForm() {
                       )}
                     />
                   </div>
+
+                  {/* Phase 3: Jito Atomic Bundle (Mint + Liquidity Pool + First Dev Buy) */}
+                  <div className={styles.authorityOption}>
+                    <div className={styles.authorityText}>
+                      <Label htmlFor="jitoBundleToggle">
+                        ⚡ Lançamento Blindado Anti-Sniper (Jito Atomic Bundle: Mint + Pool + 1ª Compra) (+
+                        {MODULAR_FEE_JITO_BUNDLE_SOL.toFixed(2)} SOL)
+                      </Label>
+                      <p>
+                        Executa Mint + Pool de Liquidez Raydium + 1ª Compra do Criador no Bloco Zero via Jito Block Engine para impedir front-running de bots MEV.
+                      </p>
+                    </div>
+                    <Controller
+                      name="jitoBundle.enabled"
+                      control={control}
+                      render={({ field }) => (
+                        <label className={styles.switch}>
+                          <input
+                            type="checkbox"
+                            id="jitoBundleToggle"
+                            checked={Boolean(field.value)}
+                            onChange={(e) => field.onChange(e.target.checked)}
+                          />
+                          <span className={styles.slider}></span>
+                        </label>
+                      )}
+                    />
+                  </div>
                 </div>
+
+                {watchedFields.jitoBundle?.enabled && (
+                  <div
+                    className={styles.advancedContent}
+                    style={{
+                      marginTop: "0.85rem",
+                      padding: "1rem",
+                      borderRadius: "0.75rem",
+                      border: "1px solid rgba(153, 69, 255, 0.45)",
+                      background: "rgba(153, 69, 255, 0.08)",
+                    }}
+                  >
+                    <div className={styles.fieldGrid}>
+                      <div className={styles.field}>
+                        <Label htmlFor="jitoLiquiditySol">Liquidez Inicial no Pool (SOL)</Label>
+                        <Controller
+                          name="jitoBundle.liquiditySol"
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              id="jitoLiquiditySol"
+                              type="number"
+                              step="0.1"
+                              min={0.05}
+                              {...field}
+                              onChange={(e) => field.onChange(Number(e.target.value) || 0.5)}
+                            />
+                          )}
+                        />
+                      </div>
+
+                      <div className={styles.field}>
+                        <Label htmlFor="jitoPoolSupplyPercent">% do Supply para o Pool</Label>
+                        <Controller
+                          name="jitoBundle.poolSupplyPercent"
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              id="jitoPoolSupplyPercent"
+                              type="number"
+                              min={10}
+                              max={100}
+                              {...field}
+                              onChange={(e) => field.onChange(Number(e.target.value) || 80)}
+                            />
+                          )}
+                        />
+                      </div>
+
+                      <div className={styles.field}>
+                        <Label htmlFor="jitoFirstBuySol">1ª Compra Anti-Sniper (SOL)</Label>
+                        <Controller
+                          name="jitoBundle.firstBuySol"
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              id="jitoFirstBuySol"
+                              type="number"
+                              step="0.05"
+                              min={0}
+                              {...field}
+                              onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                            />
+                          )}
+                        />
+                      </div>
+
+                      <div className={styles.field}>
+                        <Label htmlFor="jitoTipSol">Gorjeta Validador Jito (0.001–0.01 SOL)</Label>
+                        <Controller
+                          name="jitoBundle.jitoTipSol"
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              id="jitoTipSol"
+                              type="number"
+                              step="0.001"
+                              min={0.001}
+                              max={0.01}
+                              {...field}
+                              onChange={(e) => field.onChange(Number(e.target.value) || 0.002)}
+                            />
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
           )}
@@ -986,6 +1438,10 @@ export default function TokenForm() {
           freezeAuthority={watchedFields.freezeAuthority}
           isMetadataMutable={watchedFields.isMetadataMutable}
           transferFeeBps={watchedFields.transferFee?.basisPoints ?? 0}
+          soulbound={Boolean(watchedFields.soulbound)}
+          permanentDelegate={Boolean(watchedFields.permanentDelegate)}
+          vanityMintAddress={vanityEnabled && vanityFound ? vanityFound.publicKey : undefined}
+          jitoBundleEnabled={Boolean(watchedFields.jitoBundle?.enabled)}
         />
       </div>
     </div>

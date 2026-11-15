@@ -4,8 +4,24 @@ import { Suspense, useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { getMint, Mint, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { PublicKey } from "@solana/web3.js";
+import {
+  getMint,
+  Mint,
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountIdempotentInstruction,
+  createWithdrawWithheldTokensFromAccountsInstruction,
+  unpackAccount,
+  getTransferFeeAmount,
+} from "@solana/spl-token";
+import {
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import ManageAuthorityModal from "@/components/ManageAuthorityModal";
@@ -17,59 +33,26 @@ import { useManageAuthority } from "@/hooks/useManageAuthority";
 import { useCluster } from "@/context/WalletContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useUserTokens, RichToken } from "@/hooks/useUserTokens";
-import { DEV_WALLET_ADDRESS, SERVICE_FEE_MANAGE_AUTHORITY_SOL } from "@/lib/constants";
+import {
+  AFFILIATE_COMMISSION_RATE,
+  DEV_WALLET_ADDRESS,
+  SERVICE_FEE_CLAIM_WITHHELD_TAX_LAMPORTS,
+  SERVICE_FEE_CLAIM_WITHHELD_TAX_SOL,
+  SERVICE_FEE_MANAGE_AUTHORITY_SOL,
+} from "@/lib/constants";
+import { isValidPublicKey } from "@/lib/security";
 import styles from "./Dashboard.module.css";
 
 const devWalletBase58 = DEV_WALLET_ADDRESS.toBase58();
 
 const IconLock = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-  </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
 );
 const IconCheckCircle = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-  </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
 );
 const IconAlertTriangle = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-    <line x1="12" y1="9" x2="12" y2="13"></line>
-    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-  </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
 );
 
 const GUIDE_ICONS = [<IconLock key="l" />, <IconCheckCircle key="c" />, <IconAlertTriangle key="a" />];
@@ -170,6 +153,9 @@ const TokenManagementCard = ({
               <button type="button" onClick={handleCopyMint} className={styles.copyMintBtn}>
                 {copied ? t.common.copied : t.common.copy}
               </button>
+              <Link href={`/token/${token.mint}`} className={styles.solscanLink}>
+                🌐 Public Profile ↗
+              </Link>
             </div>
           </div>
         </div>
@@ -270,11 +256,12 @@ const AuthorityCardSkeleton = () => (
 );
 
 function DashboardPageInner() {
-  const { publicKey } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const { cluster, setCluster } = useCluster();
-  const { t } = useLanguage();
-  const { tokens: userTokens, isLoading: isLoadingUserTokens } = useUserTokens();
+  const { t, locale } = useLanguage();
+  const isPt = locale === "pt" || locale === "pt-BR";
+  const { tokens: userTokens, isLoading: isLoadingUserTokens, refreshTokens } = useUserTokens();
   const {
     manageAuthority,
     isLoading: isManagingAuthority,
@@ -284,9 +271,16 @@ function DashboardPageInner() {
     reset: resetManageAuthority,
   } = useManageAuthority();
 
+  const [activeTab, setActiveTab] = useState<"authorities" | "tax-claim">("authorities");
   const [selectedTokenMint, setSelectedTokenMint] = useState<string>("");
   const [mintInfo, setMintInfo] = useState<Mint | null>(null);
   const [isFetchingInfo, setIsFetchingInfo] = useState(false);
+
+  // Phase 5.1: Token-2022 Withheld Transfer Fee state
+  const [withheldAccounts, setWithheldAccounts] = useState<PublicKey[]>([]);
+  const [totalWithheldUi, setTotalWithheldUi] = useState<number>(0);
+  const [isScanningWithheld, setIsScanningWithheld] = useState(false);
+  const [isClaimingWithheld, setIsClaimingWithheld] = useState(false);
 
   const [notification, setNotification] = useState<NotificationState>(null);
   const [modalState, setModalState] = useState<AuthorityModalState>({
@@ -332,6 +326,171 @@ function DashboardPageInner() {
     fetchMintInfo();
   }, [selectedTokenMint, connection]);
 
+  // Scan Token-2022 accounts for withheld transfer fees when on tax-claim tab
+  const handleScanWithheldFees = async () => {
+    if (!selectedTokenMint || !connection || !mintInfo) return;
+    setIsScanningWithheld(true);
+    setWithheldAccounts([]);
+    setTotalWithheldUi(0);
+
+    try {
+      const mintPubkey = new PublicKey(selectedTokenMint);
+      const rawAccounts = await connection.getProgramAccounts(TOKEN_2022_PROGRAM_ID, {
+        commitment: "confirmed",
+        filters: [
+          {
+            memcmp: {
+              offset: 0,
+              bytes: mintPubkey.toBase58(),
+            },
+          },
+        ],
+      });
+
+      const foundAccounts: PublicKey[] = [];
+      let totalRawWithheld = BigInt(0);
+
+      for (const item of rawAccounts) {
+        try {
+          const parsedAcc = unpackAccount(item.pubkey, item.account, TOKEN_2022_PROGRAM_ID);
+          const feeAmount = getTransferFeeAmount(parsedAcc);
+          if (feeAmount && feeAmount.withheldAmount > BigInt(0)) {
+            foundAccounts.push(item.pubkey);
+            totalRawWithheld += feeAmount.withheldAmount;
+          }
+        } catch {
+          // Skip non-token or malformed accounts
+        }
+      }
+
+      setWithheldAccounts(foundAccounts);
+      setTotalWithheldUi(Number(totalRawWithheld) / Math.pow(10, mintInfo.decimals));
+    } catch (err) {
+      console.error("Error scanning Token-2022 withheld fees:", err);
+    } finally {
+      setIsScanningWithheld(false);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      activeTab === "tax-claim" &&
+      selectedToken?.programId === TOKEN_2022_PROGRAM_ID.toBase58() &&
+      mintInfo
+    ) {
+      handleScanWithheldFees();
+    }
+  }, [activeTab, selectedTokenMint, mintInfo]);
+
+  const handleClaimWithheldFees = async () => {
+    if (!publicKey || !sendTransaction || !connection || !selectedTokenMint || withheldAccounts.length === 0) {
+      return;
+    }
+
+    setIsClaimingWithheld(true);
+    setNotification(null);
+
+    try {
+      const mintPubkey = new PublicKey(selectedTokenMint);
+      const batchAccounts = withheldAccounts.slice(0, 20);
+      const destinationAta = await getAssociatedTokenAddress(
+        mintPubkey,
+        publicKey,
+        false,
+        TOKEN_2022_PROGRAM_ID
+      );
+
+      let affiliateRef: string | null = null;
+      try {
+        affiliateRef = localStorage.getItem("affiliateRef");
+      } catch {
+        affiliateRef = null;
+      }
+
+      const feeInstructions: TransactionInstruction[] = [];
+      if (
+        affiliateRef &&
+        isValidPublicKey(affiliateRef) &&
+        affiliateRef.trim() !== publicKey.toBase58()
+      ) {
+        const affLamports = Math.round(
+          SERVICE_FEE_CLAIM_WITHHELD_TAX_LAMPORTS * AFFILIATE_COMMISSION_RATE
+        );
+        const devLamports = SERVICE_FEE_CLAIM_WITHHELD_TAX_LAMPORTS - affLamports;
+        feeInstructions.push(
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: DEV_WALLET_ADDRESS,
+            lamports: devLamports,
+          }),
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: new PublicKey(affiliateRef.trim()),
+            lamports: affLamports,
+          })
+        );
+      } else {
+        feeInstructions.push(
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: DEV_WALLET_ADDRESS,
+            lamports: SERVICE_FEE_CLAIM_WITHHELD_TAX_LAMPORTS,
+          })
+        );
+      }
+
+      const instructions: TransactionInstruction[] = [
+        ...feeInstructions,
+        createAssociatedTokenAccountIdempotentInstruction(
+          publicKey,
+          destinationAta,
+          publicKey,
+          mintPubkey,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        createWithdrawWithheldTokensFromAccountsInstruction(
+          mintPubkey,
+          destinationAta,
+          publicKey,
+          [],
+          batchAccounts,
+          TOKEN_2022_PROGRAM_ID
+        ),
+      ];
+
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+      const msgV0 = new TransactionMessage({
+        payerKey: publicKey,
+        recentBlockhash: blockhash,
+        instructions,
+      }).compileToV0Message();
+
+      const tx = new VersionedTransaction(msgV0);
+      const sig = await sendTransaction(tx, connection, { skipPreflight: false });
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed"
+      );
+
+      setNotification({
+        type: "success",
+        message: isPt
+          ? `✓ Taxas Token-2022 resgatadas de ${batchAccounts.length} contas para sua carteira!`
+          : `✓ Withheld Token-2022 fees claimed from ${batchAccounts.length} accounts!`,
+        txId: sig,
+      });
+      refreshTokens();
+      handleScanWithheldFees();
+    } catch (err) {
+      setNotification({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to claim withheld fees.",
+      });
+    } finally {
+      setIsClaimingWithheld(false);
+    }
+  };
+
   const handleManageAuthorityClick = (
     mint: string,
     type: "mint" | "freeze",
@@ -376,17 +535,6 @@ function DashboardPageInner() {
     if (isLoadingUserTokens) {
       return (
         <div className={styles.skeletonContainer}>
-          <div className={styles.skeletonSelectorGrid}>
-            {[1, 2, 3].map((n) => (
-              <div key={n} className={styles.skeletonTokenChip}>
-                <div className={styles.skeletonCircle} style={{ width: 28, height: 28 }} />
-                <div className={styles.skeletonLines}>
-                  <div className={styles.skeletonBarLg} />
-                  <div className={styles.skeletonBarSm} />
-                </div>
-              </div>
-            ))}
-          </div>
           <AuthorityCardSkeleton />
         </div>
       );
@@ -395,8 +543,8 @@ function DashboardPageInner() {
     return (
       <div className={styles.managementContainer}>
         <TransactionStatusStepper
-          isActive={isManagingAuthority}
-          currentStepIndex={progressStep}
+          isActive={isManagingAuthority || isClaimingWithheld}
+          currentStepIndex={progressStep || 3}
           statusMessage={statusStep}
           operationTitle={`${t.common.signingAndConfirming} (${cluster})`}
         />
@@ -408,18 +556,74 @@ function DashboardPageInner() {
             selectedTokenMint={selectedTokenMint}
             onSelectToken={setSelectedTokenMint}
             isLoading={isLoadingUserTokens}
-            disabled={isManagingAuthority}
+            disabled={isManagingAuthority || isClaimingWithheld}
           />
         </div>
 
         {isFetchingInfo && <AuthorityCardSkeleton />}
 
-        {mintInfo && selectedToken && (
+        {activeTab === "authorities" && mintInfo && selectedToken && (
           <TokenManagementCard
             token={selectedToken}
             mintInfo={mintInfo}
             onManageClick={handleManageAuthorityClick}
           />
+        )}
+
+        {activeTab === "tax-claim" && selectedToken && (
+          <div className={styles.tokenCard}>
+            <h4 className={styles.tokenName}>
+              💰 {isPt ? "Resgatar Taxas Retidas (Token-2022 TransferFeeConfig)" : "Claim Withheld Transfer Fees (Token-2022)"}
+            </h4>
+            <p className={styles.tokenSymbol} style={{ marginTop: "0.35rem" }}>
+              {selectedToken.programId === TOKEN_2022_PROGRAM_ID.toBase58()
+                ? isPt
+                  ? `Ativo Token-2022 selecionado (${selectedToken.symbol}). Taxa por lote de até 20 contas: ${SERVICE_FEE_CLAIM_WITHHELD_TAX_SOL.toFixed(2)} SOL.`
+                  : `Token-2022 asset selected (${selectedToken.symbol}). Fee per batch of up to 20 accounts: ${SERVICE_FEE_CLAIM_WITHHELD_TAX_SOL.toFixed(2)} SOL.`
+                : isPt
+                  ? "Este token utiliza o padrão SPL clássico e não possui extensão TransferFeeConfig."
+                  : "This token uses classic SPL and does not have the TransferFeeConfig extension."}
+            </p>
+
+            {selectedToken.programId === TOKEN_2022_PROGRAM_ID.toBase58() && (
+              <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                <div className={styles.authorityGrid}>
+                  <div className={styles.authorityBox}>
+                    <strong>{isPt ? "Contas com Taxas Retidas" : "Accounts with Withheld Fees"}</strong>
+                    <p style={{ fontSize: "1.1rem", fontWeight: 800, color: "#14f195", marginTop: "0.25rem" }}>
+                      {isScanningWithheld ? "Scanning..." : `${withheldAccounts.length} ATAs`}
+                    </p>
+                  </div>
+                  <div className={styles.authorityBox}>
+                    <strong>{isPt ? "Total Acumulado Disponível" : "Total Withheld Available"}</strong>
+                    <p style={{ fontSize: "1.1rem", fontWeight: 800, color: "#00d1ff", marginTop: "0.25rem" }}>
+                      {isScanningWithheld
+                        ? "..."
+                        : `${totalWithheldUi.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${selectedToken.symbol}`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className={styles.actions}>
+                  <Button
+                    type="button"
+                    className="secondary"
+                    onClick={handleScanWithheldFees}
+                    disabled={isScanningWithheld || isClaimingWithheld}
+                  >
+                    ↻ {isPt ? "Escanear Contas On-Chain" : "Scan On-Chain Accounts"}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleClaimWithheldFees}
+                    disabled={isClaimingWithheld || withheldAccounts.length === 0}
+                  >
+                    💸 {isPt ? "Resgatar Todas as Taxas Retidas para Minha Carteira" : "Claim All Withheld Fees to My Wallet"} ({SERVICE_FEE_CLAIM_WITHHELD_TAX_SOL.toFixed(2)} SOL)
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     );
@@ -457,12 +661,63 @@ function DashboardPageInner() {
           </div>
           <span className={styles.feeBadgeTop}>
             {t.dashboardPage.feeBadgeLabel}{" "}
-            <strong>{SERVICE_FEE_MANAGE_AUTHORITY_SOL.toFixed(2)} SOL</strong>
+            <strong>
+              {activeTab === "tax-claim"
+                ? `${SERVICE_FEE_CLAIM_WITHHELD_TAX_SOL.toFixed(2)} SOL`
+                : `${SERVICE_FEE_MANAGE_AUTHORITY_SOL.toFixed(2)} SOL`}
+            </strong>
           </span>
         </div>
 
         <h1 className={styles.pageTitle}>{t.dashboardPage.pageTitle}</h1>
         <p className={styles.pageDescription}>{t.dashboardPage.pageDesc}</p>
+
+        {/* Phase 5.1: Dashboard Mode Tabs */}
+        <div
+          style={{
+            display: "inline-flex",
+            gap: "0.5rem",
+            padding: "0.35rem",
+            borderRadius: "999px",
+            background: "hsla(var(--muted), 0.75)",
+            border: "1px solid hsl(var(--border))",
+            marginTop: "1rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab("authorities")}
+            style={{
+              padding: "0.5rem 1.1rem",
+              borderRadius: "999px",
+              fontWeight: 700,
+              fontSize: "0.82rem",
+              border: activeTab === "authorities" ? "1px solid rgba(20, 241, 149, 0.5)" : "1px solid transparent",
+              background: activeTab === "authorities" ? "rgba(20, 241, 149, 0.16)" : "transparent",
+              color: activeTab === "authorities" ? "#14f195" : "hsl(var(--muted-foreground))",
+              cursor: "pointer",
+            }}
+          >
+            🛡️ {isPt ? "Autoridades Mint & Freeze (0.07 SOL)" : "Mint & Freeze Authorities (0.07 SOL)"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("tax-claim")}
+            style={{
+              padding: "0.5rem 1.1rem",
+              borderRadius: "999px",
+              fontWeight: 700,
+              fontSize: "0.82rem",
+              border: activeTab === "tax-claim" ? "1px solid rgba(153, 69, 255, 0.5)" : "1px solid transparent",
+              background: activeTab === "tax-claim" ? "rgba(153, 69, 255, 0.18)" : "transparent",
+              color: activeTab === "tax-claim" ? "#c4b5fd" : "hsl(var(--muted-foreground))",
+              cursor: "pointer",
+            }}
+          >
+            💰 {isPt ? "Resgatar Taxas (Tax Token-2022 · 0.05 SOL)" : "Claim Withheld Fees (Tax Token-2022 · 0.05 SOL)"}
+          </button>
+        </div>
       </header>
 
       <div className={styles.grid}>
@@ -479,7 +734,9 @@ function DashboardPageInner() {
         </main>
 
         <aside className={styles.sidebar}>
-          <CostSummary operation="manageAuthority" />
+          <CostSummary
+            operation={activeTab === "tax-claim" ? "claimWithheldTax" : "manageAuthority"}
+          />
 
           {t.dashboardPage.guideSections.map((section, index) => (
             <Card key={index} className={styles.guideCard}>

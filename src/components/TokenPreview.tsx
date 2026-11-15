@@ -18,6 +18,10 @@ export interface TokenPreviewProps {
   freezeAuthority?: boolean;
   isMetadataMutable?: boolean;
   transferFeeBps?: number;
+  soulbound?: boolean;
+  permanentDelegate?: boolean;
+  vanityMintAddress?: string;
+  jitoBundleEnabled?: boolean;
 }
 
 const TokenPreview = ({
@@ -32,6 +36,10 @@ const TokenPreview = ({
   freezeAuthority = false,
   isMetadataMutable = false,
   transferFeeBps = 0,
+  soulbound = false,
+  permanentDelegate = false,
+  vanityMintAddress,
+  jitoBundleEnabled = false,
 }: TokenPreviewProps) => {
   const { cluster } = useCluster();
   const { t } = useLanguage();
@@ -57,6 +65,9 @@ const TokenPreview = ({
   if (!isFreezeRevoked) rugCheckScore -= 50;
   if (!isMintRevoked) rugCheckScore -= 35;
   if (!isImmutable) rugCheckScore -= 15;
+  if (tokenStandard === "token-2022" && permanentDelegate) {
+    rugCheckScore = Math.max(0, rugCheckScore - 40);
+  }
   rugCheckScore = Math.max(0, rugCheckScore);
 
   const badgeClass =
@@ -122,6 +133,40 @@ const TokenPreview = ({
             </div>
           </div>
 
+          {vanityMintAddress && (
+            <div
+              style={{
+                marginTop: "0.65rem",
+                padding: "0.45rem 0.65rem",
+                borderRadius: "0.5rem",
+                background: "rgba(20, 241, 149, 0.1)",
+                border: "1px solid rgba(20, 241, 149, 0.35)",
+                fontSize: "0.72rem",
+                fontFamily: "monospace",
+                color: "#14f195",
+                wordBreak: "break-all",
+              }}
+            >
+              ✨ Vanity Mint: <strong>{vanityMintAddress}</strong>
+            </div>
+          )}
+
+          {jitoBundleEnabled && (
+            <div
+              style={{
+                marginTop: "0.45rem",
+                padding: "0.4rem 0.65rem",
+                borderRadius: "0.5rem",
+                background: "rgba(153, 69, 255, 0.14)",
+                border: "1px solid rgba(153, 69, 255, 0.4)",
+                fontSize: "0.72rem",
+                color: "#c4b5fd",
+              }}
+            >
+              ⚡ Jito Atomic Bundle: Mint + Pool + 1ª Compra Anti-Sniper (Bloco 0)
+            </div>
+          )}
+
           <div className={styles.metaSpecGrid}>
             <div className={styles.metaSpecItem}>
               <span>{t.tokenPreview.decimalsLabel}</span>
@@ -157,7 +202,7 @@ const TokenPreview = ({
           </div>
 
           <div className={styles.alertsList}>
-            {isMintRevoked && isFreezeRevoked && isImmutable && (
+            {rugCheckScore === 100 && (
               <div className={styles.alertSafe}>{t.tokenPreview.alertSafe}</div>
             )}
 
@@ -171,6 +216,18 @@ const TokenPreview = ({
 
             {!isImmutable && (
               <div className={styles.alertWarning}>{t.tokenPreview.alertMutable}</div>
+            )}
+
+            {tokenStandard === "token-2022" && permanentDelegate && (
+              <div className={styles.alertCritical}>
+                🔴 Alerta RugCheck (-40 pts): Permanent Delegate ativo permite movimentar/queimar tokens de qualquer carteira (recomendado apenas para stablecoins reguladas).
+              </div>
+            )}
+
+            {tokenStandard === "token-2022" && soulbound && (
+              <div className={styles.alertWarning}>
+                🔒 Token Soulbound (Non-Transferable): Os tokens emitidos não poderão ser transferidos entre carteiras (ideal para KYC/Badges).
+              </div>
             )}
           </div>
         </div>

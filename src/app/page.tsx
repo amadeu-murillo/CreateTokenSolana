@@ -71,7 +71,7 @@ export default function Home() {
         <p className={createStyles.description}>{t.home.heroSubtitle}</p>
       </header>
 
-      <div className={createStyles.grid}>
+      <div className={createStyles.grid} id="create-form">
         <div className={createStyles.formContainer}>
           <TokenForm />
         </div>

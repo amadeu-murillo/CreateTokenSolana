@@ -10,7 +10,7 @@ import {
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
-  createInitializeMintInstruction,
+  createInitializeMint2Instruction,
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   createMintToInstruction,
@@ -40,6 +40,9 @@ export interface CreateSplTokenParams {
   freezeAuthority: boolean;
   isMetadataMutable: boolean;
   customCreatorInfo?: boolean;
+  vanitySecretKey?: number[];
+  vanityCharLength?: number;
+  hasJitoBundle?: boolean;
   affiliate?: string | null;
   network?: SolanaCluster;
 }
@@ -56,12 +59,18 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
     freezeAuthority,
     isMetadataMutable,
     customCreatorInfo = false,
+    vanitySecretKey,
+    vanityCharLength = 0,
+    hasJitoBundle = false,
     affiliate,
     network = "mainnet-beta",
   } = params;
 
   const userPublicKey = new PublicKey(wallet);
-  const mintKeypair = Keypair.generate();
+  const mintKeypair =
+    Array.isArray(vanitySecretKey) && vanitySecretKey.length === 64
+      ? Keypair.fromSecretKey(Uint8Array.from(vanitySecretKey))
+      : Keypair.generate();
   const connection = getSolanaConnection(network);
 
   const rawSupply = toRawTokenAmount(supply, decimals);
@@ -70,7 +79,6 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
     connection.getBalance(userPublicKey, "confirmed"),
   ]);
 
-  // Phase 1: Calculate exact modular fee in lamports based on selected security & metadata flags
   const { totalLamports: modularFeeLamports, totalSol: modularFeeSol } =
     calculateModularTokenCreationFee({
       revokeFreeze: !freezeAuthority,
@@ -78,6 +86,8 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
       immutableMetadata: !isMetadataMutable,
       customCreatorInfo: Boolean(customCreatorInfo),
       hasTransferFeeExtension: false,
+      vanityCharLength,
+      hasJitoBundle,
     });
 
   const estimatedRentAndMetaplexLamports = rentLamports + Math.round(0.018 * LAMPORTS_PER_SOL);
@@ -100,7 +110,6 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
     TOKEN_PROGRAM_ID
   );
 
-  // Initialize Mint with userPublicKey as temporary freezeAuthority if we also want an explicit createSetAuthorityInstruction(FreezeAccount -> null) or initialize directly
   const instructions: TransactionInstruction[] = [
     ComputeBudgetProgram.setComputeUnitLimit({ units: 420_000 }),
     ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
@@ -112,7 +121,7 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
       lamports: rentLamports,
       programId: TOKEN_PROGRAM_ID,
     }),
-    createInitializeMintInstruction(
+    createInitializeMint2Instruction(
       mintKeypair.publicKey,
       decimals,
       userPublicKey,
@@ -146,7 +155,6 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
     }),
   ];
 
-  // Execute explicit on-chain authority revocations paid by the user
   if (!freezeAuthority) {
     instructions.push(
       createSetAuthorityInstruction(

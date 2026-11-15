@@ -19,9 +19,6 @@ import {
   RAYDIUM_CPMM_PROGRAM_ID_MAINNET,
 } from "./constants";
 
-/**
- * Official whitelisted Solana Program IDs allowed in client-signed transactions.
- */
 export const WHITELISTED_SOLANA_PROGRAMS = new Set<string>([
   SystemProgram.programId.toBase58(),
   ComputeBudgetProgram.programId.toBase58(),
@@ -84,8 +81,8 @@ export function sanitizeErrorMessage(rawMessage: unknown, fallback = "Operation 
     rawMessage instanceof Error
       ? rawMessage.message
       : typeof rawMessage === "string"
-      ? rawMessage
-      : fallback;
+        ? rawMessage
+        : fallback;
 
   return msg
     .replace(/api[-_]?key=[a-zA-Z0-9\-_]+/gi, "api-key=[REDACTED]")
@@ -293,6 +290,19 @@ export const createTokenRequestSchema = z.object({
       maxFee: z.number().min(0).default(0),
     })
     .optional(),
+  soulbound: z.boolean().optional().default(false),
+  permanentDelegate: z.boolean().optional().default(false),
+  vanitySecretKey: z.array(z.number().int().min(0).max(255)).length(64).optional(),
+  vanityCharLength: z.number().int().min(0).max(6).optional().default(0),
+  jitoBundle: z
+    .object({
+      enabled: z.boolean().default(false),
+      liquiditySol: z.number().min(0).optional(),
+      poolSupplyPercent: z.number().min(1).max(100).optional(),
+      firstBuySol: z.number().min(0).optional(),
+      jitoTipSol: z.number().min(0.001).max(0.05).optional(),
+    })
+    .optional(),
   affiliate: z.string().trim().nullable().optional(),
   description: z.string().trim().max(500).optional(),
   website: z.string().trim().max(200).optional(),
@@ -348,6 +358,8 @@ export const createLiquidityPoolRequestSchema = z.object({
   feeTierBps: z.number().int().min(1).max(1000).default(25),
   startTime: z.number().int().nonnegative().nullable().optional(),
   revokeFreezeIfActive: z.boolean().default(true),
+  creatorFeeEnabled: z.boolean().optional().default(false),
+  creatorFeeBps: z.number().int().min(0).max(250).optional().default(0),
   wallet: solanaAddressSchema,
   programId: tokenProgramIdSchema.optional(),
   affiliate: z.string().trim().nullable().optional(),

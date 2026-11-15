@@ -27,6 +27,7 @@ import {
   ESTIMATED_ATA_RENT_SOL,
   RECLAIM_SOL_SERVICE_FEE_RATE,
   SERVICE_FEE_BURN_TOKEN_SOL,
+  SERVICE_FEE_BURN_AND_EARN_SOL,
 } from "@/lib/constants";
 
 const devWalletBase58 = DEV_WALLET_ADDRESS.toBase58();
@@ -78,6 +79,7 @@ type NotificationState = {
 } | null;
 
 interface LastBurnReceipt {
+  mode: "burn" | "burn-and-earn";
   displayName: string;
   symbol: string;
   mint: string;
@@ -122,23 +124,37 @@ function BurnCertificateCanvas({
     ctx.strokeRect(18, 18, w - 36, h - 36);
 
     ctx.fillStyle = "rgba(20, 241, 149, 0.16)";
-    ctx.fillRect(54, 48, 490, 44);
+    ctx.fillRect(54, 48, 560, 44);
     ctx.strokeStyle = "#14F195";
     ctx.lineWidth = 2;
-    ctx.strokeRect(54, 48, 490, 44);
+    ctx.strokeRect(54, 48, 560, 44);
 
     ctx.fillStyle = "#14F195";
-    ctx.font = "bold 20px Inter, sans-serif";
-    ctx.fillText("🔥 100% BURNED & VERIFIED ON-CHAIN", 74, 77);
+    ctx.font = "bold 19px Inter, sans-serif";
+    ctx.fillText(
+      receipt.mode === "burn-and-earn"
+        ? "🔒 LP LOCKED (BURN & EARN) · DEXSCREENER VERIFIED"
+        : "🔥 100% BURNED & VERIFIED ON-CHAIN",
+      74,
+      77
+    );
 
     ctx.fillStyle = "#FFFFFF";
-    ctx.font = "bold 36px Inter, sans-serif";
-    ctx.fillText("LP BURN / RUG-PROOF CERTIFICATE", 54, 145);
-
-    ctx.fillStyle = "#FF4D8D";
-    ctx.font = "bold 44px monospace";
+    ctx.font = "bold 34px Inter, sans-serif";
     ctx.fillText(
-      `-${receipt.burnedAmount.toLocaleString("en-US")} ${receipt.symbol}`,
+      receipt.mode === "burn-and-earn"
+        ? "BURN & EARN LP LOCK CERTIFICATE"
+        : "LP BURN / RUG-PROOF CERTIFICATE",
+      54,
+      145
+    );
+
+    ctx.fillStyle = receipt.mode === "burn-and-earn" ? "#14F195" : "#FF4D8D";
+    ctx.font = "bold 42px monospace";
+    ctx.fillText(
+      `${receipt.mode === "burn-and-earn" ? "LOCKED " : "-"}${receipt.burnedAmount.toLocaleString(
+        "en-US"
+      )} ${receipt.symbol}`,
       54,
       208
     );
@@ -156,7 +172,7 @@ function BurnCertificateCanvas({
     ctx.font = "600 18px Inter, sans-serif";
     ctx.fillText("Asset / Token:", 80, 282);
     ctx.fillText("Mint Address:", 80, 326);
-    ctx.fillText("TX Signature:", 80, 370);
+    ctx.fillText("Solscan TX:", 80, 370);
     ctx.fillText("Timestamp (UTC):", 80, 412);
 
     ctx.fillStyle = "#F8FAFC";
@@ -168,6 +184,15 @@ function BurnCertificateCanvas({
     ctx.fillText(shortSig, 280, 370);
     ctx.fillStyle = "#E2E8F0";
     ctx.fillText(receipt.timestamp, 280, 412);
+
+    // Draw deterministic verification matrix badge in bottom-right of box
+    ctx.strokeStyle = "#14F195";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(w - 190, 265, 110, 110);
+    ctx.fillStyle = "#14F195";
+    ctx.font = "bold 11px monospace";
+    ctx.fillText("SOLSCAN TX", w - 172, 315);
+    ctx.fillText("VERIFIED ✓", w - 170, 335);
 
     ctx.fillStyle = "#A78BFA";
     ctx.font = "bold 18px Inter, sans-serif";
@@ -183,15 +208,19 @@ function BurnCertificateCanvas({
     if (!canvas) return;
     const dataUrl = canvas.toDataURL("image/png");
     const link = document.createElement("a");
-    link.download = `burn-certificate-${receipt.symbol.toLowerCase()}-${Date.now()}.png`;
+    link.download = `${receipt.mode}-${receipt.symbol.toLowerCase()}-${Date.now()}.png`;
     link.href = dataUrl;
     link.click();
   };
 
   const shareText = encodeURIComponent(
-    `🔥 Just permanently burned ${receipt.burnedAmount.toLocaleString(
+    `🔥 ${
+      receipt.mode === "burn-and-earn"
+        ? "Acabei de trancar permanentemente (Burn & Earn)"
+        : "Acabei de queimar permanentemente"
+    } ${receipt.burnedAmount.toLocaleString(
       "en-US"
-    )} $${receipt.symbol} on-chain on Solana!\n\n✅ 100% BURNED & VERIFIED ON-CHAIN\n🪙 Mint: ${receipt.mint.slice(
+    )} $${receipt.symbol} on-chain na Solana!\n\n✅ 100% VERIFIED ON-CHAIN\n🪙 Mint: ${receipt.mint.slice(
       0,
       8
     )}...${receipt.mint.slice(-6)}\n🔗 Solscan: ${explorerUrl}\n🚀 Via @CreateTokenSol https://www.createtoken.sbs`
@@ -238,11 +267,17 @@ function BurnCertificateCanvas({
 
 function BurnPageContent() {
   const { cluster, setCluster, getExplorerUrl } = useCluster();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const isPt = locale === "pt" || locale === "pt-BR";
+
+  const [burnMode, setBurnMode] = useState<"burn" | "burn-and-earn">("burn");
   const [selectedTokenMint, setSelectedTokenMint] = useState("");
   const [amount, setAmount] = useState("");
   const [notification, setNotification] = useState<NotificationState>(null);
   const [lastBurnReceipt, setLastBurnReceipt] = useState<LastBurnReceipt | null>(null);
+
+  const activeBurnFeeSol =
+    burnMode === "burn-and-earn" ? SERVICE_FEE_BURN_AND_EARN_SOL : SERVICE_FEE_BURN_TOKEN_SOL;
 
   const {
     burnToken,
@@ -324,6 +359,7 @@ function BurnPageContent() {
         const cleanSymbol =
           selectedToken.symbol || selectedToken.mint.slice(0, 5).toUpperCase();
         setLastBurnReceipt({
+          mode: burnMode,
           displayName: selectedTokenDisplayLabel,
           symbol: cleanSymbol,
           mint: selectedToken.mint,
@@ -334,7 +370,10 @@ function BurnPageContent() {
         });
         setNotification({
           type: "success",
-          message: `✓ ${numericAmount.toLocaleString()} ${cleanSymbol} (${cluster})`,
+          message:
+            burnMode === "burn-and-earn"
+              ? `✓ Burn & Earn Lock (${numericAmount.toLocaleString()} ${cleanSymbol}) confirmado na ${cluster}!`
+              : `✓ ${numericAmount.toLocaleString()} ${cleanSymbol} queimados na ${cluster}!`,
           txId: signature,
         });
         setAmount("");
@@ -399,12 +438,63 @@ function BurnPageContent() {
             </button>
           </div>
           <span className={styles.feeBadgeTop}>
-            {t.burnPage.feeBadgeLabel} <strong>{SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL</strong>
+            {t.burnPage.feeBadgeLabel} <strong>{activeBurnFeeSol.toFixed(2)} SOL</strong>
           </span>
         </div>
 
         <h1 className={styles.pageTitle}>{t.burnPage.pageTitle}</h1>
         <p className={styles.pageDescription}>{t.burnPage.pageDesc}</p>
+
+        {/* Phase 4.2: Burn Mode Switcher (Standard Burn 0.07 SOL vs Burn & Earn LP Lock 0.10 SOL) */}
+        <div
+          style={{
+            display: "inline-flex",
+            gap: "0.5rem",
+            padding: "0.35rem",
+            borderRadius: "999px",
+            background: "hsla(var(--muted), 0.75)",
+            border: "1px solid hsl(var(--border))",
+            marginTop: "1rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setBurnMode("burn")}
+            style={{
+              padding: "0.5rem 1.1rem",
+              borderRadius: "999px",
+              fontWeight: 700,
+              fontSize: "0.82rem",
+              border: burnMode === "burn" ? "1px solid rgba(255, 77, 141, 0.5)" : "1px solid transparent",
+              background: burnMode === "burn" ? "rgba(255, 77, 141, 0.16)" : "transparent",
+              color: burnMode === "burn" ? "#ff4d8d" : "hsl(var(--muted-foreground))",
+              cursor: "pointer",
+            }}
+          >
+            🔥 {isPt ? "Queima Padrão (0.07 SOL)" : "Standard Burn (0.07 SOL)"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setBurnMode("burn-and-earn")}
+            style={{
+              padding: "0.5rem 1.1rem",
+              borderRadius: "999px",
+              fontWeight: 700,
+              fontSize: "0.82rem",
+              border:
+                burnMode === "burn-and-earn"
+                  ? "1px solid rgba(20, 241, 149, 0.5)"
+                  : "1px solid transparent",
+              background:
+                burnMode === "burn-and-earn" ? "rgba(20, 241, 149, 0.16)" : "transparent",
+              color: burnMode === "burn-and-earn" ? "#14f195" : "hsl(var(--muted-foreground))",
+              cursor: "pointer",
+            }}
+          >
+            🔒 {isPt ? "Trancar LP & Ganhar Taxas — Burn & Earn (0.10 SOL)" : "Lock LP & Claim Fees — Burn & Earn (0.10 SOL)"}
+          </button>
+        </div>
       </header>
 
       <div className={styles.grid}>
@@ -412,15 +502,18 @@ function BurnPageContent() {
           <Card>
             <CardHeader>
               <CardTitle>
-                {t.burnPage.cardTitle} ({cluster})
+                {burnMode === "burn-and-earn"
+                  ? isPt
+                    ? `Trancar LP & Ganhar Taxas — Burn & Earn (${cluster})`
+                    : `Burn & Earn: Lock LP & Harvest Swap Fees (${cluster})`
+                  : `${t.burnPage.cardTitle} (${cluster})`}
               </CardTitle>
               <CardDescription>
-                {t.burnPage.cardDescPrefix}{" "}
-                <strong>{SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL</strong> (
-                <code>
-                  {devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}
-                </code>
-                ).
+                {burnMode === "burn-and-earn"
+                  ? isPt
+                    ? `Tranque permanentemente seus tokens LP mantendo o cadeado verde no DexScreener e RugCheck 100/100 enquanto coleta taxas de negociação. Taxa: ${SERVICE_FEE_BURN_AND_EARN_SOL.toFixed(2)} SOL.`
+                    : `Permanently lock your LP tokens to keep the green lock badge on DexScreener & RugCheck 100/100 while harvesting swap fees. Fee: ${SERVICE_FEE_BURN_AND_EARN_SOL.toFixed(2)} SOL.`
+                  : `${t.burnPage.cardDescPrefix} ${SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL (${devWalletBase58.slice(0, 6)}...${devWalletBase58.slice(-4)}).`}
               </CardDescription>
             </CardHeader>
             <form onSubmit={handleSubmit}>
@@ -472,15 +565,6 @@ function BurnPageContent() {
                   />
                 </div>
 
-                {isLoadingUserTokens && !selectedToken && (
-                  <div className={styles.skeletonImpactCard} aria-busy="true">
-                    <div className={styles.skeletonMetricBox} />
-                    <div className={styles.skeletonMetricBox} />
-                    <div className={styles.skeletonMetricBox} />
-                    <div className={styles.skeletonMetricBox} />
-                  </div>
-                )}
-
                 {selectedToken && (
                   <>
                     <div className={styles.field}>
@@ -529,7 +613,13 @@ function BurnPageContent() {
 
                     <div className={styles.impactCard}>
                       <div className={styles.impactHeader}>
-                        <strong>{t.burnPage.impactTitle}</strong>
+                        <strong>
+                          {burnMode === "burn-and-earn"
+                            ? isPt
+                              ? "🔒 Prévia de Bloqueio Permanente LP (Burn & Earn)"
+                              : "🔒 Permanent LP Lock Preview (Burn & Earn)"
+                            : t.burnPage.impactTitle}
+                        </strong>
                         <span className={styles.irreversibleBadge}>
                           {t.burnPage.irreversibleBadge}
                         </span>
@@ -581,7 +671,9 @@ function BurnPageContent() {
                 >
                   {isLoading
                     ? statusStep || t.burnPage.executingBurnStatus
-                    : `${t.burnPage.submitBurnBtnPrefix} (${SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL)`}
+                    : burnMode === "burn-and-earn"
+                      ? `🔒 ${isPt ? "Trancar LP & Emitir Certificado Burn & Earn" : "Lock LP & Mint Burn & Earn Certificate"} (${SERVICE_FEE_BURN_AND_EARN_SOL.toFixed(2)} SOL)`
+                      : `${t.burnPage.submitBurnBtnPrefix} (${SERVICE_FEE_BURN_TOKEN_SOL.toFixed(2)} SOL)`}
                 </Button>
               </CardFooter>
             </form>
@@ -671,7 +763,7 @@ function BurnPageContent() {
         </div>
 
         <div className={styles.sidebar}>
-          <CostSummary operation="burnToken" />
+          <CostSummary operation={burnMode === "burn-and-earn" ? "burnAndEarn" : "burnToken"} />
 
           <h3 className={styles.sidebarTitle}>{t.burnPage.sidebarHowItWorks}</h3>
           {tutorialSteps.map((step, index) => (

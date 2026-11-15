@@ -12,7 +12,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "dgurmzcht",
   api_key: process.env.CLOUDINARY_API_KEY || "376481879818689",
@@ -59,6 +58,11 @@ export async function POST(request: NextRequest) {
       metadataUri: preUploadedMetadataUri,
       customCreator,
       transferFee,
+      soulbound = false,
+      permanentDelegate = false,
+      vanitySecretKey,
+      vanityCharLength = 0,
+      jitoBundle,
       affiliate,
       description,
       website,
@@ -164,6 +168,7 @@ export async function POST(request: NextRequest) {
     }
 
     const cleanSupplyStr = String(supply).replace(/,/g, "").trim();
+    const hasJitoBundle = Boolean(jitoBundle?.enabled);
 
     const result =
       tokenStandard === "token-2022"
@@ -181,6 +186,11 @@ export async function POST(request: NextRequest) {
             useNativeMetadataExtension,
             additionalMetadata,
             transferFee,
+            soulbound,
+            permanentDelegate,
+            vanitySecretKey,
+            vanityCharLength,
+            hasJitoBundle,
             affiliate,
             network,
           })
@@ -195,6 +205,9 @@ export async function POST(request: NextRequest) {
             freezeAuthority,
             isMetadataMutable,
             customCreatorInfo: isCustomCreatorEnabled,
+            vanitySecretKey,
+            vanityCharLength,
+            hasJitoBundle,
             affiliate,
             network,
           });

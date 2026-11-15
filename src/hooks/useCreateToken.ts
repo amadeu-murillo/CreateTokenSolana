@@ -9,6 +9,7 @@ import {
 } from "@/lib/constants";
 import { getMetadataCache, setMetadataCache } from "@/lib/cache";
 import { verifyTransactionIntegrity } from "@/lib/security";
+import { buildAndSendAtomicLaunchBundle } from "@/lib/solana/jitoBundler";
 import { parseSolanaError } from "./useErrorHandler";
 
 export interface TokenData {
@@ -35,12 +36,23 @@ export interface TokenData {
     basisPoints: number;
     maxFee: number;
   };
+  soulbound?: boolean;
+  permanentDelegate?: boolean;
+  vanitySecretKey?: number[];
+  vanityCharLength?: number;
+  jitoBundle?: {
+    enabled: boolean;
+    liquiditySol: number;
+    poolSupplyPercent: number;
+    firstBuySol: number;
+    jitoTipSol: number;
+  };
   isMetadataMutable: boolean;
 }
 
 export const useCreateToken = () => {
   const router = useRouter();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction, signAllTransactions } = useWallet();
   const { connection } = useConnection();
   const { cluster } = useCluster();
   const [isLoading, setIsLoading] = useState(false);
@@ -75,6 +87,8 @@ export const useCreateToken = () => {
           affiliateRef = null;
         }
 
+        const isJitoEnabled = Boolean(tokenData.jitoBundle?.enabled);
+
         const { totalSol: expectedModularFeeSol } = calculateModularTokenCreationFee({
           revokeFreeze: !tokenData.freezeAuthority,
           revokeMint: !tokenData.mintAuthority,
@@ -83,6 +97,12 @@ export const useCreateToken = () => {
           hasTransferFeeExtension:
             tokenData.tokenStandard === "token-2022" &&
             Boolean(tokenData.transferFee && tokenData.transferFee.basisPoints > 0),
+          hasSoulboundExtension:
+            tokenData.tokenStandard === "token-2022" && Boolean(tokenData.soulbound),
+          hasPermanentDelegateExtension:
+            tokenData.tokenStandard === "token-2022" && Boolean(tokenData.permanentDelegate),
+          vanityCharLength: tokenData.vanityCharLength ?? 0,
+          hasJitoBundle: isJitoEnabled,
         });
 
         setProgressStep(2);
@@ -117,50 +137,110 @@ export const useCreateToken = () => {
           );
         }
 
-        const simulationResult = await connection.simulateTransaction(transaction, {
-          sigVerify: false,
-          replaceRecentBlockhash: true,
-          commitment: "confirmed",
-        });
+        let signature = "";
 
-        if (simulationResult.value.err) {
-          console.error(
-            "Token creation simulation failed:",
-            simulationResult.value.err,
-            simulationResult.value.logs
+        // Phase 3: Jito Atomic Bundle (Mint + Liquidity Pool + First Dev Buy + Jito Tip)
+        if (isJitoEnabled && signAllTransactions && tokenData.jitoBundle) {
+          const unsignedTxs: VersionedTransaction[] = [transaction];
+          let poolVaultAddress: string | undefined;
+
+          const poolTokenAmount = Math.max(
+            1,
+            Math.floor((tokenData.supply * (tokenData.jitoBundle.poolSupplyPercent || 80)) / 100)
           );
-          throw new Error(
-            `Simulação falhou: ${JSON.stringify(simulationResult.value.err)}`
+          const poolLiquiditySol = tokenData.jitoBundle.liquiditySol || 0.5;
+
+          try {
+            const lpResponse = await fetch("/api/create-liquidity-pool", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                dex: "raydium-cpmm",
+                baseMint: result.mintAddress,
+                quoteToken: "SOL",
+                baseAmount: poolTokenAmount,
+                quoteAmount: poolLiquiditySol,
+                feeTierBps: 25,
+                revokeFreezeIfActive: true,
+                wallet: publicKey.toBase58(),
+                affiliate: affiliateRef,
+                network: cluster,
+              }),
+            });
+            if (lpResponse.ok) {
+              const lpData = await lpResponse.json();
+              if (lpData.transaction) {
+                const lpTxBuf = Buffer.from(lpData.transaction, "base64");
+                unsignedTxs.push(VersionedTransaction.deserialize(new Uint8Array(lpTxBuf)));
+                poolVaultAddress = lpData.quoteVaultAddress;
+              }
+            }
+          } catch (lpErr) {
+            console.warn("Could not pre-build LP transaction in Jito bundle:", lpErr);
+          }
+
+          const bundleResult = await buildAndSendAtomicLaunchBundle({
+            connection,
+            cluster,
+            payerPublicKey: publicKey,
+            signAllTransactions,
+            unsignedTransactions: unsignedTxs,
+            jitoTipSol: tokenData.jitoBundle.jitoTipSol || 0.002,
+            firstBuySol: tokenData.jitoBundle.firstBuySol || 0,
+            poolVaultAddress,
+            onStatusUpdate: (msg, stepIdx) => {
+              setProgressStep(stepIdx);
+              setStatusStep(msg);
+            },
+          });
+
+          signature = bundleResult.signatures[0] || bundleResult.bundleId;
+        } else {
+          const simulationResult = await connection.simulateTransaction(transaction, {
+            sigVerify: false,
+            replaceRecentBlockhash: true,
+            commitment: "confirmed",
+          });
+
+          if (simulationResult.value.err) {
+            console.error(
+              "Token creation simulation failed:",
+              simulationResult.value.err,
+              simulationResult.value.logs
+            );
+            throw new Error(
+              `Simulação falhou: ${JSON.stringify(simulationResult.value.err)}`
+            );
+          }
+
+          setProgressStep(3);
+          setStatusStep("3. Aguardando Assinatura — Confirme a transação na sua carteira...");
+
+          signature = await sendTransaction(transaction, connection, {
+            skipPreflight: false,
+            maxRetries: 3,
+          });
+
+          setProgressStep(4);
+          setStatusStep("4. Confirmando na Rede — Aguardando finalidade do bloco na Solana...");
+
+          const blockhashInfo =
+            result.blockhash && result.lastValidBlockHeight
+              ? {
+                  blockhash: result.blockhash,
+                  lastValidBlockHeight: result.lastValidBlockHeight,
+                }
+              : await connection.getLatestBlockhash("confirmed");
+
+          await connection.confirmTransaction(
+            {
+              signature,
+              blockhash: blockhashInfo.blockhash,
+              lastValidBlockHeight: blockhashInfo.lastValidBlockHeight,
+            },
+            "confirmed"
           );
         }
-
-        setProgressStep(3);
-        setStatusStep("3. Aguardando Assinatura — Confirme a transação na sua carteira...");
-
-        const signature = await sendTransaction(transaction, connection, {
-          skipPreflight: false,
-          maxRetries: 3,
-        });
-
-        setProgressStep(4);
-        setStatusStep("4. Confirmando na Rede — Aguardando finalidade do bloco na Solana...");
-
-        const blockhashInfo =
-          result.blockhash && result.lastValidBlockHeight
-            ? {
-                blockhash: result.blockhash,
-                lastValidBlockHeight: result.lastValidBlockHeight,
-              }
-            : await connection.getLatestBlockhash("confirmed");
-
-        await connection.confirmTransaction(
-          {
-            signature,
-            blockhash: blockhashInfo.blockhash,
-            lastValidBlockHeight: blockhashInfo.lastValidBlockHeight,
-          },
-          "confirmed"
-        );
 
         const effectiveFeeSol = result.serviceFeeSol ?? expectedModularFeeSol;
 
@@ -233,7 +313,7 @@ export const useCreateToken = () => {
         setProgressStep(0);
       }
     },
-    [publicKey, sendTransaction, connection, cluster, router]
+    [publicKey, sendTransaction, signAllTransactions, connection, cluster, router]
   );
 
   const clearError = useCallback(() => setError(null), []);

@@ -3779,6 +3779,12 @@ const ZH_TRANSLATIONS: TranslationDictionary = {
   },
 };
 
+EN_TRANSLATIONS.costs = EN_TRANSLATIONS.costsPage;
+ES_TRANSLATIONS.costs = ES_TRANSLATIONS.costsPage;
+RU_TRANSLATIONS.costs = RU_TRANSLATIONS.costsPage;
+ZH_TRANSLATIONS.costs = ZH_TRANSLATIONS.costsPage;
+PT_BR_TRANSLATIONS.costs = PT_BR_TRANSLATIONS.costsPage;
+
 export const TRANSLATIONS: Record<AppLocale, TranslationDictionary> = {
   en: EN_TRANSLATIONS,
   es: ES_TRANSLATIONS,
