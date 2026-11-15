@@ -1,3 +1,5 @@
+const path = require("path");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
@@ -20,6 +22,14 @@ const nextConfig = {
     ],
   },
   webpack: (config, { isServer }) => {
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      "@/components/ui/Button": path.resolve(__dirname, "src/components/ui/button.tsx"),
+      "@/components/ui/Input": path.resolve(__dirname, "src/components/ui/input.tsx"),
+      "@/components/ui/Card": path.resolve(__dirname, "src/components/ui/card.tsx"),
+      "@/components/ui/Label": path.resolve(__dirname, "src/components/ui/label.tsx"),
+    };
+
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
