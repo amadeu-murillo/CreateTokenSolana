@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useCluster } from "@/context/WalletContext";
+import { useLanguage } from "@/context/LanguageContext";
 import styles from "@/components/TokenPreview.module.css";
 
 export interface TokenPreviewProps {
@@ -33,6 +34,7 @@ const TokenPreview = ({
   transferFeeBps = 0,
 }: TokenPreviewProps) => {
   const { cluster } = useCluster();
+  const { t } = useLanguage();
   const isDevnet = cluster === "devnet";
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
 
@@ -76,16 +78,13 @@ const TokenPreview = ({
   return (
     <Card className={styles.previewCard}>
       <CardHeader>
-        <CardTitle>Simulador de Carteira &amp; Auditoria</CardTitle>
-        <CardDescription>
-          Visualização reativa em tempo real de como seu ativo será exibido na Phantom, Solflare e
-          DexScreener.
-        </CardDescription>
+        <CardTitle>{t.tokenPreview.cardTitle}</CardTitle>
+        <CardDescription>{t.tokenPreview.cardDesc}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className={styles.walletSimCard}>
           <div className={styles.walletSimHeader}>
-            <span>SOLANA WALLET ASSET PREVIEW</span>
+            <span>{t.tokenPreview.headerLabel}</span>
             <span className={isDevnet ? styles.networkBadgeDevnet : styles.networkBadgeMainnet}>
               {isDevnet ? "DEVNET SANDBOX" : "MAINNET-BETA"}
             </span>
@@ -107,7 +106,9 @@ const TokenPreview = ({
 
             <div className={styles.tokenInfo}>
               <div className={styles.nameAndBadge}>
-                <p className={styles.tokenName}>{name.trim() || "Nome do Token"}</p>
+                <p className={styles.tokenName}>
+                  {name.trim() || t.tokenPreview.defaultTokenName}
+                </p>
                 <span className={styles.tokenBadge}>
                   {tokenStandard === "token-2022" ? "Token-2022" : "SPL"}
                 </span>
@@ -123,11 +124,11 @@ const TokenPreview = ({
 
           <div className={styles.metaSpecGrid}>
             <div className={styles.metaSpecItem}>
-              <span>Decimais</span>
+              <span>{t.tokenPreview.decimalsLabel}</span>
               <strong>{Number.isFinite(decimals) ? decimals : 9}</strong>
             </div>
             <div className={styles.metaSpecItem}>
-              <span>Taxa Transfer</span>
+              <span>{t.tokenPreview.transferFeeLabel}</span>
               <strong>
                 {tokenStandard === "token-2022" && transferFeeBps > 0
                   ? `${(transferFeeBps / 100).toFixed(2)}%`
@@ -135,8 +136,8 @@ const TokenPreview = ({
               </strong>
             </div>
             <div className={styles.metaSpecItem}>
-              <span>Metadados</span>
-              <strong>{isImmutable ? "Imutável" : "Mutável"}</strong>
+              <span>{t.tokenPreview.metadataLabel}</span>
+              <strong>{isImmutable ? t.tokenPreview.immutable : t.tokenPreview.mutable}</strong>
             </div>
           </div>
 
@@ -145,10 +146,9 @@ const TokenPreview = ({
           )}
         </div>
 
-        {/* Dynamic Auditoria & RugCheck Score (0 to 100%) */}
         <div className={styles.rugCheckBox}>
           <div className={styles.rugCheckHeader}>
-            <span className={styles.rugCheckTitle}>🛡️ Auditoria &amp; RugCheck Score</span>
+            <span className={styles.rugCheckTitle}>{t.tokenPreview.auditTitle}</span>
             <span className={badgeClass}>{rugCheckScore}/100</span>
           </div>
 
@@ -158,28 +158,19 @@ const TokenPreview = ({
 
           <div className={styles.alertsList}>
             {isMintRevoked && isFreezeRevoked && isImmutable && (
-              <div className={styles.alertSafe}>
-                🟢 100/100 - Seguro (Padrão DexScreener / RugCheck)
-              </div>
+              <div className={styles.alertSafe}>{t.tokenPreview.alertSafe}</div>
             )}
 
             {!isFreezeRevoked && (
-              <div className={styles.alertCritical}>
-                🔴 Alerta Crítico: Freeze Authority ativa impede criação de Pool/Swap na Jupiter
-              </div>
+              <div className={styles.alertCritical}>{t.tokenPreview.alertFreeze}</div>
             )}
 
             {!isMintRevoked && (
-              <div className={styles.alertWarning}>
-                🟡 Risco de Diluição: Mint Authority aberta gera alerta nos scanners
-              </div>
+              <div className={styles.alertWarning}>{t.tokenPreview.alertMint}</div>
             )}
 
             {!isImmutable && (
-              <div className={styles.alertWarning}>
-                🟡 Metadados Mutáveis: Desative a mutabilidade (+0.05 SOL) para atingir 100/100 no
-                RugCheck
-              </div>
+              <div className={styles.alertWarning}>{t.tokenPreview.alertMutable}</div>
             )}
           </div>
         </div>

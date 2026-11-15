@@ -6,12 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useCluster } from "@/context/WalletContext";
-import {
-  AFFILIATE_COMMISSION_RATE,
-  DEV_AFFILIATE_SHARE_RATE,
-  SERVICE_FEE_CREATE_LP_SOL,
-  SERVICE_FEE_CREATE_TOKEN_SOL,
-} from "@/lib/constants";
+import { useLanguage } from "@/context/LanguageContext";
 import styles from "./Affiliates.module.css";
 
 const IconTrendingUp = () => (
@@ -112,21 +107,13 @@ interface AffiliateEarnings {
 function AffiliatesContent() {
   const { connected, publicKey } = useWallet();
   const { getExplorerUrl } = useCluster();
+  const { t } = useLanguage();
   const [copySuccess, setCopySuccess] = useState(false);
   const [affiliateLink, setAffiliateLink] = useState("");
   const [earnings, setEarnings] = useState<AffiliateEarnings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEarnings, setShowEarnings] = useState(false);
-
-  const commissionPct = Math.round(AFFILIATE_COMMISSION_RATE * 100);
-  const devSharePct = Math.round(DEV_AFFILIATE_SHARE_RATE * 100);
-  const tokenCommissionSol = (
-    SERVICE_FEE_CREATE_TOKEN_SOL * AFFILIATE_COMMISSION_RATE
-  ).toFixed(4);
-  const lpCommissionSol = (
-    SERVICE_FEE_CREATE_LP_SOL * AFFILIATE_COMMISSION_RATE
-  ).toFixed(4);
 
   useEffect(() => {
     if (typeof window !== "undefined" && connected && publicKey) {
@@ -175,14 +162,8 @@ function AffiliatesContent() {
   return (
     <div className={styles.pageContainer}>
       <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Affiliate Program: Earn {commissionPct}% SOL Instantly</h1>
-        <p className={styles.pageDescription}>
-          Join our on-chain affiliate program and earn{" "}
-          <span className={styles.highlight}>{commissionPct}% instant commission in SOL</span> on
-          every token creation or liquidity pool transaction through your referral link (atomic{" "}
-          {devSharePct}% Dev / {commissionPct}% Affiliate split via{" "}
-          <code>SystemProgram.transfer</code>).
-        </p>
+        <h1 className={styles.pageTitle}>{t.affiliatesPage.pageTitle}</h1>
+        <p className={styles.pageDescription}>{t.affiliatesPage.pageDesc}</p>
       </header>
 
       <div className={styles.grid}>
@@ -190,26 +171,22 @@ function AffiliatesContent() {
           <div className={styles.contentStack}>
             <Card>
               <CardHeader>
-                <CardTitle>Your Personal Affiliate Link</CardTitle>
+                <CardTitle>{t.affiliatesPage.linkCardTitle}</CardTitle>
               </CardHeader>
               <CardContent>
                 {connected && publicKey ? (
                   <div className={styles.linkContainer}>
-                    <p className={styles.linkExplanation}>
-                      This is your exclusive referral link. The <code>?ref=</code> parameter is
-                      captured on any entry page and splits {commissionPct}% of the service fee
-                      directly to your wallet in the exact same transaction.
-                    </p>
+                    <p className={styles.linkExplanation}>{t.affiliatesPage.linkExplanation}</p>
                     <div className={styles.inputWrapper}>
                       <Input id="affiliate-link" type="text" value={affiliateLink} readOnly />
                       <Button onClick={handleCopy} className={styles.copyButton}>
-                        {copySuccess ? "Copied!" : "Copy"}
+                        {copySuccess ? t.common.copied : t.common.copy}
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <div className={styles.connectWalletPrompt}>
-                    <p>Connect your Solana wallet to generate your personal affiliate link.</p>
+                    <p>{t.affiliatesPage.connectPrompt}</p>
                   </div>
                 )}
               </CardContent>
@@ -218,32 +195,29 @@ function AffiliatesContent() {
             {connected && publicKey && (
               <>
                 <Button onClick={handleToggleEarnings} className="w-full">
-                  {showEarnings ? "Hide Earnings Panel" : "View My Earnings & Ranking"}
+                  {showEarnings ? t.affiliatesPage.hideEarningsBtn : t.affiliatesPage.viewEarningsBtn}
                 </Button>
                 {showEarnings && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Earnings Dashboard</CardTitle>
-                      <CardDescription>
-                        Track your on-chain verified referral performance and {commissionPct}% SOL
-                        commissions received.
-                      </CardDescription>
+                      <CardTitle>{t.affiliatesPage.dashboardTitle}</CardTitle>
+                      <CardDescription>{t.affiliatesPage.dashboardDesc}</CardDescription>
                     </CardHeader>
                     <CardContent>
                       {isLoading ? (
                         <div className={styles.loadingContainer}>
                           <div className={styles.spinner}></div>
-                          <p>Loading your earnings...</p>
+                          <p>{t.common.loading}</p>
                         </div>
                       ) : error ? (
-                        <p className={styles.errorText}>Error loading earnings: {error}</p>
+                        <p className={styles.errorText}>{error}</p>
                       ) : earnings ? (
                         <div className={styles.earningsDashboard}>
                           <div className={styles.earningsGrid}>
                             <div className={styles.earningStat}>
                               <div className={styles.statHeader}>
                                 <IconTrendingUp />
-                                <span>Total Earnings ({commissionPct}% Split)</span>
+                                <span>{t.affiliatesPage.totalEarningsLabel}</span>
                               </div>
                               <p className={styles.statValue}>
                                 {earnings.totalEarningsSol.toFixed(4)} SOL
@@ -252,26 +226,26 @@ function AffiliatesContent() {
                             <div className={styles.earningStat}>
                               <div className={styles.statHeader}>
                                 <IconUsers />
-                                <span>Verified Referrals</span>
+                                <span>{t.affiliatesPage.verifiedReferralsLabel}</span>
                               </div>
                               <p className={styles.statValue}>{earnings.referralCount}</p>
                             </div>
                           </div>
 
-                          <h4 className={styles.historyTitle}>Last 10 Verified Commissions</h4>
+                          <h4 className={styles.historyTitle}>{t.affiliatesPage.historyTitle}</h4>
                           {earnings.transactions.length > 0 ? (
                             <div className={styles.historyTable}>
                               <div className={styles.historyTableHeader}>
-                                <div>Date</div>
-                                <div className={styles.amountHeader}>Amount</div>
-                                <div className={styles.txHeader}>Transaction</div>
+                                <div>{t.affiliatesPage.dateCol}</div>
+                                <div className={styles.amountHeader}>{t.affiliatesPage.amountCol}</div>
+                                <div className={styles.txHeader}>{t.affiliatesPage.txCol}</div>
                               </div>
                               {earnings.transactions.map((tx) => (
                                 <div key={tx.signature} className={styles.historyRow}>
                                   <div className={styles.historyDate}>
                                     {tx.blockTime
                                       ? new Date(tx.blockTime * 1000).toLocaleString()
-                                      : "Confirmed"}
+                                      : "✓"}
                                   </div>
                                   <div className={styles.historyAmount}>
                                     +{tx.amount.toFixed(4)} SOL
@@ -282,13 +256,13 @@ function AffiliatesContent() {
                                     rel="noopener noreferrer"
                                     className={styles.historyLink}
                                   >
-                                    View on Solscan ↗
+                                    {t.common.viewOnSolscan}
                                   </a>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <p className={styles.noHistoryText}>No commission transactions yet.</p>
+                            <p className={styles.noHistoryText}>{t.affiliatesPage.noHistoryText}</p>
                           )}
                         </div>
                       ) : null}
@@ -304,28 +278,16 @@ function AffiliatesContent() {
           <Card className={styles.sidebarCard}>
             <CardHeader>
               <CardTitle className={styles.sidebarCardTitle}>
-                <IconZap /> How It Works
+                <IconZap /> {t.affiliatesPage.howItWorksTitle}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <ol className={styles.stepList}>
-                <li className={styles.stepItem}>
-                  <strong>1. Connect Your Wallet:</strong> Your wallet’s public address serves as
-                  your unique referral identifier.
-                </li>
-                <li className={styles.stepItem}>
-                  <strong>2. Copy Your Link:</strong> Your affiliate link is generated automatically
-                  with <code>?ref=YOUR_WALLET</code>.
-                </li>
-                <li className={styles.stepItem}>
-                  <strong>3. Share and Refer:</strong> Share the link with creators launching tokens
-                  or liquidity pools.
-                </li>
-                <li className={styles.stepItem}>
-                  <strong>4. Receive {commissionPct}% Instant Commissions:</strong> {commissionPct}%
-                  of the service fee is transferred directly to your wallet in the exact same
-                  transaction ({devSharePct}% Dev / {commissionPct}% Affiliate).
-                </li>
+                {t.affiliatesPage.steps.map((step, idx) => (
+                  <li key={idx} className={styles.stepItem}>
+                    <strong>{step.title}</strong> {step.text}
+                  </li>
+                ))}
               </ol>
             </CardContent>
           </Card>
@@ -333,31 +295,22 @@ function AffiliatesContent() {
           <Card className={styles.sidebarCard}>
             <CardHeader>
               <CardTitle className={styles.sidebarCardTitle}>
-                <IconPercent /> Your {commissionPct}% Commission
+                <IconPercent /> {t.affiliatesPage.commissionCardTitle}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className={styles.sidebarText}>
-                You receive <strong className={styles.highlight}>{commissionPct}%</strong> of our
-                service fee: <strong className={styles.highlight}>~{tokenCommissionSol} SOL</strong>{" "}
-                on a standard 0.35 SOL token launch (up to 0.1650 SOL on a full 0.55 SOL launch) and{" "}
-                <strong className={styles.highlight}>{lpCommissionSol} SOL</strong> per liquidity
-                pool initialized through your link.
-              </p>
+              <p className={styles.sidebarText}>{t.affiliatesPage.commissionCardText}</p>
             </CardContent>
           </Card>
 
           <Card className={styles.sidebarCard}>
             <CardHeader>
               <CardTitle className={styles.sidebarCardTitle}>
-                <IconShieldCheck /> Transparent On-Chain Payments
+                <IconShieldCheck /> {t.affiliatesPage.transparentCardTitle}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className={styles.sidebarText}>
-                Commissions are paid atomically via Solana’s System Program and verified on-chain
-                before being indexed in Firebase, guaranteeing instant, tamper-proof payouts.
-              </p>
+              <p className={styles.sidebarText}>{t.affiliatesPage.transparentCardText}</p>
             </CardContent>
           </Card>
         </aside>
@@ -368,7 +321,7 @@ function AffiliatesContent() {
 
 export default function AfiliatesPage() {
   return (
-    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading affiliate dashboard...</div>}>
+    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
       <AffiliatesContent />
     </Suspense>
   );

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { useLanguage } from "@/context/LanguageContext";
 import styles from "./TokenSelector.module.css";
 
 export interface SelectableWalletToken {
@@ -27,10 +28,6 @@ interface TokenSelectorProps {
   showQuickWalletCards?: boolean;
 }
 
-/**
- * Child component inside <Suspense> that reads ?mint= from URL searchParams
- * and auto-selects the matching token once wallet tokens load.
- */
 function UrlMintAutoSelector({
   tokens,
   selectedTokenMint,
@@ -65,15 +62,15 @@ export const TokenSelector = ({
   autoSelectFirst = true,
   showQuickWalletCards = true,
 }: TokenSelectorProps) => {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Auto-select from URL ?mint= if present, or fall back to first token in wallet
   useEffect(() => {
     if (isLoading || tokens.length === 0 || selectedTokenMint) return;
     if (typeof window !== "undefined") {
       const urlMint = new URLSearchParams(window.location.search).get("mint");
-      if (urlMint && tokens.some((t) => t.mint === urlMint)) {
+      if (urlMint && tokens.some((tk) => tk.mint === urlMint)) {
         onSelectToken(urlMint);
         return;
       }
@@ -83,7 +80,7 @@ export const TokenSelector = ({
     }
   }, [autoSelectFirst, selectedTokenMint, tokens, isLoading, onSelectToken]);
 
-  const selectedToken = tokens.find((t) => t.mint === selectedTokenMint) || null;
+  const selectedToken = tokens.find((tk) => tk.mint === selectedTokenMint) || null;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -113,9 +110,12 @@ export const TokenSelector = ({
         />
       </Suspense>
 
-      {/* Minimalist Skeleton Loaders while useUserTokens isLoading === true (Zero Layout Shift) */}
       {showQuickWalletCards && isLoading && (
-        <div className={styles.skeletonStrip} aria-busy="true" aria-label="Carregando tokens da carteira">
+        <div
+          className={styles.skeletonStrip}
+          aria-busy="true"
+          aria-label={t.tokenSelector.loadingAria}
+        >
           {[1, 2, 3].map((item) => (
             <div key={item} className={styles.skeletonChip}>
               <div className={styles.skeletonAvatar} />
@@ -128,7 +128,6 @@ export const TokenSelector = ({
         </div>
       )}
 
-      {/* 1-Click Direct Wallet Token Cards (No typing or symbol input required) */}
       {showQuickWalletCards && !isLoading && tokens.length > 0 && (
         <div className={styles.walletCardsStrip}>
           {tokens.map((token) => {
@@ -136,7 +135,7 @@ export const TokenSelector = ({
             const displayLabel =
               token.name && token.name !== "Custom Token"
                 ? token.name
-                : `Wallet Token (${formatMintShort(token.mint)})`;
+                : `Token (${formatMintShort(token.mint)})`;
             return (
               <button
                 key={token.mint}
@@ -164,7 +163,7 @@ export const TokenSelector = ({
                     {token.isLpToken && <span className={styles.lpTag}>LP</span>}
                   </span>
                   <span className={styles.chipSub}>
-                    Balance:{" "}
+                    {t.tokenSelector.balancePrefix}{" "}
                     {parseFloat(token.amount).toLocaleString("en-US", {
                       maximumFractionDigits: 4,
                     })}{" "}
@@ -178,7 +177,6 @@ export const TokenSelector = ({
         </div>
       )}
 
-      {/* Direct Wallet Dropdown Selector (Zero text/symbol inputs) */}
       <div className={styles.wrapper} ref={wrapperRef}>
         <button
           type="button"
@@ -211,10 +209,10 @@ export const TokenSelector = ({
                 <span className={styles.selectedPrimary}>
                   {selectedToken.name && selectedToken.name !== "Custom Token"
                     ? selectedToken.name
-                    : `Wallet Asset (${formatMintShort(selectedToken.mint)})`}
+                    : `Asset (${formatMintShort(selectedToken.mint)})`}
                 </span>
                 <span className={styles.selectedSecondary}>
-                  Mint: {formatMintShort(selectedToken.mint)} · Balance:{" "}
+                  Mint: {formatMintShort(selectedToken.mint)} · {t.tokenSelector.balancePrefix}{" "}
                   {parseFloat(selectedToken.amount).toLocaleString("en-US", {
                     maximumFractionDigits: 4,
                   })}
@@ -222,9 +220,9 @@ export const TokenSelector = ({
               </div>
             </div>
           ) : tokens.length === 0 ? (
-            <span>No tokens detected in your connected wallet on this network</span>
+            <span>{t.tokenSelector.noTokensDetected}</span>
           ) : (
-            <span>Click to choose a token from your connected wallet</span>
+            <span>{t.tokenSelector.clickToChoose}</span>
           )}
           <span className={`${styles.arrow} ${isOpen ? styles.arrowOpen : ""}`}>▼</span>
         </button>
@@ -232,7 +230,9 @@ export const TokenSelector = ({
         {isOpen && (
           <div className={styles.dropdown}>
             <div className={styles.dropdownHeader}>
-              <span>Connected Wallet Assets ({tokens.length}) — Click to Select</span>
+              <span>
+                {t.tokenSelector.dropdownHeader} ({tokens.length})
+              </span>
             </div>
             <ul className={styles.tokenList}>
               {tokens.length > 0 ? (
@@ -260,7 +260,9 @@ export const TokenSelector = ({
                         {token.name && token.name !== "Custom Token"
                           ? token.name
                           : `Token ${formatMintShort(token.mint)}`}
-                        {token.isLpToken && <span className={styles.lpTag}>LP Pool Token</span>}
+                        {token.isLpToken && (
+                          <span className={styles.lpTag}>{t.tokenSelector.lpPoolTokenTag}</span>
+                        )}
                       </span>
                       <span className={styles.tokenName}>Mint: {token.mint}</span>
                     </div>
@@ -272,9 +274,7 @@ export const TokenSelector = ({
                   </li>
                 ))
               ) : (
-                <li className={styles.noResult}>
-                  No tokens found in your connected wallet on this network.
-                </li>
+                <li className={styles.noResult}>{t.tokenSelector.noTokensDetected}</li>
               )}
             </ul>
           </div>

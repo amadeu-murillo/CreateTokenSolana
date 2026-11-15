@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense,  useState, useMemo, useEffect } from "react";
+import React, { Suspense, useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -21,6 +21,7 @@ import CostSummary from "@/components/CostSummary";
 import Notification from "@/components/ui/Notification";
 import TransactionStatusStepper from "@/components/TransactionStatusStepper";
 import { useCluster } from "@/context/WalletContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useUserTokens } from "@/hooks/useUserTokens";
 import { useCreateLiquidityPool } from "@/hooks/useCreateLiquidityPool";
 import { useRemoveLiquidity } from "@/hooks/useRemoveLiquidity";
@@ -35,24 +36,11 @@ import styles from "./AddLiquidity.module.css";
 
 const devWalletBase58 = DEV_WALLET_ADDRESS.toBase58();
 
-const FEE_TIERS = [
-  { bps: 25, label: "0.25%", badge: "Recommended" },
-  { bps: 30, label: "0.30%", badge: "Standard AMM" },
-  { bps: 100, label: "1.00%", badge: "High Volatility" },
-];
-
 const ALLOCATION_PRESETS = [
   { label: "25%", ratio: 0.25 },
   { label: "50%", ratio: 0.5 },
   { label: "75%", ratio: 0.75 },
   { label: "MAX", ratio: 1 },
-];
-
-const WITHDRAW_SHARE_OPTIONS = [
-  { pct: 25, label: "25%", desc: "Partial SOL Exit" },
-  { pct: 50, label: "50%", desc: "Half Position" },
-  { pct: 75, label: "75%", desc: "Major Exit" },
-  { pct: 100, label: "100% MAX", desc: "Full Unwrap + Rent" },
 ];
 
 interface SnapshotTokenDossier {
@@ -80,6 +68,7 @@ function AddLiquidityPageInner() {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   const { cluster, setCluster, getExplorerUrl } = useCluster();
+  const { t } = useLanguage();
   const { tokens: userTokens, isLoading: isLoadingTokens, refreshTokens } = useUserTokens();
 
   const {
@@ -122,7 +111,6 @@ function AddLiquidityPageInner() {
   );
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  // Withdraw Liquidity in SOL states (selected directly from connected wallet)
   const [withdrawPercentage, setWithdrawPercentage] = useState<number>(100);
   const [derivedWsolVault, setDerivedWsolVault] = useState<string>("");
   const [detectedVaultSol, setDetectedVaultSol] = useState<number | null>(null);
@@ -131,7 +119,25 @@ function AddLiquidityPageInner() {
   const activeLpFeeSol =
     cluster === "devnet" ? SERVICE_FEE_CREATE_LP_DEVNET_SOL : SERVICE_FEE_CREATE_LP_SOL;
 
-  // Pre-select ?mint= from URL if navigated from Token Creation Confirmation
+  const feeTiers = useMemo(
+    () => [
+      { bps: 25, label: "0.25%", badge: t.liquidityPage.tierRecommended },
+      { bps: 30, label: "0.30%", badge: t.liquidityPage.tierStandard },
+      { bps: 100, label: "1.00%", badge: t.liquidityPage.tierHighVol },
+    ],
+    [t]
+  );
+
+  const withdrawShareOptions = useMemo(
+    () => [
+      { pct: 25, label: "25%", desc: t.liquidityPage.sharePartial },
+      { pct: 50, label: "50%", desc: t.liquidityPage.shareHalf },
+      { pct: 75, label: "75%", desc: t.liquidityPage.shareMajor },
+      { pct: 100, label: "100% MAX", desc: t.liquidityPage.shareFull },
+    ],
+    [t]
+  );
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -147,11 +153,10 @@ function AddLiquidityPageInner() {
   }, [selectedTokenMint]);
 
   const selectedToken = useMemo(
-    () => userTokens.find((t) => t.mint === selectedTokenMint) || null,
+    () => userTokens.find((tk) => tk.mint === selectedTokenMint) || null,
     [userTokens, selectedTokenMint]
   );
 
-  // Automatically resolve the underlying baseMint & lpMint from the selected wallet token
   const resolvedWithdrawBaseMint = useMemo(() => {
     if (!selectedToken) return selectedTokenMint;
     if (selectedToken.isLpToken && selectedToken.pairedBaseMint) {
@@ -166,7 +171,7 @@ function AddLiquidityPageInner() {
       return selectedToken.mint;
     }
     if (selectedToken.pairedLpMint) {
-      const hasLpInWallet = userTokens.some((t) => t.mint === selectedToken.pairedLpMint);
+      const hasLpInWallet = userTokens.some((tk) => tk.mint === selectedToken.pairedLpMint);
       if (hasLpInWallet) return selectedToken.pairedLpMint;
     }
     return undefined;
@@ -191,7 +196,6 @@ function AddLiquidityPageInner() {
     };
   }, [publicKey, connection, cluster, poolResult, removeResult]);
 
-  // Inspect on-chain deterministic WSOL liquidity vault balance when a token is selected from the wallet
   useEffect(() => {
     if (!publicKey || !resolvedWithdrawBaseMint || !connection) {
       setDerivedWsolVault("");
@@ -313,7 +317,7 @@ function AddLiquidityPageInner() {
 
     const totalSup = totalTokenSupply || parseFloat(selectedToken.amount) || numericBase;
     const walletBalBefore = parseFloat(selectedToken.amount) || 0;
-    const tierObj = FEE_TIERS.find((t) => t.bps === feeTierBps) || FEE_TIERS[0];
+    const tierObj = feeTiers.find((tr) => tr.bps === feeTierBps) || feeTiers[0];
 
     const snapshot: SnapshotTokenDossier = {
       mint: selectedToken.mint,
@@ -337,7 +341,7 @@ function AddLiquidityPageInner() {
       launchScheduleLabel:
         launchMode === "scheduled" && scheduledDateTime
           ? new Date(scheduledDateTime).toLocaleString()
-          : "Immediate (Trading Active)",
+          : t.liquidityPage.immediateBtn,
     };
 
     const res = await createLiquidityPool({
@@ -388,12 +392,10 @@ function AddLiquidityPageInner() {
     setQuoteAmount("0.2");
   };
 
-  // Pre-flight readiness checklist for user confidence
   const isTokenReady = Boolean(selectedToken);
   const areAmountsReady = numericBase > 0 && numericQuote > 0;
   const isFreezeReady = !hasActiveFreezeAuth || revokeFreezeIfActive;
 
-  // Live SOL withdrawal simulation
   const simulatedGrossSol =
     detectedVaultSol && detectedVaultSol > 0
       ? Number(((detectedVaultSol * withdrawPercentage) / 100).toFixed(6))
@@ -409,7 +411,7 @@ function AddLiquidityPageInner() {
       <header className={styles.pageHeader}>
         <div className={styles.topNetworkRow}>
           <div className={styles.networkPillGroup}>
-            <span>Active Network:</span>
+            <span>{t.common.activeNetwork}</span>
             <button
               type="button"
               onClick={() => setCluster("mainnet-beta")}
@@ -428,28 +430,24 @@ function AddLiquidityPageInner() {
           <span className={styles.feeBadgeTop}>
             {activeMode === "add" ? (
               <>
-                Add Liquidity Fee: <strong>{activeLpFeeSol.toFixed(2)} SOL</strong>
+                {t.liquidityPage.addFeeLabel} <strong>{activeLpFeeSol.toFixed(2)} SOL</strong>
               </>
             ) : (
               <>
-                Withdraw Liquidity Fee: <strong>{SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL</strong>
+                {t.liquidityPage.withdrawFeeLabel}{" "}
+                <strong>{SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL</strong>
               </>
             )}
           </span>
         </div>
 
         <h1 className={styles.pageTitle}>
-          {activeMode === "add"
-            ? "Create On-Chain Liquidity Pool"
-            : "Withdraw Liquidity in SOL"}
+          {activeMode === "add" ? t.liquidityPage.titleAdd : t.liquidityPage.titleWithdraw}
         </h1>
         <p className={styles.pageDescription}>
-          {activeMode === "add"
-            ? `Initialize an on-chain Liquidity Pool & LP Token Mint on Solana (${cluster}). Select your token directly from your connected wallet, deposit initial ${quoteToken}, and receive LP tokens.`
-            : `Select your token or LP token directly from your connected wallet—no symbol or address typing needed. Unwraps your WSOL liquidity vault back into native SOL with a ${SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL fee routed to Dev Wallet (${devWalletBase58.slice(0, 6)}...${devWalletBase58.slice(-4)}).`}
+          {activeMode === "add" ? t.liquidityPage.descAdd : t.liquidityPage.descWithdraw}
         </p>
 
-        {/* Mode Switcher Bar */}
         <div className={styles.modeTabsBar}>
           <button
             type="button"
@@ -459,7 +457,7 @@ function AddLiquidityPageInner() {
             }}
             className={activeMode === "add" ? styles.modeTabBtnActive : styles.modeTabBtn}
           >
-            <span>➕ Add Liquidity</span>
+            <span>{t.liquidityPage.tabAdd}</span>
             <span className={styles.modeFeePill}>{activeLpFeeSol.toFixed(2)} SOL</span>
           </button>
           <button
@@ -472,7 +470,7 @@ function AddLiquidityPageInner() {
               activeMode === "withdraw" ? styles.modeTabBtnWithdrawActive : styles.modeTabBtn
             }
           >
-            <span>💸 Withdraw Liquidity in SOL</span>
+            <span>{t.liquidityPage.tabWithdraw}</span>
             <span className={styles.modeFeePill}>{SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL</span>
           </button>
         </div>
@@ -488,38 +486,30 @@ function AddLiquidityPageInner() {
                     <div className={styles.dossierHeroHeader}>
                       <div>
                         <span className={styles.livePoolBadge}>
-                          ✓ SOL LIQUIDITY WITHDRAWN ON {cluster.toUpperCase()}
+                          ✓ SOL LIQUIDITY WITHDRAWN ({cluster.toUpperCase()})
                         </span>
                         <CardTitle className={styles.receiptTitle}>
-                          +{removeResult.withdrawnSol.toFixed(6)} SOL Returned to Wallet
+                          +{removeResult.withdrawnSol.toFixed(6)} SOL
                         </CardTitle>
-                        <CardDescription>
-                          Your WSOL liquidity vault was unwrapped into native SOL and the{" "}
-                          {removeResult.serviceFeeSol.toFixed(2)} SOL service fee was routed
-                          atomically to Dev Wallet.
-                        </CardDescription>
                       </div>
                     </div>
                   </CardHeader>
 
                   <CardContent className={styles.receiptContent}>
                     <div className={styles.dossierSection}>
-                      <h3 className={styles.dossierSectionTitle}>
-                        💸 1. SOL Liquidity Withdrawal Summary
-                      </h3>
                       <div className={styles.dossierMetricsGrid}>
                         <div className={styles.dossierMetricBox}>
-                          <span>Gross SOL Unwrapped</span>
+                          <span>{t.liquidityPage.estimatedSolUnwrapped}</span>
                           <strong className={styles.textEmerald}>
                             {removeResult.withdrawnSol.toFixed(6)} SOL
                           </strong>
                         </div>
                         <div className={styles.dossierMetricBox}>
-                          <span>Withdrawal Percentage</span>
-                          <strong>{removeResult.withdrawPercentage}% of Vault</strong>
+                          <span>{t.liquidityPage.selectedShareLabel}</span>
+                          <strong>{removeResult.withdrawPercentage}%</strong>
                         </div>
                         <div className={styles.dossierMetricBox}>
-                          <span>Dev Wallet Service Fee</span>
+                          <span>{t.liquidityPage.devFeeLabel}</span>
                           <strong className={styles.textPurple}>
                             {removeResult.serviceFeeSol.toFixed(2)} SOL
                           </strong>
@@ -528,26 +518,17 @@ function AddLiquidityPageInner() {
                     </div>
 
                     <div className={styles.dossierSection}>
-                      <h3 className={styles.dossierSectionTitle}>
-                        🔗 2. On-Chain Verification & Explorer Links
-                      </h3>
                       <div className={styles.addressDirectory}>
                         {[
                           {
                             key: "wsolVault",
-                            label: "Unwrapped WSOL Liquidity Vault",
+                            label: "WSOL Vault",
                             value: removeResult.wsolVaultAddress,
                             explorerType: "account" as const,
                           },
                           {
-                            key: "devWallet",
-                            label: "Developer Fee Destination Wallet (0.05 SOL)",
-                            value: devWalletBase58,
-                            explorerType: "account" as const,
-                          },
-                          {
                             key: "withdrawTx",
-                            label: "Withdrawal Transaction Signature",
+                            label: "TX Signature",
                             value: removeResult.signature,
                             explorerType: "tx" as const,
                           },
@@ -561,7 +542,7 @@ function AddLiquidityPageInner() {
                                   onClick={() => handleCopy(item.value, item.key)}
                                   className={styles.copyBtnSmall}
                                 >
-                                  {copiedKey === item.key ? "✓ Copied!" : "Copy"}
+                                  {copiedKey === item.key ? t.common.copied : t.common.copy}
                                 </button>
                                 <a
                                   href={getExplorerUrl(item.explorerType, item.value)}
@@ -569,7 +550,7 @@ function AddLiquidityPageInner() {
                                   rel="noopener noreferrer"
                                   className={styles.solscanBtnSmall}
                                 >
-                                  Solscan ↗
+                                  {t.common.viewOnSolscan}
                                 </a>
                               </div>
                             </div>
@@ -582,7 +563,7 @@ function AddLiquidityPageInner() {
 
                   <CardFooter className={styles.dossierFooterActions}>
                     <Button onClick={resetRemoveState} className="secondary">
-                      💸 Make Another Withdrawal
+                      {t.liquidityPage.tabWithdraw}
                     </Button>
                     <Button
                       onClick={() => {
@@ -590,7 +571,7 @@ function AddLiquidityPageInner() {
                         setActiveMode("add");
                       }}
                     >
-                      ➕ Back to Add Liquidity
+                      {t.liquidityPage.tabAdd}
                     </Button>
                   </CardFooter>
                 </Card>
@@ -598,11 +579,12 @@ function AddLiquidityPageInner() {
             ) : (
               <Card>
                 <CardHeader>
-                  <CardTitle>Withdraw Liquidity in SOL ({cluster})</CardTitle>
+                  <CardTitle>
+                    {t.liquidityPage.withdrawCardTitle} ({cluster})
+                  </CardTitle>
                   <CardDescription>
-                    Click any token or LP token directly from your connected wallet below—no symbol
-                    or manual address required. Standardized Service Fee:{" "}
-                    <strong>{SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL</strong>.
+                    {t.liquidityPage.withdrawCardDesc} (
+                    <strong>{SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL</strong>)
                   </CardDescription>
                 </CardHeader>
 
@@ -620,19 +602,16 @@ function AddLiquidityPageInner() {
                       isActive={isRemovingLiquidity}
                       currentStepIndex={removeProgressStep}
                       statusMessage={removeStatusStep}
-                      operationTitle={`Withdrawing ${withdrawPercentage}% SOL Liquidity on ${cluster}`}
+                      operationTitle={`${t.liquidityPage.withdrawingStatus} (${withdrawPercentage}% · ${cluster})`}
                     />
 
-                    {/* 1. Direct Wallet Token Selection (Cards + Dropdown, zero symbol input) */}
                     <div className={styles.field}>
                       <div className={styles.labelRow}>
-                        <Label>
-                          1. Select Token or LP Token Directly from Your Connected Wallet
-                        </Label>
+                        <Label>{t.liquidityPage.step2SelectToken}</Label>
                         <div className={styles.presetButtons}>
                           {solBalance !== null && (
                             <span className={styles.balanceTag}>
-                              Wallet SOL: {solBalance.toFixed(4)} SOL
+                              SOL: {solBalance.toFixed(4)} SOL
                             </span>
                           )}
                           <button
@@ -641,7 +620,7 @@ function AddLiquidityPageInner() {
                             disabled={isLoadingTokens || isRemovingLiquidity}
                             className={styles.presetBtn}
                           >
-                            ↻ Refresh Wallet
+                            {t.common.refreshWallet}
                           </button>
                         </div>
                       </div>
@@ -656,42 +635,34 @@ function AddLiquidityPageInner() {
                       />
                     </div>
 
-                    {/* Automatic On-Chain Vault & LP Resolution Card */}
                     {resolvedWithdrawBaseMint && (
                       <div className={styles.vaultStatusCard}>
                         <div className={styles.vaultStatusHeader}>
                           <strong>
-                            Auto-Detected WSOL Liquidity Vault (Mint:{" "}
+                            {t.liquidityPage.vaultAutoDetected} (
                             {resolvedWithdrawBaseMint.slice(0, 6)}...
                             {resolvedWithdrawBaseMint.slice(-4)})
                           </strong>
                           <span className={styles.balanceTag}>
                             {isCheckingVault
-                              ? "Inspecting on-chain vault..."
+                              ? t.liquidityPage.inspectingVault
                               : detectedVaultSol !== null && detectedVaultSol > 0
-                                ? `Active Balance: ${detectedVaultSol.toFixed(6)} WSOL`
-                                : "Ready to unwrap WSOL vault / ATA"}
+                                ? `${detectedVaultSol.toFixed(6)} WSOL`
+                                : t.liquidityPage.readyToUnwrap}
                           </span>
                         </div>
                         {derivedWsolVault && (
                           <span className={styles.vaultAddressMono}>
-                            WSOL Vault Account: {derivedWsolVault}
-                          </span>
-                        )}
-                        {resolvedWithdrawLpMint && (
-                          <span className={styles.vaultAddressMono}>
-                            Linked LP Token in Wallet: {resolvedWithdrawLpMint} (Auto-burned
-                            proportionally)
+                            WSOL Vault: {derivedWsolVault}
                           </span>
                         )}
                       </div>
                     )}
 
-                    {/* 2. Choose Withdrawal Percentage */}
                     <div className={styles.field}>
-                      <Label>2. Select SOL Withdrawal Share</Label>
+                      <Label>{t.liquidityPage.selectWithdrawalShareLabel}</Label>
                       <div className={styles.withdrawShareGrid}>
-                        {WITHDRAW_SHARE_OPTIONS.map((opt) => (
+                        {withdrawShareOptions.map((opt) => (
                           <button
                             key={opt.pct}
                             type="button"
@@ -710,30 +681,29 @@ function AddLiquidityPageInner() {
                       </div>
                     </div>
 
-                    {/* 3. Live SOL Withdrawal Simulator */}
                     <div className={styles.simulatorBox}>
                       <h4 className={styles.simulatorTitle}>
-                        Live SOL Liquidity Withdrawal Breakdown
+                        {t.liquidityPage.withdrawSimulatorTitle}
                       </h4>
                       <div className={styles.simulatorMetrics}>
                         <div className={styles.metricCard}>
-                          <span>Selected Share</span>
+                          <span>{t.liquidityPage.selectedShareLabel}</span>
                           <strong>{withdrawPercentage}%</strong>
                         </div>
                         <div className={styles.metricCard}>
-                          <span>Estimated SOL Unwrapped</span>
+                          <span>{t.liquidityPage.estimatedSolUnwrapped}</span>
                           <strong className={styles.textEmerald}>
                             ~{simulatedGrossSol.toFixed(4)} SOL
                           </strong>
                         </div>
                         <div className={styles.metricCard}>
-                          <span>Service Fee (Dev Wallet)</span>
+                          <span>{t.liquidityPage.devFeeLabel}</span>
                           <strong className={styles.textPurple}>
                             {SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL
                           </strong>
                         </div>
                         <div className={styles.metricCard}>
-                          <span>Est. Net SOL to Wallet</span>
+                          <span>{t.liquidityPage.estNetSolToWallet}</span>
                           <strong className={styles.textEmerald}>
                             ~{simulatedNetSolOut.toFixed(4)} SOL
                           </strong>
@@ -749,8 +719,8 @@ function AddLiquidityPageInner() {
                       disabled={isRemovingLiquidity || !resolvedWithdrawBaseMint || !publicKey}
                     >
                       {isRemovingLiquidity
-                        ? removeStatusStep || "Withdrawing SOL Liquidity..."
-                        : `💸 Withdraw ${withdrawPercentage}% Liquidity in SOL (Fee: ${SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL)`}
+                        ? removeStatusStep || t.liquidityPage.withdrawingStatus
+                        : `${t.liquidityPage.submitWithdrawBtn} (${withdrawPercentage}% · ${SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL)`}
                     </Button>
                   </CardFooter>
                 </form>
@@ -758,7 +728,6 @@ function AddLiquidityPageInner() {
             )
           ) : poolResult ? (
             <div className={styles.dossierWrapper}>
-              {/* 1. Hero Confirmation Banner */}
               <Card className={styles.receiptCard}>
                 <CardHeader>
                   <div className={styles.dossierHeroHeader}>
@@ -773,104 +742,30 @@ function AddLiquidityPageInner() {
                       />
                       <div>
                         <span className={styles.livePoolBadge}>
-                          ✓ LIQUIDITY POOL & LP TOKENS LIVE ON {cluster.toUpperCase()}
+                          ✓ LIQUIDITY POOL LIVE ({cluster.toUpperCase()})
                         </span>
                         <CardTitle className={styles.receiptTitle}>
                           {tokenDossierSnapshot?.name || "Token"} (
                           {tokenDossierSnapshot?.symbol || "TOKEN"}) /{" "}
                           {tokenDossierSnapshot?.quoteSymbol || quoteToken}
                         </CardTitle>
-                        <CardDescription>
-                          All token parameters, liquidity vaults, and LP tokens have been verified
-                          and indexed on the Solana blockchain.
-                        </CardDescription>
                       </div>
                     </div>
                   </div>
                 </CardHeader>
 
                 <CardContent className={styles.receiptContent}>
-                  {/* SECTION A: Complete Token Information Dossier */}
                   <div className={styles.dossierSection}>
-                    <h3 className={styles.dossierSectionTitle}>
-                      🪙 1. Complete Token Information & Supply Breakdown
-                    </h3>
                     <div className={styles.dossierMetricsGrid}>
                       <div className={styles.dossierMetricBox}>
-                        <span>Token Name & Ticker</span>
-                        <strong>
-                          {tokenDossierSnapshot?.name} ({tokenDossierSnapshot?.symbol})
-                        </strong>
-                      </div>
-                      <div className={styles.dossierMetricBox}>
-                        <span>Token Standard & Decimals</span>
-                        <strong>
-                          {tokenDossierSnapshot?.standard || "SPL"} ·{" "}
-                          {tokenDossierSnapshot?.decimals ?? 9} Decimals
-                        </strong>
-                      </div>
-                      <div className={styles.dossierMetricBox}>
-                        <span>Total Token Supply</span>
-                        <strong>
-                          {(tokenDossierSnapshot?.totalSupply || 0).toLocaleString("en-US")}{" "}
-                          {tokenDossierSnapshot?.symbol}
-                        </strong>
-                      </div>
-                      <div className={styles.dossierMetricBox}>
-                        <span>Supply Deposited in Pool</span>
-                        <strong className={styles.textEmerald}>
-                          {(tokenDossierSnapshot?.baseDeposited || numericBase).toLocaleString(
-                            "en-US"
-                          )}{" "}
-                          {tokenDossierSnapshot?.symbol} (
-                          {(tokenDossierSnapshot?.supplyPctInPool ?? supplyPercentageInPool).toFixed(
-                            1
-                          )}
-                          %)
-                        </strong>
-                      </div>
-                      <div className={styles.dossierMetricBox}>
-                        <span>Remaining Creator Balance</span>
-                        <strong>
-                          {(tokenDossierSnapshot?.remainingBalance ?? 0).toLocaleString("en-US")}{" "}
-                          {tokenDossierSnapshot?.symbol}
-                        </strong>
-                      </div>
-                      <div className={styles.dossierMetricBox}>
-                        <span>On-Chain Authorities</span>
-                        <strong className={styles.textEmerald}>
-                          Mint:{" "}
-                          {tokenDossierSnapshot?.mintAuthorityActive ? "Active" : "Revoked ✓"} ·
-                          Freeze: Revoked ✓
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* SECTION B: Liquidity Pool & Market Metrics */}
-                  <div className={styles.dossierSection}>
-                    <h3 className={styles.dossierSectionTitle}>
-                      💧 2. Liquidity Pool & Market Valuation Metrics
-                    </h3>
-                    <div className={styles.dossierMetricsGrid}>
-                      <div className={styles.dossierMetricBox}>
-                        <span>AMM Protocol & Fee Tier</span>
-                        <strong>
-                          {poolResult.dex === "raydium-cpmm"
-                            ? "Raydium CPMM (v2)"
-                            : "Meteora Dynamic AMM"}{" "}
-                          · {tokenDossierSnapshot?.feeTierLabel || "0.25%"}
-                        </strong>
-                      </div>
-                      <div className={styles.dossierMetricBox}>
-                        <span>Initial Token Price</span>
+                        <span>{t.liquidityPage.initialPriceLabel}</span>
                         <strong className={styles.textEmerald}>
                           {poolResult.initialPrice.toFixed(9)}{" "}
                           {tokenDossierSnapshot?.quoteSymbol || quoteToken}
                         </strong>
                       </div>
                       <div className={styles.dossierMetricBox}>
-                        <span>Implied Initial Market Cap</span>
+                        <span>{t.liquidityPage.impliedMcapLabel}</span>
                         <strong>
                           {(
                             tokenDossierSnapshot?.impliedMarketCap ?? estimatedMarketCap
@@ -881,70 +776,38 @@ function AddLiquidityPageInner() {
                         </strong>
                       </div>
                       <div className={styles.dossierMetricBox}>
-                        <span>Initial Quote Liquidity</span>
-                        <strong>
-                          {tokenDossierSnapshot?.quoteDeposited ?? numericQuote}{" "}
-                          {tokenDossierSnapshot?.quoteSymbol || quoteToken}
-                        </strong>
-                      </div>
-                      <div className={styles.dossierMetricBox}>
-                        <span>LP Tokens Minted to Wallet</span>
+                        <span>LP Minted</span>
                         <strong className={styles.textPurple}>
-                          {poolResult.lpTokensMinted || "Minted"} LP (100% Share)
-                        </strong>
-                      </div>
-                      <div className={styles.dossierMetricBox}>
-                        <span>Trading Status & Dev Fee</span>
-                        <strong>
-                          {tokenDossierSnapshot?.launchScheduleLabel || "Active"} ·{" "}
-                          {(poolResult.serviceFeeSol ?? activeLpFeeSol).toFixed(2)} SOL Fee
+                          {poolResult.lpTokensMinted || "100%"} LP
                         </strong>
                       </div>
                     </div>
                   </div>
 
-                  {/* SECTION C: Complete On-Chain Addresses & Explorer Directory */}
                   <div className={styles.dossierSection}>
-                    <h3 className={styles.dossierSectionTitle}>
-                      🔗 3. Verified On-Chain Addresses & Explorer Links
-                    </h3>
                     <div className={styles.addressDirectory}>
                       {[
                         {
                           key: "tokenMint",
-                          label: "Token Mint Address",
+                          label: "Token Mint",
                           value: tokenDossierSnapshot?.mint || selectedTokenMint,
                           explorerType: "token" as const,
                         },
                         {
                           key: "poolPda",
-                          label: "Pool Authority / State PDA (AMM ID)",
+                          label: "Pool PDA",
                           value: poolResult.poolAddress,
                           explorerType: "account" as const,
                         },
                         {
                           key: "lpMint",
-                          label: "LP Token Mint Address (Burnable)",
+                          label: "LP Mint",
                           value: poolResult.lpMintAddress,
                           explorerType: "token" as const,
                         },
                         {
-                          key: "baseVault",
-                          label: `Base Token Vault ATA (${tokenDossierSnapshot?.symbol || "TOKEN"})`,
-                          value: poolResult.baseVaultAddress,
-                          explorerType: "account" as const,
-                        },
-                        {
-                          key: "quoteVault",
-                          label: `Quote Token Vault ATA (${
-                            tokenDossierSnapshot?.quoteSymbol || quoteToken
-                          })`,
-                          value: poolResult.quoteVaultAddress,
-                          explorerType: "account" as const,
-                        },
-                        {
                           key: "txSig",
-                          label: "On-Chain Transaction Signature",
+                          label: "TX Signature",
                           value: poolResult.signature,
                           explorerType: "tx" as const,
                         },
@@ -958,7 +821,7 @@ function AddLiquidityPageInner() {
                                 onClick={() => handleCopy(item.value, item.key)}
                                 className={styles.copyBtnSmall}
                               >
-                                {copiedKey === item.key ? "✓ Copied!" : "Copy"}
+                                {copiedKey === item.key ? t.common.copied : t.common.copy}
                               </button>
                               <a
                                 href={getExplorerUrl(item.explorerType, item.value)}
@@ -966,7 +829,7 @@ function AddLiquidityPageInner() {
                                 rel="noopener noreferrer"
                                 className={styles.solscanBtnSmall}
                               >
-                                Solscan ↗
+                                {t.common.viewOnSolscan}
                               </a>
                             </div>
                           </div>
@@ -983,16 +846,16 @@ function AddLiquidityPageInner() {
                     onClick={handleSwitchToWithdrawFromDossier}
                     className={styles.actionLinkBtn}
                   >
-                    💸 Withdraw Liquidity in SOL (0.05 SOL)
+                    {t.liquidityPage.tabWithdraw}
                   </button>
                   <Link href="/burn" className={styles.actionLinkBtn}>
-                    🔥 Burn LP Tokens (Lock Liquidity)
+                    🔥 {t.nav.burn}
                   </Link>
                   <Link href="/airdrop" className={styles.actionLinkBtn}>
-                    📦 Distribute Token Airdrop
+                    📦 {t.nav.airdrop}
                   </Link>
                   <Button onClick={handleReset} className="secondary">
-                    ➕ Create Another Pool
+                    {t.liquidityPage.tabAdd}
                   </Button>
                 </CardFooter>
               </Card>
@@ -1000,23 +863,27 @@ function AddLiquidityPageInner() {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle>Configure Liquidity Pair ({cluster})</CardTitle>
-                <CardDescription>
-                  Select your token directly from your connected wallet, deposit initial{" "}
-                  {quoteToken} liquidity, and mint your LP tokens in a single atomic transaction.
-                </CardDescription>
+                <CardTitle>
+                  {t.liquidityPage.configurePairTitle} ({cluster})
+                </CardTitle>
+                <CardDescription>{t.liquidityPage.configurePairDesc}</CardDescription>
 
-                {/* Live Pre-Flight Readiness Checklist */}
                 <div className={styles.readinessBar}>
-                  <span className={styles.readyStepDone}>1. AMM Selected ✓</span>
+                  <span className={styles.readyStepDone}>{t.liquidityPage.readyStep1}</span>
                   <span className={isTokenReady ? styles.readyStepDone : styles.readyStepPending}>
-                    2. Wallet Token {isTokenReady ? "Selected ✓" : "Pending"}
+                    {isTokenReady
+                      ? t.liquidityPage.readyStep2Done
+                      : t.liquidityPage.readyStep2Pending}
                   </span>
                   <span className={areAmountsReady ? styles.readyStepDone : styles.readyStepPending}>
-                    3. Liquidity Amounts {areAmountsReady ? "✓" : "Pending"}
+                    {areAmountsReady
+                      ? t.liquidityPage.readyStep3Done
+                      : t.liquidityPage.readyStep3Pending}
                   </span>
                   <span className={isFreezeReady ? styles.readyStepDone : styles.readyStepWarn}>
-                    4. Freeze Auth {isFreezeReady ? "Ready ✓" : "Action Needed"}
+                    {isFreezeReady
+                      ? t.liquidityPage.readyStep4Done
+                      : t.liquidityPage.readyStep4Warn}
                   </span>
                 </div>
               </CardHeader>
@@ -1027,17 +894,15 @@ function AddLiquidityPageInner() {
                     <Notification type="error" message={poolError} onClose={resetPoolState} />
                   )}
 
-                  {/* Real-Time 5-Stage Progress Stepper During Pool Initialization */}
                   <TransactionStatusStepper
                     isActive={isCreatingPool}
                     currentStepIndex={progressStep}
                     statusMessage={statusStep}
-                    operationTitle={`Initializing Liquidity Pool on ${cluster}`}
+                    operationTitle={`${t.liquidityPage.initializingPoolStatus} (${cluster})`}
                   />
 
-                  {/* 1. DEX Protocol */}
                   <div className={styles.field}>
-                    <Label>1. Select AMM Architecture</Label>
+                    <Label>{t.liquidityPage.step1AmmLabel}</Label>
                     <div className={styles.dexSelector}>
                       <button
                         type="button"
@@ -1050,10 +915,7 @@ function AddLiquidityPageInner() {
                           <strong>Raydium CPMM Vault</strong>
                           <span className={styles.dexBadge}>SPL & Token-2022</span>
                         </div>
-                        <p>
-                          Constant-product liquidity vaults with native LP Token minting on both
-                          Mainnet-Beta and Devnet.
-                        </p>
+                        <p>{t.liquidityPage.raydiumDesc}</p>
                       </button>
 
                       <button
@@ -1067,21 +929,18 @@ function AddLiquidityPageInner() {
                           <strong>Meteora Dynamic AMM</strong>
                           <span className={styles.dexBadge}>Dynamic Fees</span>
                         </div>
-                        <p>
-                          Dynamic liquidity pool vaults with customizable fee tiers and instant LP
-                          minting.
-                        </p>
+                        <p>{t.liquidityPage.meteoraDesc}</p>
                       </button>
                     </div>
                   </div>
 
-                  {/* 2. Base Token Selection Directly from Wallet */}
                   <div className={styles.field}>
                     <div className={styles.labelRow}>
-                      <Label>2. Select Token Directly from Your Connected Wallet</Label>
+                      <Label>{t.liquidityPage.step2SelectToken}</Label>
                       {selectedToken && (
                         <span className={styles.balanceTag}>
-                          Available: {parseFloat(selectedToken.amount).toLocaleString()}
+                          {t.common.availableBalance}{" "}
+                          {parseFloat(selectedToken.amount).toLocaleString()}
                         </span>
                       )}
                     </div>
@@ -1102,11 +961,8 @@ function AddLiquidityPageInner() {
                   {selectedToken && hasActiveFreezeAuth && (
                     <div className={styles.freezeWarningBox}>
                       <div>
-                        <strong>Active Freeze Authority Detected</strong>
-                        <p>
-                          Liquidity pools require Freeze Authority to be revoked. We will revoke it
-                          automatically in the same transaction.
-                        </p>
+                        <strong>{t.liquidityPage.freezeWarnTitle}</strong>
+                        <p>{t.liquidityPage.freezeWarnDesc}</p>
                       </div>
                       <label className={styles.checkboxLabel}>
                         <input
@@ -1114,16 +970,15 @@ function AddLiquidityPageInner() {
                           checked={revokeFreezeIfActive}
                           onChange={(e) => setRevokeFreezeIfActive(e.target.checked)}
                         />
-                        <span>Auto-revoke in same transaction</span>
+                        <span>{t.liquidityPage.freezeAutoRevokeCheck}</span>
                       </label>
                     </div>
                   )}
 
-                  {/* 3. Base & Quote Amounts */}
                   <div className={styles.fieldGrid}>
                     <div className={styles.field}>
                       <div className={styles.labelRow}>
-                        <Label htmlFor="baseAmount">Token Amount to Deposit</Label>
+                        <Label htmlFor="baseAmount">{t.liquidityPage.tokenAmountLabel}</Label>
                         <div className={styles.presetButtons}>
                           {ALLOCATION_PRESETS.map((preset) => (
                             <button
@@ -1143,7 +998,7 @@ function AddLiquidityPageInner() {
                         type="number"
                         step="any"
                         min="0"
-                        placeholder="Ex: 500000000"
+                        placeholder="500000000"
                         value={baseAmount}
                         onChange={(e) => setBaseAmount(e.target.value)}
                         disabled={isCreatingPool || !selectedToken}
@@ -1153,7 +1008,9 @@ function AddLiquidityPageInner() {
 
                     <div className={styles.field}>
                       <div className={styles.labelRow}>
-                        <Label htmlFor="quoteAmount">Initial Liquidity ({quoteToken})</Label>
+                        <Label htmlFor="quoteAmount">
+                          {t.liquidityPage.initialLiquidityLabel} ({quoteToken})
+                        </Label>
                         <div className={styles.quoteSwitch}>
                           {(["SOL", "USDC"] as QuoteAsset[]).map((asset) => (
                             <button
@@ -1174,7 +1031,7 @@ function AddLiquidityPageInner() {
                         type="number"
                         step="any"
                         min="0.001"
-                        placeholder={quoteToken === "SOL" ? "Ex: 0.2" : "Ex: 100"}
+                        placeholder={quoteToken === "SOL" ? "0.2" : "100"}
                         value={quoteAmount}
                         onChange={(e) => setQuoteAmount(e.target.value)}
                         disabled={isCreatingPool}
@@ -1182,18 +1039,17 @@ function AddLiquidityPageInner() {
                       />
                       {quoteToken === "SOL" && solBalance !== null && (
                         <span className={styles.helperText}>
-                          Wallet Balance: {solBalance.toFixed(4)} SOL ({cluster})
+                          {t.common.walletBalance} {solBalance.toFixed(4)} SOL ({cluster})
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* 5. Fee Tier & Launch Time */}
                   <div className={styles.fieldGrid}>
                     <div className={styles.field}>
-                      <Label>Pool Swap Fee Tier</Label>
+                      <Label>{t.liquidityPage.swapFeeTierLabel}</Label>
                       <div className={styles.feeTierGrid}>
-                        {FEE_TIERS.map((tier) => (
+                        {feeTiers.map((tier) => (
                           <button
                             key={tier.bps}
                             type="button"
@@ -1210,21 +1066,21 @@ function AddLiquidityPageInner() {
                     </div>
 
                     <div className={styles.field}>
-                      <Label>Pool Activation Schedule</Label>
+                      <Label>{t.liquidityPage.activationScheduleLabel}</Label>
                       <div className={styles.launchToggle}>
                         <button
                           type="button"
                           onClick={() => setLaunchMode("immediate")}
                           className={launchMode === "immediate" ? styles.launchActive : ""}
                         >
-                          Immediate
+                          {t.liquidityPage.immediateBtn}
                         </button>
                         <button
                           type="button"
                           onClick={() => setLaunchMode("scheduled")}
                           className={launchMode === "scheduled" ? styles.launchActive : ""}
                         >
-                          Schedule Time
+                          {t.liquidityPage.scheduleTimeBtn}
                         </button>
                       </div>
                       {launchMode === "scheduled" && (
@@ -1238,18 +1094,17 @@ function AddLiquidityPageInner() {
                     </div>
                   </div>
 
-                  {/* 6. Live Economic Simulator */}
                   <div className={styles.simulatorBox}>
-                    <h4 className={styles.simulatorTitle}>Live Pool Economic Simulation</h4>
+                    <h4 className={styles.simulatorTitle}>{t.liquidityPage.simulatorTitle}</h4>
                     <div className={styles.simulatorMetrics}>
                       <div className={styles.metricCard}>
-                        <span>Initial Token Price</span>
+                        <span>{t.liquidityPage.initialPriceLabel}</span>
                         <strong>
                           {initialPrice > 0 ? initialPrice.toFixed(9) : "0.000000000"} {quoteToken}
                         </strong>
                       </div>
                       <div className={styles.metricCard}>
-                        <span>Implied Market Cap</span>
+                        <span>{t.liquidityPage.impliedMcapLabel}</span>
                         <strong>
                           {estimatedMarketCap > 0
                             ? `${estimatedMarketCap.toLocaleString(undefined, {
@@ -1259,11 +1114,13 @@ function AddLiquidityPageInner() {
                         </strong>
                       </div>
                       <div className={styles.metricCard}>
-                        <span>Pool Supply Allocation</span>
+                        <span>{t.liquidityPage.poolAllocationLabel}</span>
                         <strong>{supplyPercentageInPool.toFixed(1)}%</strong>
                       </div>
                       <div className={styles.metricCard}>
-                        <span>Dev Fee ({cluster})</span>
+                        <span>
+                          {t.liquidityPage.devFeeLabel} ({cluster})
+                        </span>
                         <strong>{activeLpFeeSol.toFixed(2)} SOL</strong>
                       </div>
                     </div>
@@ -1279,8 +1136,8 @@ function AddLiquidityPageInner() {
                     }
                   >
                     {isCreatingPool
-                      ? statusStep || "Initializing On-Chain Liquidity Pool..."
-                      : `Initialize Liquidity Pool & Mint LP (${activeLpFeeSol.toFixed(2)} SOL Fee)`}
+                      ? statusStep || t.liquidityPage.initializingPoolStatus
+                      : `${t.liquidityPage.submitAddBtn} (${activeLpFeeSol.toFixed(2)} SOL)`}
                   </Button>
                 </CardFooter>
               </form>
@@ -1289,66 +1146,29 @@ function AddLiquidityPageInner() {
         </main>
 
         <aside className={styles.sidebar}>
-          <CostSummary operation={activeMode === "add" ? "createLiquidityPool" : "removeLiquidity"} />
+          <CostSummary
+            operation={activeMode === "add" ? "createLiquidityPool" : "removeLiquidity"}
+          />
 
           <Card>
             <CardHeader>
               <CardTitle className={styles.cardTitle}>
                 {activeMode === "add"
-                  ? "On-Chain Pool & Dossier Architecture"
-                  : "Direct Wallet SOL Withdrawal"}
+                  ? t.liquidityPage.sidebarAddTitle
+                  : t.liquidityPage.sidebarWithdrawTitle}
               </CardTitle>
             </CardHeader>
             <CardContent className={styles.infoContent}>
-              {activeMode === "add" ? (
-                <ul className={styles.tokenList}>
-                  <li>
-                    <strong>1-Click Wallet Selection:</strong> Click any token directly from your
-                    connected wallet—no need to type a symbol or paste a contract address.
+              <ul className={styles.tokenList}>
+                {(activeMode === "add"
+                  ? t.liquidityPage.sidebarAddBullets
+                  : t.liquidityPage.sidebarWithdrawBullets
+                ).map((b, idx) => (
+                  <li key={idx}>
+                    <strong>{b.title}</strong> {b.text}
                   </li>
-                  <li>
-                    <strong>Real On-Chain LP Mint:</strong> Creates a deterministic Pool Authority
-                    PDA, wraps SOL into the WSOL Pool Vault, and mints real SPL LP tokens to your
-                    wallet.
-                  </li>
-                  <li>
-                    <strong>Flexible SOL Recovery:</strong> Need to withdraw your deposited SOL
-                    later? Switch to the <strong>Withdraw Liquidity in SOL</strong> tab anytime
-                    (0.05 SOL fee).
-                  </li>
-                  <li>
-                    <strong>Standardized Service Fee:</strong>{" "}
-                    <strong>{activeLpFeeSol.toFixed(2)} SOL</strong> is routed atomically to Dev
-                    Wallet{" "}
-                    <code>
-                      {devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}
-                    </code>
-                    .
-                  </li>
-                </ul>
-              ) : (
-                <ul className={styles.tokenList}>
-                  <li>
-                    <strong>Zero Symbol or Address Typing:</strong> Simply click your token or LP
-                    token directly from your connected wallet list; the vault and LP mint are
-                    resolved automatically.
-                  </li>
-                  <li>
-                    <strong>Partial or Full Exit (25% – 100%):</strong> Choose whether to withdraw a
-                    portion of your SOL liquidity or 100% MAX (which also reclaims the vault rent
-                    deposit).
-                  </li>
-                  <li>
-                    <strong>0.05 SOL Dev Wallet Fee:</strong> Charges a standardized{" "}
-                    <strong>{SERVICE_FEE_REMOVE_LP_SOL.toFixed(2)} SOL</strong> fee routed
-                    atomically to{" "}
-                    <code>
-                      {devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}
-                    </code>
-                    .
-                  </li>
-                </ul>
-              )}
+                ))}
+              </ul>
             </CardContent>
           </Card>
         </aside>

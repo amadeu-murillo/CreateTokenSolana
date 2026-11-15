@@ -39,12 +39,7 @@ const DEFAULT_MODULAR_OPTIONS: ModularPricingOptions = {
   hasTransferFeeExtension: false,
 };
 
-/**
- * Transparent Solana Protocol Constants (No Magic Numbers):
- * - Account Rent Exemption (~0.00204 SOL per account/ATA on Solana)
- * - Base Solana Signature Network Fee (~0.00001 SOL = 10,000 lamports)
- */
-const SOLANA_ACCOUNT_RENT_SOL = Number(ESTIMATED_ATA_RENT_SOL.toFixed(4)); // ~0.002 SOL
+const SOLANA_ACCOUNT_RENT_SOL = Number(ESTIMATED_ATA_RENT_SOL.toFixed(4));
 const SOLANA_NETWORK_TX_FEE_SOL = 0.00001;
 
 const serviceFeeByOperation: Record<Operation, number> = {
@@ -106,21 +101,21 @@ export default function CostSummary({
   return (
     <div className={styles.card}>
       <div className={styles.headerRow}>
-        <span className={styles.headerTitle}>Transparência de Custos On-Chain</span>
-        <span className={styles.headerBadge}>100% Atômico</span>
+        <span className={styles.headerTitle}>{t.costs.headerTitle}</span>
+        <span className={styles.headerBadge}>{t.costs.headerBadge}</span>
       </div>
 
       <ul className={styles.costList}>
         <li className={styles.costListItem}>
-          <span>Aluguel da rede (Rent):</span>
+          <span>{t.costs.rentLabel}</span>
           <span className={styles.costValueMono}>~{SOLANA_ACCOUNT_RENT_SOL.toFixed(3)} SOL</span>
         </li>
         <li className={styles.costListItem}>
-          <span>Taxa da rede:</span>
+          <span>{t.costs.networkFeeLabel}</span>
           <span className={styles.costValueMono}>~{SOLANA_NETWORK_TX_FEE_SOL.toFixed(5)} SOL</span>
         </li>
         <li className={styles.costListItem}>
-          <span>Taxa de serviço:</span>
+          <span>{t.costs.serviceFeeLabel}</span>
           <span className={styles.costValueMono}>{activeServiceFeeSol.toFixed(2)} SOL</span>
         </li>
       </ul>
@@ -143,8 +138,8 @@ export default function CostSummary({
 
       <div className={styles.estimatedTotalBox}>
         <div className={styles.estimatedTotalLabel}>
-          <strong>Total Estimado</strong>
-          <span>Assinatura única na carteira</span>
+          <strong>{t.costs.estimatedWalletTotal}</strong>
+          <span>{t.costs.singleSignatureSub}</span>
         </div>
         <span className={styles.estimatedTotalValue}>
           ~{estimatedTotalSol.toFixed(4)} SOL

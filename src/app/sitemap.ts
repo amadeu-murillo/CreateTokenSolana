@@ -1,63 +1,46 @@
 import { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/seo";
 
+const BASE_URL = SITE_URL || "https://www.createtoken.sbs";
+
+interface SitemapRouteConfig {
+  path: string;
+  changeFrequency: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
+  priority: number;
+}
+
+const INDEXED_ROUTES: ReadonlyArray<SitemapRouteConfig> = [
+  { path: "/", changeFrequency: "daily", priority: 1.0 },
+  { path: "/create", changeFrequency: "daily", priority: 0.95 },
+  { path: "/add-liquidity", changeFrequency: "weekly", priority: 0.9 },
+  { path: "/dashboard", changeFrequency: "weekly", priority: 0.85 },
+  { path: "/airdrop", changeFrequency: "weekly", priority: 0.85 },
+  { path: "/burn", changeFrequency: "weekly", priority: 0.85 },
+  { path: "/afiliates", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/documentacao", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/costs", changeFrequency: "monthly", priority: 0.75 },
+];
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
 
-  return [
-    {
-      url: SITE_URL,
+  return INDEXED_ROUTES.map((route) => {
+    const routeUrl = route.path === "/" ? BASE_URL : `${BASE_URL}${route.path}`;
+
+    return {
+      url: routeUrl,
       lastModified: now,
-      changeFrequency: "weekly",
-      priority: 1.0,
-    },
-    {
-      url: `${SITE_URL}/add-liquidity`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.95,
-    },
-    {
-      url: `${SITE_URL}/create`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.9,
-    },
-    {
-      url: `${SITE_URL}/burn`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.85,
-    },
-    {
-      url: `${SITE_URL}/airdrop`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.85,
-    },
-    {
-      url: `${SITE_URL}/dashboard`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.85,
-    },
-    {
-      url: `${SITE_URL}/afiliates`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/documentacao`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/costs`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.75,
-    },
-  ];
+      changeFrequency: route.changeFrequency,
+      priority: route.priority,
+      alternates: {
+        languages: {
+          en: `${routeUrl}?lang=en`,
+          es: `${routeUrl}?lang=es`,
+          ru: `${routeUrl}?lang=ru`,
+          zh: `${routeUrl}?lang=zh`,
+          "pt-BR": `${routeUrl}?lang=pt-BR`,
+        },
+      },
+    };
+  });
 }

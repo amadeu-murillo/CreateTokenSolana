@@ -15,6 +15,7 @@ import Notification from "@/components/ui/Notification";
 import { TokenSelector } from "@/components/TokenSelector";
 import { useManageAuthority } from "@/hooks/useManageAuthority";
 import { useCluster } from "@/context/WalletContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useUserTokens, RichToken } from "@/hooks/useUserTokens";
 import { DEV_WALLET_ADDRESS, SERVICE_FEE_MANAGE_AUTHORITY_SOL } from "@/lib/constants";
 import styles from "./Dashboard.module.css";
@@ -71,6 +72,8 @@ const IconAlertTriangle = () => (
   </svg>
 );
 
+const GUIDE_ICONS = [<IconLock key="l" />, <IconCheckCircle key="c" />, <IconAlertTriangle key="a" />];
+
 type AuthorityModalState = {
   isOpen: boolean;
   mint: string | null;
@@ -83,26 +86,6 @@ type NotificationState = {
   message: string;
   txId?: string | null;
 } | null;
-
-const guideSections = [
-  {
-    icon: <IconLock />,
-    title: "Mint vs. Freeze Authorities",
-    description:
-      "Mint Authority controls whether new tokens can be minted. Freeze Authority controls whether holder token accounts can be frozen.",
-  },
-  {
-    icon: <IconCheckCircle />,
-    title: "DEX & Raydium Pool Readiness",
-    description:
-      "Revoking Freeze Authority is mandatory for Raydium & Meteora liquidity pools. Revoking Mint Authority proves fixed supply to investors and RugCheck.",
-  },
-  {
-    icon: <IconAlertTriangle />,
-    title: "Permanent & Atomic Routing",
-    description: `Revoking an authority is irreversible on Solana and includes a ${SERVICE_FEE_MANAGE_AUTHORITY_SOL.toFixed(2)} SOL service fee routed to Dev Wallet (${devWalletBase58.slice(0, 6)}...${devWalletBase58.slice(-4)}).`,
-  },
-];
 
 const InfoState = ({
   message,
@@ -128,6 +111,7 @@ const TokenManagementCard = ({
 }) => {
   const { publicKey } = useWallet();
   const { getExplorerUrl } = useCluster();
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   const isMintAuthority = Boolean(
@@ -143,7 +127,7 @@ const TokenManagementCard = ({
 
   const totalSupplyUi = Number(mintInfo.supply) / Math.pow(10, mintInfo.decimals);
   const standardLabel =
-    token.programId === TOKEN_2022_PROGRAM_ID.toBase58() ? "Token-2022" : "Standard SPL";
+    token.programId === TOKEN_2022_PROGRAM_ID.toBase58() ? "Token-2022" : "SPL";
 
   const handleCopyMint = () => {
     navigator.clipboard?.writeText(token.mint);
@@ -171,7 +155,7 @@ const TokenManagementCard = ({
               {token.name} ({token.symbol})
             </h4>
             <p className={styles.tokenSymbol}>
-              {standardLabel} · {mintInfo.decimals} Decimals · Supply:{" "}
+              {standardLabel} · {mintInfo.decimals} Dec · Supply:{" "}
               {totalSupplyUi.toLocaleString()}
             </p>
             <div className={styles.mintLinksRow}>
@@ -184,17 +168,16 @@ const TokenManagementCard = ({
                 {token.mint.slice(0, 8)}...{token.mint.slice(-6)} ↗
               </a>
               <button type="button" onClick={handleCopyMint} className={styles.copyMintBtn}>
-                {copied ? "✓ Copied" : "Copy Mint"}
+                {copied ? t.common.copied : t.common.copy}
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Token Security & DEX Readiness Score */}
       <div className={styles.securityScoreBox}>
         <div className={styles.securityScoreHeader}>
-          <strong>🛡️ On-Chain Security & RugCheck Readiness Score</strong>
+          <strong>{t.dashboardPage.securityScoreTitle}</strong>
           <span
             className={
               securityScore === 100
@@ -206,10 +189,10 @@ const TokenManagementCard = ({
           >
             {securityScore}% —{" "}
             {securityScore === 100
-              ? "Fully Immutable & DEX-Ready ✓"
+              ? t.dashboardPage.scoreFull
               : securityScore === 50
-                ? "Partially Revoked"
-                : "Authorities Active"}
+                ? t.dashboardPage.scorePartial
+                : t.dashboardPage.scoreActive}
           </span>
         </div>
         <div className={styles.scoreProgressTrack}>
@@ -217,37 +200,30 @@ const TokenManagementCard = ({
         </div>
       </div>
 
-      {/* Detailed Authority Cards */}
       <div className={styles.authorityGrid}>
         <div className={styles.authorityBox}>
           <div className={styles.authorityBoxTop}>
-            <strong>Mint Authority (Supply Cap)</strong>
+            <strong>{t.dashboardPage.mintAuthTitle}</strong>
             {mintRevoked ? (
-              <span className={styles.statusRevoked}>Revoked ✓</span>
+              <span className={styles.statusRevoked}>{t.dashboardPage.statusRevoked}</span>
             ) : (
-              <span className={styles.statusActive}>Active</span>
+              <span className={styles.statusActive}>{t.dashboardPage.statusActive}</span>
             )}
           </div>
-          <p>
-            {mintRevoked
-              ? "Token supply is permanently fixed. No additional tokens can ever be minted."
-              : "Your wallet can still mint new tokens. Revoke to guarantee a fixed cap to holders."}
-          </p>
+          <p>{mintRevoked ? t.dashboardPage.mintRevokedDesc : t.dashboardPage.mintActiveDesc}</p>
         </div>
 
         <div className={styles.authorityBox}>
           <div className={styles.authorityBoxTop}>
-            <strong>Freeze Authority (DEX Pool Lock)</strong>
+            <strong>{t.dashboardPage.freezeAuthTitle}</strong>
             {freezeRevoked ? (
-              <span className={styles.statusRevoked}>Revoked ✓ (LP Ready)</span>
+              <span className={styles.statusRevoked}>{t.dashboardPage.statusRevoked}</span>
             ) : (
-              <span className={styles.statusActive}>Active (Blocks DEX LP)</span>
+              <span className={styles.statusActive}>{t.dashboardPage.statusActive}</span>
             )}
           </div>
           <p>
-            {freezeRevoked
-              ? "No wallet can be frozen. Token is eligible for Raydium & Meteora liquidity pools."
-              : "Must be revoked before initializing an AMM liquidity pool on Raydium or Meteora."}
+            {freezeRevoked ? t.dashboardPage.freezeRevokedDesc : t.dashboardPage.freezeActiveDesc}
           </p>
         </div>
       </div>
@@ -258,7 +234,7 @@ const TokenManagementCard = ({
             className="secondary"
             onClick={() => onManageClick(token.mint, "mint", token.programId)}
           >
-            🔒 Revoke Mint Authority ({SERVICE_FEE_MANAGE_AUTHORITY_SOL.toFixed(2)} SOL)
+            {t.dashboardPage.revokeMintBtn} ({SERVICE_FEE_MANAGE_AUTHORITY_SOL.toFixed(2)} SOL)
           </Button>
         )}
         {isFreezeAuthority && (
@@ -266,11 +242,11 @@ const TokenManagementCard = ({
             className="secondary"
             onClick={() => onManageClick(token.mint, "freeze", token.programId)}
           >
-            ❄️ Revoke Freeze Authority ({SERVICE_FEE_MANAGE_AUTHORITY_SOL.toFixed(2)} SOL)
+            {t.dashboardPage.revokeFreezeBtn} ({SERVICE_FEE_MANAGE_AUTHORITY_SOL.toFixed(2)} SOL)
           </Button>
         )}
         <Link href={`/add-liquidity?mint=${token.mint}`} className={styles.lpLinkBtn}>
-          💧 Go to Liquidity Pool →
+          {t.dashboardPage.goToLpBtn}
         </Link>
       </div>
     </div>
@@ -278,7 +254,7 @@ const TokenManagementCard = ({
 };
 
 const AuthorityCardSkeleton = () => (
-  <div className={styles.skeletonCard} aria-busy="true" aria-label="Carregando estrutura do token">
+  <div className={styles.skeletonCard} aria-busy="true">
     <div className={styles.skeletonHeaderRow}>
       <div className={styles.skeletonCircle} />
       <div className={styles.skeletonLines}>
@@ -297,6 +273,7 @@ function DashboardPageInner() {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   const { cluster, setCluster } = useCluster();
+  const { t } = useLanguage();
   const { tokens: userTokens, isLoading: isLoadingUserTokens } = useUserTokens();
   const {
     manageAuthority,
@@ -320,7 +297,7 @@ function DashboardPageInner() {
   });
 
   const selectedToken = useMemo(
-    () => userTokens.find((t) => t.mint === selectedTokenMint),
+    () => userTokens.find((tk) => tk.mint === selectedTokenMint),
     [userTokens, selectedTokenMint]
   );
 
@@ -347,7 +324,6 @@ function DashboardPageInner() {
         setMintInfo(info);
       } catch (err) {
         console.error("Failed to fetch mint info:", err);
-        setNotification({ type: "error", message: "Failed to fetch token mint information." });
       } finally {
         setIsFetchingInfo(false);
       }
@@ -380,7 +356,7 @@ function DashboardPageInner() {
     if (signature) {
       setNotification({
         type: "success",
-        message: `${targetType === "mint" ? "Mint" : "Freeze"} authority permanently revoked on ${cluster}!`,
+        message: `✓ ${targetType === "mint" ? "Mint" : "Freeze"} Authority (${cluster})`,
         txId: signature,
       });
       const mintPublicKey = new PublicKey(targetMint);
@@ -396,7 +372,7 @@ function DashboardPageInner() {
   };
 
   const renderContent = () => {
-    if (!publicKey) return <InfoState message="Connect your wallet to inspect and manage token authorities." />;
+    if (!publicKey) return <InfoState message={t.dashboardPage.connectPrompt} />;
     if (isLoadingUserTokens) {
       return (
         <div className={styles.skeletonContainer}>
@@ -422,11 +398,11 @@ function DashboardPageInner() {
           isActive={isManagingAuthority}
           currentStepIndex={progressStep}
           statusMessage={statusStep}
-          operationTitle={`Revoking Authority on ${cluster}`}
+          operationTitle={`${t.common.signingAndConfirming} (${cluster})`}
         />
 
         <div className={styles.field}>
-          <label htmlFor="token-select">1. Select a Token from Your Wallet</label>
+          <label htmlFor="token-select">{t.dashboardPage.step1SelectLabel}</label>
           <TokenSelector
             tokens={userTokens}
             selectedTokenMint={selectedTokenMint}
@@ -463,7 +439,7 @@ function DashboardPageInner() {
       <header className={styles.pageHeader}>
         <div className={styles.topNetworkRow}>
           <div className={styles.networkPillGroup}>
-            <span>Active Network:</span>
+            <span>{t.common.activeNetwork}</span>
             <button
               type="button"
               onClick={() => setCluster("mainnet-beta")}
@@ -480,28 +456,23 @@ function DashboardPageInner() {
             </button>
           </div>
           <span className={styles.feeBadgeTop}>
-            Standardized Revocation Fee:{" "}
+            {t.dashboardPage.feeBadgeLabel}{" "}
             <strong>{SERVICE_FEE_MANAGE_AUTHORITY_SOL.toFixed(2)} SOL</strong>
           </span>
         </div>
 
-        <h1 className={styles.pageTitle}>Manage Token Authorities & Security</h1>
-        <p className={styles.pageDescription}>
-          Inspect your token&apos;s on-chain security score and permanently revoke Mint or Freeze
-          authorities on Solana ({cluster}). Service Fee:{" "}
-          <strong>{SERVICE_FEE_MANAGE_AUTHORITY_SOL.toFixed(2)} SOL</strong> per revocation.
-        </p>
+        <h1 className={styles.pageTitle}>{t.dashboardPage.pageTitle}</h1>
+        <p className={styles.pageDescription}>{t.dashboardPage.pageDesc}</p>
       </header>
 
       <div className={styles.grid}>
         <main className={styles.mainContent}>
           <Card>
             <CardHeader>
-              <CardTitle>Authority & Security Inspection Panel ({cluster})</CardTitle>
-              <CardDescription>
-                Select any SPL or Token-2022 asset from your wallet to verify its RugCheck security
-                score and revoke active privileges.
-              </CardDescription>
+              <CardTitle>
+                {t.dashboardPage.panelTitle} ({cluster})
+              </CardTitle>
+              <CardDescription>{t.dashboardPage.panelDesc}</CardDescription>
             </CardHeader>
             <CardContent>{renderContent()}</CardContent>
           </Card>
@@ -510,10 +481,10 @@ function DashboardPageInner() {
         <aside className={styles.sidebar}>
           <CostSummary operation="manageAuthority" />
 
-          {guideSections.map((section, index) => (
+          {t.dashboardPage.guideSections.map((section, index) => (
             <Card key={index} className={styles.guideCard}>
               <CardContent className={styles.guideCardContent}>
-                <div className={styles.guideIcon}>{section.icon}</div>
+                <div className={styles.guideIcon}>{GUIDE_ICONS[index]}</div>
                 <div>
                   <p className={styles.guideTitle}>{section.title}</p>
                   <p className={styles.guideDescription}>{section.description}</p>
@@ -528,8 +499,8 @@ function DashboardPageInner() {
         isOpen={modalState.isOpen}
         onClose={() => setModalState({ isOpen: false, mint: null, type: null, programId: null })}
         onConfirm={handleConfirmManageAuthority}
-        title={`Confirm Permanent Removal of ${modalState.type === "mint" ? "Mint" : "Freeze"} Authority`}
-        description={`This action is irreversible on Solana (${cluster}) and routes a ${SERVICE_FEE_MANAGE_AUTHORITY_SOL.toFixed(2)} SOL service fee to Dev Wallet (${devWalletBase58.slice(0, 6)}...${devWalletBase58.slice(-4)}). Do you want to proceed?`}
+        title={`${t.dashboardPage.modalTitlePrefix} ${modalState.type === "mint" ? "Mint" : "Freeze"}`}
+        description={`${t.dashboardPage.modalDesc} (${SERVICE_FEE_MANAGE_AUTHORITY_SOL.toFixed(2)} SOL · ${devWalletBase58.slice(0, 6)}...${devWalletBase58.slice(-4)})`}
         isLoading={isManagingAuthority}
       />
     </div>

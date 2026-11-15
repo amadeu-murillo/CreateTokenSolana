@@ -5,9 +5,11 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Feedback from "@/components/Feedback";
 import Notification from "@/components/ui/Notification";
+import { useLanguage } from "@/context/LanguageContext";
 import styles from "./Confirmation.module.css";
 
 function ConfirmationContent() {
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const status = searchParams.get("status");
   const tokenAddress = searchParams.get("tokenAddress");
@@ -20,12 +22,12 @@ function ConfirmationContent() {
 
   return (
     <div className={styles.contentWrapper}>
-      <h2 className={styles.title}>Token Launch Status</h2>
+      <h2 className={styles.title}>{t.confirmationPage.pageTitle}</h2>
 
       {status === "success" && isInfoVisible && (
         <Notification
           type="info"
-          message="Seu token já está ativo na Solana! Siga os 3 passos abaixo para adicionar liquidez, queimar o LP (Rug-Proof) e distribuir para a comunidade."
+          message={t.confirmationPage.infoBanner}
           onClose={() => setIsInfoVisible(false)}
         />
       )}
@@ -34,11 +36,14 @@ function ConfirmationContent() {
         <>
           <Feedback success={true} tokenAddress={tokenAddress} txId={txId} />
 
-          {/* Phase 3: Post-Creation 3-Step Funnel passing ?mint=ENDERECO_DO_MINT */}
           <div className={styles.funnelCard}>
-            <h3 className={styles.funnelTitle}>🚀 Próximos Passos para Listar seu Token</h3>
+            <h3 className={styles.funnelTitle}>{t.confirmationPage.funnelTitle}</h3>
             <p className={styles.funnelSubtitle}>
-              O endereço do seu novo token (<code>{tokenAddress.slice(0, 6)}...{tokenAddress.slice(-4)}</code>) será selecionado automaticamente em cada etapa:
+              {t.confirmationPage.funnelSubtitle} (
+              <code>
+                {tokenAddress.slice(0, 6)}...{tokenAddress.slice(-4)}
+              </code>
+              )
             </p>
 
             <div className={styles.funnelStepsGrid}>
@@ -47,33 +52,27 @@ function ConfirmationContent() {
                 className={styles.stepActionLink}
               >
                 <div className={styles.stepInfo}>
-                  <span className={styles.stepBadge}>Passo 1 · Negociação DEX</span>
-                  <strong>💧 Criar Pool de Liquidez</strong>
-                  <span>
-                    Inicialize seu par na Raydium CPMM ou Meteora DAMM para liberar compras e vendas.
-                  </span>
+                  <span className={styles.stepBadge}>{t.confirmationPage.step1Badge}</span>
+                  <strong>{t.confirmationPage.step1Title}</strong>
+                  <span>{t.confirmationPage.step1Desc}</span>
                 </div>
                 <span className={styles.stepArrow}>→</span>
               </Link>
 
               <Link href={`/burn?mint=${encodedMint}`} className={styles.stepActionLink}>
                 <div className={styles.stepInfo}>
-                  <span className={styles.stepBadge}>Passo 2 · Selo Rug-Proof</span>
-                  <strong>🔥 Queimar Liquidez / Supply (LP Burn)</strong>
-                  <span>
-                    Queime LP tokens ou parte do supply e gere seu Certificado Visual PNG verificável.
-                  </span>
+                  <span className={styles.stepBadge}>{t.confirmationPage.step2Badge}</span>
+                  <strong>{t.confirmationPage.step2Title}</strong>
+                  <span>{t.confirmationPage.step2Desc}</span>
                 </div>
                 <span className={styles.stepArrow}>→</span>
               </Link>
 
               <Link href={`/airdrop?mint=${encodedMint}`} className={styles.stepActionLink}>
                 <div className={styles.stepInfo}>
-                  <span className={styles.stepBadge}>Passo 3 · Distribuição Viral</span>
-                  <strong>📦 Fazer Airdrop para Comunidade</strong>
-                  <span>
-                    Envie tokens em lote para múltiplas carteiras com criação automática de ATA.
-                  </span>
+                  <span className={styles.stepBadge}>{t.confirmationPage.step3Badge}</span>
+                  <strong>{t.confirmationPage.step3Title}</strong>
+                  <span>{t.confirmationPage.step3Desc}</span>
                 </div>
                 <span className={styles.stepArrow}>→</span>
               </Link>
@@ -86,7 +85,7 @@ function ConfirmationContent() {
 
       <div className={styles.linkContainer}>
         <Link href="/" className={styles.link}>
-          ← Back to Token Creator
+          {t.confirmationPage.backToCreator}
         </Link>
       </div>
     </div>
@@ -96,7 +95,7 @@ function ConfirmationContent() {
 export default function ConfirmationPage() {
   return (
     <div className={styles.container}>
-      <Suspense fallback={<div>Loading confirmation...</div>}>
+      <Suspense fallback={<div>Loading...</div>}>
         <ConfirmationContent />
       </Suspense>
     </div>

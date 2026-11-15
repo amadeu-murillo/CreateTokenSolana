@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCluster } from "@/context/WalletContext";
+import { useLanguage } from "@/context/LanguageContext";
 import styles from "./Feedback.module.css";
 
 const CheckCircle = () => (
@@ -67,6 +68,7 @@ interface CachedTokenDossier {
 
 export default function Feedback({ success, tokenAddress, errorMessage, txId }: FeedbackProps) {
   const { getExplorerUrl } = useCluster();
+  const { t } = useLanguage();
   const [dossier, setDossier] = useState<CachedTokenDossier | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -96,7 +98,7 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
         <CardHeader>
           <div className={styles.header}>
             <CheckCircle />
-            <CardTitle>Token Minted & Verified On-Chain!</CardTitle>
+            <CardTitle>{t.confirmationPage.mintedVerifiedTitle}</CardTitle>
           </div>
         </CardHeader>
         <CardContent style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -147,7 +149,7 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
               }}
             >
               <span style={{ fontSize: "0.78rem", color: "hsl(var(--muted-foreground))" }}>
-                Token Mint Address:
+                {t.confirmationPage.mintAddressLabel}
               </span>
               {tokenAddress && (
                 <button
@@ -163,7 +165,7 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
                     cursor: "pointer",
                   }}
                 >
-                  {copiedField === "mint" ? "✓ Copied!" : "Copy Address"}
+                  {copiedField === "mint" ? t.common.copied : t.common.copy}
                 </button>
               )}
             </div>
@@ -181,7 +183,7 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
                 }}
               >
                 <span style={{ fontSize: "0.78rem", color: "hsl(var(--muted-foreground))" }}>
-                  Transaction Signature:
+                  {t.confirmationPage.txSignatureLabel}
                 </span>
                 <button
                   type="button"
@@ -196,7 +198,7 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
                     cursor: "pointer",
                   }}
                 >
-                  {copiedField === "tx" ? "✓ Copied!" : "Copy TX"}
+                  {copiedField === "tx" ? t.common.copied : t.common.copy}
                 </button>
               </div>
               <p className={styles.address}>{txId}</p>
@@ -211,7 +213,7 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
                 rel="noopener noreferrer"
                 className={styles.link}
               >
-                View Token on Solscan ↗
+                {t.confirmationPage.viewTokenSolscan}
               </a>
             )}
             {txId && (
@@ -221,7 +223,7 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
                 rel="noopener noreferrer"
                 className={styles.link}
               >
-                View Transaction on Solscan ↗
+                {t.confirmationPage.viewTxSolscan}
               </a>
             )}
           </div>
@@ -235,7 +237,7 @@ export default function Feedback({ success, tokenAddress, errorMessage, txId }: 
       <CardHeader>
         <div className={styles.header}>
           <XCircle />
-          <CardTitle>An Error Occurred</CardTitle>
+          <CardTitle>Error</CardTitle>
         </div>
       </CardHeader>
       <CardContent>

@@ -1,10 +1,11 @@
 "use client";
 
-import React, { Suspense,  useState, useEffect, useMemo, useRef } from "react";
+import React, { Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useAirdrop } from "@/hooks/useAirdrop";
 import { useUserTokens } from "@/hooks/useUserTokens";
 import { useCluster } from "@/context/WalletContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -95,28 +96,11 @@ const CheckIcon = () => (
   </svg>
 );
 
-const tutorialSteps = [
-  {
-    icon: <TokenIcon />,
-    title: "1. Select Token from Wallet",
-    description:
-      "Choose any SPL or Token-2022 asset from your connected wallet to distribute to your community.",
-  },
-  {
-    icon: <UsersIcon />,
-    title: "2. Import CSV or Paste Wallets",
-    description:
-      "Paste Address,Amount pairs, upload a .CSV/.TXT file, or apply a uniform token amount across all addresses.",
-  },
-  {
-    icon: <CheckIcon />,
-    title: "3. Automatic ATA Creation & Batching",
-    description: `Automatically creates missing Associated Token Accounts (ATAs) and batches up to 10 recipients per transaction (${SERVICE_FEE_AIRDROP_SOL.toFixed(2)} SOL fee per batch routed to Dev Wallet).`,
-  },
-];
+const TUTORIAL_ICONS = [<TokenIcon key="t" />, <UsersIcon key="u" />, <CheckIcon key="c" />];
 
 function AirdropPageInner() {
   const { cluster, setCluster } = useCluster();
+  const { t } = useLanguage();
   const [selectedTokenMint, setSelectedTokenMint] = useState("");
   const [recipientsText, setRecipientsText] = useState("");
   const [uniformAmount, setUniformAmount] = useState("1000");
@@ -128,7 +112,7 @@ function AirdropPageInner() {
   const { tokens: userTokens, isLoading: isLoadingUserTokens, refreshTokens } = useUserTokens();
 
   const selectedToken = useMemo(
-    () => userTokens.find((t) => t.mint === selectedTokenMint) || null,
+    () => userTokens.find((tk) => tk.mint === selectedTokenMint) || null,
     [userTokens, selectedTokenMint]
   );
 
@@ -151,7 +135,7 @@ function AirdropPageInner() {
         result.invalid.push({
           line: lineNumber,
           value: line,
-          error: "Incomplete pair of wallet address and token amount.",
+          error: "Invalid format (Address,Amount).",
         });
         return;
       }
@@ -159,12 +143,12 @@ function AirdropPageInner() {
       try {
         new PublicKey(address);
       } catch {
-        lineError = "Invalid Solana base58 address.";
+        lineError = "Invalid Base58 address.";
       }
 
       const amount = parseFloat(amountStr);
       if (isNaN(amount) || amount <= 0) {
-        lineError = lineError ? `${lineError} Invalid token amount.` : "Invalid token amount.";
+        lineError = lineError ? `${lineError} Invalid amount.` : "Invalid amount.";
       }
 
       if (lineError) {
@@ -179,7 +163,6 @@ function AirdropPageInner() {
     return result;
   };
 
-  // Auto-parse live whenever text changes so user gets immediate feedback
   useEffect(() => {
     if (!recipientsText.trim()) {
       setParsedResult(null);
@@ -263,12 +246,12 @@ function AirdropPageInner() {
       <div className={styles.centeredContainer}>
         <Notification
           type="success"
-          message={`Airdrop completed on ${cluster}! Distributed ${parsedResult?.totalAmount.toLocaleString() || ""} ${selectedToken?.symbol || "tokens"} across ${parsedResult?.valid.length || 0} wallets (${numBatches} batch${numBatches === 1 ? "" : "es"}).`}
+          message={`✓ Airdrop (${cluster}): ${parsedResult?.totalAmount.toLocaleString() || ""} ${selectedToken?.symbol || "tokens"} → ${parsedResult?.valid.length || 0} wallets.`}
           txId={signature}
           onClose={clearAll}
         />
         <Button onClick={clearAll} className="w-full" style={{ maxWidth: "400px", marginTop: "1rem" }}>
-          📦 Launch Another Airdrop
+          {t.airdropPage.launchAnotherBtn}
         </Button>
       </div>
     );
@@ -279,7 +262,7 @@ function AirdropPageInner() {
       <header className={styles.pageHeader}>
         <div className={styles.topNetworkRow}>
           <div className={styles.networkPillGroup}>
-            <span>Active Network:</span>
+            <span>{t.common.activeNetwork}</span>
             <button
               type="button"
               onClick={() => setCluster("mainnet-beta")}
@@ -296,31 +279,29 @@ function AirdropPageInner() {
             </button>
           </div>
           <span className={styles.feeBadgeTop}>
-            Standardized Batch Fee:{" "}
-            <strong>{SERVICE_FEE_AIRDROP_SOL.toFixed(2)} SOL / Batch</strong>
+            {t.airdropPage.feeBadgeLabel}{" "}
+            <strong>{SERVICE_FEE_AIRDROP_SOL.toFixed(2)} SOL</strong>
           </span>
         </div>
 
-        <h1>Mass Token Airdrop & Multi-Sender</h1>
-        <p>
-          Distribute SPL or Token-2022 tokens to multiple Solana wallets in batched atomic
-          transactions on {cluster}. Automatically initializes recipient ATAs when needed.
-        </p>
+        <h1>{t.airdropPage.pageTitle}</h1>
+        <p>{t.airdropPage.pageDesc}</p>
       </header>
 
       <div className={styles.grid}>
         <div className={styles.formContainer}>
           <Card>
             <CardHeader>
-              <CardTitle>Configure Multi-Send Airdrop ({cluster})</CardTitle>
+              <CardTitle>
+                {t.airdropPage.cardTitle} ({cluster})
+              </CardTitle>
               <CardDescription>
-                Select your token, import or paste recipient addresses, and validate balances before
-                broadcasting. Service Fee: <strong>{SERVICE_FEE_AIRDROP_SOL.toFixed(2)} SOL</strong>{" "}
-                per batch routed to Dev Wallet{" "}
+                {t.airdropPage.cardDescPrefix}{" "}
+                <strong>{SERVICE_FEE_AIRDROP_SOL.toFixed(2)} SOL</strong> (
                 <code>
                   {devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}
                 </code>
-                .
+                ).
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -331,15 +312,16 @@ function AirdropPageInner() {
                   isActive={isLoading}
                   currentStepIndex={progressStep}
                   statusMessage={statusStep || signature}
-                  operationTitle={`Broadcasting ${numBatches} Airdrop Batch(es) on ${cluster}`}
+                  operationTitle={`${t.airdropPage.processingAirdropStatus} (${numBatches} batches · ${cluster})`}
                 />
 
                 <div className={styles.field}>
                   <div className={styles.toolbarRow}>
-                    <Label htmlFor="token-select">1. Select Token to Distribute</Label>
+                    <Label htmlFor="token-select">{t.airdropPage.step1SelectLabel}</Label>
                     {selectedToken && (
                       <span className={styles.fieldDescription}>
-                        Available Balance: <strong>{walletTokenBalance.toLocaleString()}</strong>{" "}
+                        {t.common.availableBalance}{" "}
+                        <strong>{walletTokenBalance.toLocaleString()}</strong>{" "}
                         {selectedToken.symbol}
                       </span>
                     )}
@@ -355,7 +337,7 @@ function AirdropPageInner() {
 
                 <div className={styles.field}>
                   <div className={styles.toolbarRow}>
-                    <Label htmlFor="recipients">2. Recipient Wallet List (Address,Amount)</Label>
+                    <Label htmlFor="recipients">{t.airdropPage.step2RecipientsLabel}</Label>
                     <div className={styles.quickToolsGroup}>
                       <button
                         type="button"
@@ -363,7 +345,7 @@ function AirdropPageInner() {
                         disabled={isLoading}
                         className={styles.toolChipBtn}
                       >
-                        📄 Load Sample List
+                        {t.airdropPage.loadSampleBtn}
                       </button>
                       <button
                         type="button"
@@ -371,7 +353,7 @@ function AirdropPageInner() {
                         disabled={isLoading}
                         className={styles.toolChipBtn}
                       >
-                        📁 Import CSV / TXT
+                        {t.airdropPage.importCsvBtn}
                       </button>
                       {recipientsText && (
                         <button
@@ -380,7 +362,7 @@ function AirdropPageInner() {
                           disabled={isLoading}
                           className={styles.toolChipBtn}
                         >
-                          ✕ Clear List
+                          {t.airdropPage.clearListBtn}
                         </button>
                       )}
                       <input
@@ -393,9 +375,8 @@ function AirdropPageInner() {
                     </div>
                   </div>
 
-                  {/* Uniform Amount Quick-Fill Helper */}
                   <div className={styles.uniformBar}>
-                    <span>⚡ Set Uniform Amount for All Wallets:</span>
+                    <span>{t.airdropPage.uniformLabel}</span>
                     <input
                       type="number"
                       step="any"
@@ -412,73 +393,52 @@ function AirdropPageInner() {
                       disabled={isLoading || !recipientsText.trim()}
                       className={styles.toolChipBtn}
                     >
-                      Apply to All Lines
+                      {t.airdropPage.applyAllBtn}
                     </button>
                   </div>
 
                   <textarea
                     id="recipients"
-                    placeholder={
-                      "One recipient per line: WalletAddress,TokenAmount\nExample:\n7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU,1500\n9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin,2500"
-                    }
+                    placeholder={t.airdropPage.textareaPlaceholder}
                     value={recipientsText}
                     onChange={(e) => setRecipientsText(e.target.value)}
                     className={styles.textarea}
                     rows={8}
                     disabled={isLoading}
                   />
-                  <p className={styles.fieldDescription}>
-                    Separate each wallet address and token amount with a comma, space, or semicolon.
-                  </p>
+                  <p className={styles.fieldDescription}>{t.airdropPage.textareaHint}</p>
                 </div>
 
                 {parsedResult && (
                   <div className={styles.summaryCard}>
                     <div className={styles.summaryTitle}>
-                      <span>📊 Live Airdrop Validation & Cost Summary</span>
+                      <span>{t.airdropPage.summaryTitle}</span>
                       <span>
                         {parsedResult.invalid.length === 0 && parsedResult.valid.length > 0
-                          ? "✓ Ready to Broadcast"
-                          : "⚠️ Review Required"}
+                          ? t.airdropPage.readyToBroadcast
+                          : t.airdropPage.reviewRequired}
                       </span>
                     </div>
 
                     {parsedResult.invalid.length > 0 && (
                       <div className={styles.errorList}>
-                        <p>
-                          <strong>{parsedResult.invalid.length} formatting issue(s) found:</strong>
-                        </p>
                         <ul>
                           {parsedResult.invalid.slice(0, 5).map((item) => (
                             <li key={item.line}>
-                              Line {item.line}: {item.error}
+                              #{item.line}: {item.error}
                             </li>
                           ))}
-                          {parsedResult.invalid.length > 5 && (
-                            <li>... and {parsedResult.invalid.length - 5} more errors.</li>
-                          )}
                         </ul>
-                      </div>
-                    )}
-
-                    {!hasEnoughTokenBalance && (
-                      <div className={styles.errorList}>
-                        <p>
-                          <strong>Insufficient {selectedToken?.symbol} Balance:</strong> This list
-                          requires {parsedResult.totalAmount.toLocaleString()}{" "}
-                          {selectedToken?.symbol}, but your wallet holds{" "}
-                          {walletTokenBalance.toLocaleString()} {selectedToken?.symbol}.
-                        </p>
                       </div>
                     )}
 
                     <div className={styles.summaryMetricsGrid}>
                       <div className={styles.summaryMetricBox}>
-                        <span>Valid Wallets</span>
+                        <span>{t.airdropPage.validWalletsLabel}</span>
                         <strong className={styles.textEmerald}>{parsedResult.valid.length}</strong>
                       </div>
                       <div className={styles.summaryMetricBox}>
-                        <span>Total Tokens to Send</span>
+                        <span>{t.airdropPage.totalTokensLabel}</span>
                         <strong
                           className={
                             hasEnoughTokenBalance ? styles.textEmerald : styles.textRose
@@ -489,11 +449,11 @@ function AirdropPageInner() {
                         </strong>
                       </div>
                       <div className={styles.summaryMetricBox}>
-                        <span>Atomic Tx Batches</span>
-                        <strong>{numBatches} Batch(es)</strong>
+                        <span>{t.airdropPage.atomicBatchesLabel}</span>
+                        <strong>{numBatches}</strong>
                       </div>
                       <div className={styles.summaryMetricBox}>
-                        <span>Total Service Fee</span>
+                        <span>{t.airdropPage.totalServiceFeeLabel}</span>
                         <strong>{totalFee} SOL</strong>
                       </div>
                     </div>
@@ -508,12 +468,12 @@ function AirdropPageInner() {
                 disabled={isLoading || !recipientsText.trim()}
                 className="secondary"
               >
-                ✓ Validate Recipient List
+                {t.airdropPage.validateBtn}
               </Button>
               <Button type="button" onClick={handleSubmit} disabled={isSubmitDisabled}>
                 {isLoading
-                  ? statusStep || signature || "Processing Airdrop..."
-                  : `📦 Send Airdrop (${totalFee} SOL Fee)`}
+                  ? statusStep || signature || t.airdropPage.processingAirdropStatus
+                  : `${t.airdropPage.sendAirdropBtn} (${totalFee} SOL)`}
               </Button>
             </CardFooter>
           </Card>
@@ -522,11 +482,11 @@ function AirdropPageInner() {
         <aside className={styles.sidebar}>
           <CostSummary operation="airdrop" />
 
-          <h3 className={styles.sidebarTitle}>How Multi-Send Works</h3>
-          {tutorialSteps.map((step, index) => (
+          <h3 className={styles.sidebarTitle}>{t.airdropPage.sidebarTitle}</h3>
+          {t.airdropPage.tutorialSteps.map((step, index) => (
             <Card key={index} className={styles.tutorialCard}>
               <CardContent className={styles.tutorialCardContent}>
-                <div className={styles.tutorialIcon}>{step.icon}</div>
+                <div className={styles.tutorialIcon}>{TUTORIAL_ICONS[index]}</div>
                 <div className={styles.tutorialText}>
                   <p className={styles.tutorialTitle}>{step.title}</p>
                   <p className={styles.tutorialDescription}>{step.description}</p>

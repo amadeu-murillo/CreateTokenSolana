@@ -3,10 +3,11 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { WalletProvider, useCluster } from "../context/WalletContext";
-import { LanguageProvider, useLanguage, AppLocale } from "../context/LanguageContext";
+import { LanguageProvider, useLanguage } from "../context/LanguageContext";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import ConnectWallet from "./ConnectWallet";
+import FloatingLanguageSwitcher from "./FloatingLanguageSwitcher";
 import styles from "../app/Layout.module.css";
 import ThemeSwitcher from "./ThemeSwitcher";
 import { useEffect, Suspense, useState } from "react";
@@ -64,30 +65,6 @@ function AffiliateTracker() {
   return null;
 }
 
-function LanguageSwitcherControls() {
-  const { locale, setLocale } = useLanguage();
-  const options: Array<{ code: AppLocale; label: string }> = [
-    { code: "pt", label: "🇧🇷 PT" },
-    { code: "en", label: "🇺🇸 EN" },
-    { code: "es", label: "🇪🇸 ES" },
-  ];
-
-  return (
-    <div className={styles.langSwitcher} role="group" aria-label="Language Selector">
-      {options.map((opt) => (
-        <button
-          key={opt.code}
-          type="button"
-          onClick={() => setLocale(opt.code)}
-          className={locale === opt.code ? styles.langBtnActive : styles.langBtn}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function NetworkSwitcherPill() {
   const { cluster, setCluster } = useCluster();
   const { t } = useLanguage();
@@ -118,11 +95,6 @@ function NetworkSwitcherPill() {
   );
 }
 
-/**
- * Floating Web3 Control Dock positioned directly underneath the top Navbar.
- * Keeps the Mainnet/Devnet Switcher, Network Status, Devnet Faucet, and Connect Wallet Button
- * permanently floating and accessible across all screen sizes without crowding the navbar.
- */
 function FloatingUnderNavbarDock() {
   const { cluster } = useCluster();
   const { publicKey } = useWallet();
@@ -158,13 +130,12 @@ function FloatingUnderNavbarDock() {
   };
 
   return (
-    <div className={styles.floatingDockOuter} role="region" aria-label="Controles de Rede e Carteira">
+    <div className={styles.floatingDockOuter} role="region" aria-label="Network and Wallet Controls">
       <div
         className={`${styles.floatingDockBar} ${
           isDevnet ? styles.floatingDockBarDevnet : styles.floatingDockBarMainnet
         }`}
       >
-        {/* Left: Mainnet / Devnet Floating Buttons + Active Status */}
         <div className={styles.floatingDockLeft}>
           <NetworkSwitcherPill />
 
@@ -178,7 +149,6 @@ function FloatingUnderNavbarDock() {
           </div>
         </div>
 
-        {/* Right: Optional Devnet Faucet + Floating Connect Wallet Button */}
         <div className={styles.floatingDockRight}>
           {isDevnet && (
             <button
@@ -260,65 +230,24 @@ function NavLinks({ onLinkClick, mobile = false }: { onLinkClick?: () => void; m
 
 function TrustFooter() {
   const { cluster } = useCluster();
+  const { t } = useLanguage();
   const clusterSuffix = cluster === "devnet" ? "?cluster=devnet" : "";
   const feeText = `${STANDARD_SERVICE_FEE_SOL.toFixed(2)} SOL`;
+  const badgeIcons = [<IconShield key="s" />, <IconLayers key="l" />, <IconPlusCircle key="p" />, <IconSettings key="g" />];
 
   return (
     <footer className={styles.footer}>
       <div className={`${styles.container} ${styles.footerContainer}`}>
         <div className={styles.trustBadgesGrid}>
-          <div className={styles.trustBadgeCard}>
-            <div className={styles.trustBadgeIcon}>
-              <IconShield />
+          {t.footer.badges.map((badge, idx) => (
+            <div key={idx} className={styles.trustBadgeCard}>
+              <div className={styles.trustBadgeIcon}>{badgeIcons[idx]}</div>
+              <div>
+                <h5>{badge.title}</h5>
+                <p>{badge.desc}</p>
+              </div>
             </div>
-            <div>
-              <h5>100% Non-Custodial &amp; Program-Whitelisted</h5>
-              <p>
-                Every transaction is verified against our client-side Solana program whitelist and
-                simulated before your wallet signs.
-              </p>
-            </div>
-          </div>
-
-          <div className={styles.trustBadgeCard}>
-            <div className={styles.trustBadgeIcon}>
-              <IconLayers />
-            </div>
-            <div>
-              <h5>Audited On-Chain Protocols</h5>
-              <p>
-                Built directly on official Solana SPL Token, Token-2022, Metaplex Token Metadata,
-                and Constant-Product AMM Liquidity Vaults.
-              </p>
-            </div>
-          </div>
-
-          <div className={styles.trustBadgeCard}>
-            <div className={styles.trustBadgeIcon}>
-              <IconPlusCircle />
-            </div>
-            <div>
-              <h5>Modular Pricing &amp; 30% Affiliate Split</h5>
-              <p>
-                Transparent modular fees routed atomically on-chain to Dev Wallet (
-                {devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}) with 30% instant
-                referral payouts.
-              </p>
-            </div>
-          </div>
-
-          <div className={styles.trustBadgeCard}>
-            <div className={styles.trustBadgeIcon}>
-              <IconSettings />
-            </div>
-            <div>
-              <h5>Mainnet-Beta Default &amp; Devnet Ready</h5>
-              <p>
-                Defaults to Solana Mainnet-Beta for production launches, with 1-click switching to
-                Solana Devnet for testing.
-              </p>
-            </div>
-          </div>
+          ))}
         </div>
 
         <div className={styles.footerGrid}>
@@ -326,54 +255,50 @@ function TrustFooter() {
             <Link href="/" className={styles.logoLink}>
               <span className={styles.logoText}>CreateTokenSolana</span>
               {cluster === "devnet" && (
-                <span className={styles.devnetHeaderBadge} title="Rede de Testes Solana Devnet Ativa">
+                <span className={styles.devnetHeaderBadge} title="Solana Devnet">
                   ● DEVNET
                 </span>
               )}
             </Link>
-            <p className={styles.footerTagline}>
-              Swiss-engineered non-custodial launchpad for creating SPL &amp; Token-2022 assets,
-              initializing AMM liquidity pools, and managing token authorities on Solana.
-            </p>
+            <p className={styles.footerTagline}>{t.footer.tagline}</p>
             <div className={styles.networkStatusBadge}>
               <span className={styles.statusDotOnline} />
               <span>
-                Connected to Solana{" "}
-                <strong>{cluster === "devnet" ? "Devnet (Sandbox)" : "Mainnet-Beta (Live)"}</strong>{" "}
-                RPC
+                {t.footer.connectedTo}:{" "}
+                <strong>{cluster === "devnet" ? t.network.devnetShort : t.network.mainnetShort}</strong>
               </span>
             </div>
           </div>
 
           <div className={styles.footerColumn}>
-            <h4 className={styles.footerColumnTitle}>Platform Services</h4>
+            <h4 className={styles.footerColumnTitle}>{t.footer.servicesTitle}</h4>
             <Link href="/" className={styles.footerLink}>
-              Token Creator (Modular 0.10–0.55 SOL)
+              {t.nav.createToken} (0.10–0.55 SOL)
             </Link>
             <Link href="/add-liquidity" className={styles.footerLink}>
-              Liquidity Pool ({feeText} Fee)
+              {t.nav.liquidityPool} ({feeText})
             </Link>
             <Link href="/burn" className={styles.footerLink}>
-              Burn Tokens &amp; Reclaim SOL
+              {t.nav.burn}
             </Link>
             <Link href="/airdrop" className={styles.footerLink}>
-              Mass Airdrop ({feeText} / Batch)
+              {t.nav.airdrop} ({feeText})
             </Link>
             <Link href="/dashboard" className={styles.footerLink}>
-              Revoke Authorities ({feeText} Fee)
+              {t.nav.manage} ({feeText})
             </Link>
           </div>
 
           <div className={styles.footerColumn}>
-            <h4 className={styles.footerColumnTitle}>Resources &amp; Transparency</h4>
+            <h4 className={styles.footerColumnTitle}>{t.footer.resourcesTitle}</h4>
             <Link href="/afiliates" className={styles.footerLink}>
-              Affiliate Program (30% Instant SOL)
+              {t.nav.affiliates}
             </Link>
             <Link href="/costs" className={styles.footerLink}>
-              Transparent Fee Schedule
+              {t.costsPage.pageTitle}
             </Link>
             <Link href="/documentacao" className={styles.footerLink}>
-              Technical Documentation
+              {t.nav.docs}
             </Link>
             <a
               href={`https://solscan.io/account/${devWalletBase58}${clusterSuffix}`}
@@ -386,7 +311,7 @@ function TrustFooter() {
           </div>
 
           <div className={styles.footerColumn}>
-            <h4 className={styles.footerColumnTitle}>Verified On-Chain Programs</h4>
+            <h4 className={styles.footerColumnTitle}>{t.footer.programsTitle}</h4>
             <a
               href={`https://solscan.io/account/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA${clusterSuffix}`}
               target="_blank"
@@ -432,12 +357,9 @@ function TrustFooter() {
 
         <div className={styles.footerBottom}>
           <p className={styles.footerText}>
-            © {new Date().getFullYear()} CreateTokenSolana. All rights reserved. Non-custodial
-            interface for the Solana blockchain.
+            © {new Date().getFullYear()} CreateTokenSolana. {t.footer.rightsReserved}
           </p>
-          <p className={styles.footerDisclaimer}>
-            Security Notice: Always review transaction simulations in your wallet before signing.
-          </p>
+          <p className={styles.footerDisclaimer}>{t.footer.securityNotice}</p>
         </div>
       </div>
     </footer>
@@ -460,14 +382,13 @@ function InnerAppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className={styles.wrapper} data-cluster={cluster} data-network={cluster}>
-      {/* Clean Top Navigation Header */}
       <header className={isDevnet ? styles.headerDevnet : styles.header}>
         <div className={`${styles.container} ${styles.headerContainer}`}>
           <div className={styles.navContainer}>
             <Link href="/" className={styles.logoLink} onClick={closeMobileMenu}>
               <span className={styles.logoText}>CreateTokenSolana</span>
               {isDevnet && (
-                <span className={styles.devnetHeaderBadge} title="Rede de Testes Solana Devnet Ativa">
+                <span className={styles.devnetHeaderBadge} title="Solana Devnet">
                   ● DEVNET
                 </span>
               )}
@@ -476,7 +397,6 @@ function InnerAppShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className={styles.rightItemsContainer}>
-            <LanguageSwitcherControls />
             <ThemeSwitcher />
             <button
               className={styles.mobileMenuButton}
@@ -496,12 +416,13 @@ function InnerAppShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {/* Floating Sticky Control Bar Below Navbar: Mainnet/Devnet Buttons + Connect Wallet Button */}
       <FloatingUnderNavbarDock />
 
       <main className={`${styles.container} ${styles.main}`}>{children}</main>
 
       <TrustFooter />
+
+      <FloatingLanguageSwitcher />
     </div>
   );
 }

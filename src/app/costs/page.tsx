@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import styles from "./Costs.module.css";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Costs {
   createToken: string;
@@ -13,16 +14,8 @@ interface Costs {
   removeLiquidity?: string;
 }
 
-const costLabels: Record<keyof Costs, string> = {
-  createToken: "Token Creation (0.90 SOL Fee)",
-  burnToken: "Token Burn (0.07 SOL Fee)",
-  airdrop: "Mass Airdrop (0.07 SOL / Batch)",
-  manageAuthority: "Revoke Authority (0.07 SOL Fee)",
-  createLiquidityPool: "Create Liquidity Pool (0.07 SOL Fee)",
-  removeLiquidity: "Withdraw Liquidity in SOL (0.05 SOL Fee)",
-};
-
 export default function CostsPage() {
+  const { t } = useLanguage();
   const [costs, setCosts] = useState<Costs | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +33,7 @@ export default function CostsPage() {
         setCosts(data);
       } catch (err: unknown) {
         console.error(err);
-        setError((err instanceof Error ? err.message : String(err)));
+        setError(err instanceof Error ? err.message : String(err));
       } finally {
         setIsLoading(false);
       }
@@ -49,21 +42,27 @@ export default function CostsPage() {
     fetchCosts();
   }, []);
 
+  const costLabels: Record<keyof Costs, string> = {
+    createToken: t.costsPage.labels.createToken,
+    burnToken: t.costsPage.labels.burnToken,
+    airdrop: t.costsPage.labels.airdrop,
+    manageAuthority: t.costsPage.labels.manageAuthority,
+    createLiquidityPool: t.costsPage.labels.createLiquidityPool,
+    removeLiquidity: t.costsPage.labels.removeLiquidity,
+  };
+
   return (
     <div className={styles.container}>
       <Card>
         <CardHeader>
-          <CardTitle className={styles.title}>Cost Summary</CardTitle>
-          <CardDescription>
-            Estimated costs for all operations on the Solana network, including our platform
-            service fee and estimated Solana network rent.
-          </CardDescription>
+          <CardTitle className={styles.title}>{t.costsPage.pageTitle}</CardTitle>
+          <CardDescription>{t.costsPage.pageDesc}</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className={styles.loading}>Loading costs...</div>
+            <div className={styles.loading}>{t.costsPage.loading}</div>
           ) : error ? (
-            <div className={styles.error}>Error: {error}</div>
+            <div className={styles.error}>{error}</div>
           ) : costs ? (
             <div className={styles.costList}>
               {(Object.keys(costs) as Array<keyof Costs>).map((key) => (

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { useLanguage } from "@/context/LanguageContext";
 import styles from "./ManageAuthorityModal.module.css";
 import { Button } from "./ui/button";
 
@@ -21,6 +22,8 @@ const ManageAuthorityModal: React.FC<ManageAuthorityModalProps> = ({
   description,
   isLoading,
 }) => {
+  const { t } = useLanguage();
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -45,7 +48,7 @@ const ManageAuthorityModal: React.FC<ManageAuthorityModalProps> = ({
       aria-labelledby="manage-authority-modal-title"
     >
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <span className={styles.badgeDanger}>⚠️ Ação Irreversível On-Chain</span>
+        <span className={styles.badgeDanger}>{t.common.irreversibleWarning}</span>
         <h3 id="manage-authority-modal-title" className={styles.title}>
           {title}
         </h3>
@@ -57,7 +60,7 @@ const ManageAuthorityModal: React.FC<ManageAuthorityModalProps> = ({
             className={styles.cancelButton}
             disabled={isLoading}
           >
-            Cancelar
+            {t.common.cancel}
           </Button>
           <Button
             type="button"
@@ -65,7 +68,7 @@ const ManageAuthorityModal: React.FC<ManageAuthorityModalProps> = ({
             className={styles.confirmButton}
             disabled={isLoading}
           >
-            {isLoading ? "Assinando e Confirmando..." : "Confirmar e Revogar"}
+            {isLoading ? t.common.signingAndConfirming : t.common.confirmAndRevoke}
           </Button>
         </div>
       </div>

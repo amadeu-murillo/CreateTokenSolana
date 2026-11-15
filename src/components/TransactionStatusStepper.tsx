@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useCluster } from "@/context/WalletContext";
+import { useLanguage } from "@/context/LanguageContext";
 import styles from "./TransactionStatusStepper.module.css";
 
 export interface StepDefinition {
@@ -11,23 +12,23 @@ export interface StepDefinition {
 
 export interface TransactionStatusStepperProps {
   isActive: boolean;
-  currentStepIndex: number; // 1 to 4
+  currentStepIndex: number;
   statusMessage?: string | null;
   operationTitle?: string;
   steps?: StepDefinition[];
 }
 
 export const DEFAULT_TOKEN_CREATION_STEPS: StepDefinition[] = [
-  { id: 1, label: "1. Upload para Irys" },
-  { id: 2, label: "2. Upload de Metadados" },
-  { id: 3, label: "3. Aguardando Assinatura" },
-  { id: 4, label: "4. Confirmando na Rede" },
+  { id: 1, label: "1. Upload to Irys" },
+  { id: 2, label: "2. Upload Metadata" },
+  { id: 3, label: "3. Awaiting Signature" },
+  { id: 4, label: "4. Confirming On-Chain" },
 ];
 
 const SpinnerIcon = () => (
   <svg
     className={styles.spinnerSvg}
-     xmlns="http://www.w3.org/2000/svg"
+    xmlns="http://www.w3.org/2000/svg"
     fill="none"
     viewBox="0 0 24 24"
     aria-hidden="true"
@@ -63,17 +64,25 @@ export default function TransactionStatusStepper({
   isActive,
   currentStepIndex,
   statusMessage = null,
-  operationTitle = "Progresso da Transação Solana",
-  steps = DEFAULT_TOKEN_CREATION_STEPS,
+  operationTitle,
+  steps,
 }: TransactionStatusStepperProps) {
   const { cluster } = useCluster();
+  const { t } = useLanguage();
   const isDevnet = cluster === "devnet";
 
   if (!isActive && !statusMessage) {
     return null;
   }
 
-  const totalSteps = steps.length;
+  const resolvedSteps: StepDefinition[] =
+    steps ||
+    t.stepper.steps.map((label, idx) => ({
+      id: idx + 1,
+      label,
+    }));
+
+  const totalSteps = resolvedSteps.length;
   const clampedStep = Math.min(Math.max(currentStepIndex || 1, 1), totalSteps);
   const progressPercent = Math.round((clampedStep / totalSteps) * 100);
 
@@ -86,10 +95,12 @@ export default function TransactionStatusStepper({
       <div className={styles.headerRow}>
         <div className={styles.titleGroup}>
           <span className={`${styles.liveDot} ${isDevnet ? styles.liveDotDevnet : ""}`} />
-          <strong className={styles.operationTitle}>{operationTitle}</strong>
+          <strong className={styles.operationTitle}>
+            {operationTitle || t.stepper.defaultTitle}
+          </strong>
         </div>
         <span className={styles.stepCounterBadge}>
-          Etapa {clampedStep}/{totalSteps} · {progressPercent}%
+          {t.stepper.stepBadge} {clampedStep}/{totalSteps} · {progressPercent}%
         </span>
       </div>
 
@@ -101,7 +112,7 @@ export default function TransactionStatusStepper({
       </div>
 
       <div className={styles.stepsGrid}>
-        {steps.map((step) => {
+        {resolvedSteps.map((step) => {
           const isCompleted = clampedStep > step.id;
           const isCurrent = clampedStep === step.id;
 
@@ -112,8 +123,8 @@ export default function TransactionStatusStepper({
                 isCurrent
                   ? styles.stepCardActive
                   : isCompleted
-                  ? styles.stepCardCompleted
-                  : ""
+                    ? styles.stepCardCompleted
+                    : ""
               }`}
             >
               <span className={styles.iconBox}>
