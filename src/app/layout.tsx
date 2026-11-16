@@ -53,7 +53,10 @@ export const metadata: Metadata = {
     languages: getLanguageAlternates(PRIMARY_DOMAIN),
   },
   verification: {
-    google: "KgtGmUrAXO4vF6RITCjOmdyXvH3Bh4zzf01pDYs2pbc",
+    google: [
+      "Rn6YsjYWjAnnHv7Qn_TuE4tLy1cxjO_LvybiUCOixYY",
+      "KgtGmUrAXO4vF6RITCjOmdyXvH3Bh4zzf01pDYs2pbc",
+    ],
   },
   openGraph: {
     type: "website",
