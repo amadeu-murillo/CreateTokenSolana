@@ -120,6 +120,7 @@ const formatNumber = (value: string) => {
 export default function TokenForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [clientValidationAlert, setClientValidationAlert] = useState<string | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const { cluster, setCluster } = useCluster();
   const { t } = useLanguage();
   const isDevnet = cluster === "devnet";
@@ -395,6 +396,12 @@ export default function TokenForm() {
     const file = acceptedFiles[0];
     if (file) {
       setClientValidationAlert(null);
+      try {
+        if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+        setLocalPreviewUrl(URL.createObjectURL(file));
+      } catch {
+        // Ignore object URL errors
+      }
       const uploadedUri = await uploadImageDecentralized(
         file,
         watchedFields.storageProvider === "arweave" ? "wallet-irys" : "server-irys"
@@ -415,6 +422,10 @@ export default function TokenForm() {
   const removeImage = (e: React.MouseEvent) => {
     e.stopPropagation();
     setUploadError(null);
+    if (localPreviewUrl) {
+      URL.revokeObjectURL(localPreviewUrl);
+      setLocalPreviewUrl(null);
+    }
     setValue("imageUrl", "", { shouldValidate: true });
   };
 
@@ -899,7 +910,15 @@ export default function TokenForm() {
                     </div>
                   ) : watchedFields.imageUrl ? (
                     <div className={styles.preview}>
-                      <img src={watchedFields.imageUrl} alt="Token Logo Preview" />
+                      <img
+                        src={watchedFields.imageUrl}
+                        alt="Token Logo Preview"
+                        onError={(e) => {
+                          if (localPreviewUrl && e.currentTarget.src !== localPreviewUrl) {
+                            e.currentTarget.src = localPreviewUrl;
+                          }
+                        }}
+                      />
                       <button type="button" onClick={removeImage} className={styles.removeButton}>
                         ×
                       </button>

@@ -46,11 +46,18 @@ export function getIrysNodeAddress(cluster: SolanaCluster = "mainnet-beta"): str
 /**
  * Normalizes an Irys/Bundlr gateway URI to a canonical permanent Arweave URI.
  */
-export function normalizeArweaveUri(uri: string): string {
+export function normalizeArweaveUri(
+  uri: string,
+  cluster: SolanaCluster = "mainnet-beta"
+): string {
   if (!uri) return uri;
   const match = uri.match(/\/([a-zA-Z0-9_-]{43,44})(?:\?.*)?$/);
   if (match && match[1]) {
-    return `https://arweave.net/${match[1]}`;
+    // Devnet uploads live on devnet.irys.xyz and do NOT propagate to arweave.net.
+    // Mainnet uploads are immediately available on gateway.irys.xyz (0s propagation delay).
+    return cluster === "devnet"
+      ? `https://devnet.irys.xyz/${match[1]}`
+      : `https://gateway.irys.xyz/${match[1]}`;
   }
   return uri;
 }
@@ -122,7 +129,7 @@ export async function uploadImageToArweave(params: {
     throw new Error("Failed to receive transaction URI from Irys/Arweave node.");
   }
 
-  const canonicalUri = normalizeArweaveUri(uploadedUri);
+  const canonicalUri = normalizeArweaveUri(uploadedUri, cluster);
   return {
     arweaveUri: canonicalUri,
     gatewayUrl: uploadedUri,
@@ -155,7 +162,7 @@ export async function uploadMetadataJsonToArweave(params: {
     throw new Error("Failed to upload metadata JSON to Arweave via Irys.");
   }
 
-  const canonicalUri = normalizeArweaveUri(uploadedUri);
+  const canonicalUri = normalizeArweaveUri(uploadedUri, cluster);
   return {
     metadataUri: canonicalUri,
     gatewayUrl: uploadedUri,
