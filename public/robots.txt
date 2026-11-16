@@ -1,10 +1,11 @@
 User-agent: *
 Allow: /
 
-# Prevent indexing of internal API routes, build assets, and transient confirmation query strings
+# Prevent indexing of internal API routes, build assets, redirect aliases, and transient confirmation query strings
 Disallow: /_next/
 Disallow: /api/
 Disallow: /confirmation
+Disallow: /create
 
-Host: https://www.createtoken.sbs
-Sitemap: https://www.createtoken.sbs/sitemap.xml
+Host: https://www.createtokensol.store
+Sitemap: https://www.createtokensol.store/sitemap.xml

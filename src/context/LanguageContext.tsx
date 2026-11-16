@@ -1,5 +1,6 @@
 "use client";
 
+import { MULTILINGUAL_ROUTE_SEO, RoutePath } from "@/lib/seo";
 import React, {
   createContext,
   useContext,
@@ -3815,6 +3816,34 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (typeof document !== "undefined") {
       const meta = SUPPORTED_LOCALES.find((item) => item.code === target);
       document.documentElement.lang = meta ? meta.htmlLang : target;
+
+      try {
+        const rawPath = window.location.pathname || "/";
+        const normalizedPath = (
+          rawPath === "/affiliates"
+            ? "/afiliates"
+            : rawPath === "/docs"
+              ? "/documentacao"
+              : rawPath === "/create"
+                ? "/"
+                : rawPath
+        ) as RoutePath;
+        const routeSeo = MULTILINGUAL_ROUTE_SEO[normalizedPath]?.[target];
+        if (routeSeo) {
+          document.title = routeSeo.title;
+          const setMetaContent = (selector: string, value: string) => {
+            const el = document.querySelector(selector);
+            if (el) el.setAttribute("content", value);
+          };
+          setMetaContent("meta[name=\"description\"]", routeSeo.description);
+          setMetaContent("meta[property=\"og:title\"]", routeSeo.title);
+          setMetaContent("meta[property=\"og:description\"]", routeSeo.description);
+          setMetaContent("meta[name=\"twitter:title\"]", routeSeo.title);
+          setMetaContent("meta[name=\"twitter:description\"]", routeSeo.description);
+        }
+      } catch {
+        // Ignore DOM meta update errors
+      }
     }
   }, []);
 

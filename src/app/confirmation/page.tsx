@@ -23,12 +23,12 @@ function ConfirmationContent() {
   const publicTokenPath = tokenAddress ? `/token/${encodedMint}` : "/";
   const shareUrlX = tokenAddress
     ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-        `🚀 Acabei de lançar meu token na Solana com blindagem RugCheck 100/100!\n\n🪙 Mint: ${tokenAddress}\n🔗 Confira a página oficial: https://www.createtoken.sbs/token/${tokenAddress}`
+        `🚀 Acabei de lançar meu token na Solana com blindagem RugCheck 100/100!\n\n🪙 Mint: ${tokenAddress}\n🔗 Confira a página oficial: https://www.createtokensol.store/token/${tokenAddress}`
       )}`
     : "https://twitter.com";
   const shareUrlTelegram = tokenAddress
     ? `https://t.me/share/url?url=${encodeURIComponent(
-        `https://www.createtoken.sbs/token/${tokenAddress}`
+        `https://www.createtokensol.store/token/${tokenAddress}`
       )}&text=${encodeURIComponent("🚀 Confira nosso novo token verificado na Solana!")}`
     : "https://t.me";
 

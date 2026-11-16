@@ -1,19 +1,17 @@
 import type { ReactNode } from "react";
-import { buildRouteMetadata } from "@/lib/seo";
+import { buildRouteMetadata, MULTILINGUAL_ROUTE_SEO } from "@/lib/seo";
+
+const seo = MULTILINGUAL_ROUTE_SEO["/afiliates"].en;
 
 export const metadata = buildRouteMetadata({
-  title: "Solana Launchpad Affiliate Program — Earn 30% Instant SOL Commissions",
-  description:
-    "Share your personal Solana wallet referral link and earn 30% commission in SOL atomically on every token creation, liquidity pool, burn, and airdrop transaction.",
+  title: seo.title,
+  description: seo.description,
   path: "/affiliates",
-  keywords: [
-    "solana affiliate program",
-    "crypto launchpad referral",
-    "earn sol commissions",
-    "web3 referral program",
-  ],
+  canonicalOverride: "/afiliates",
+  noIndex: true,
+  keywords: seo.keywords,
 });
 
-export default function AffiliatesLayout({ children }: { children: ReactNode }) {
+export default function RouteLayout({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }

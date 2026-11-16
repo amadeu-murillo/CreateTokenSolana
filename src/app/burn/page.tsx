@@ -197,7 +197,7 @@ function BurnCertificateCanvas({
     ctx.fillStyle = "#A78BFA";
     ctx.font = "bold 18px Inter, sans-serif";
     ctx.fillText(
-      "Verified by CreateTokenSolana · https://www.createtoken.sbs",
+      "Verified by CreateTokenSolana · https://www.createtokensol.store",
       54,
       485
     );
@@ -223,7 +223,7 @@ function BurnCertificateCanvas({
     )} $${receipt.symbol} on-chain na Solana!\n\n✅ 100% VERIFIED ON-CHAIN\n🪙 Mint: ${receipt.mint.slice(
       0,
       8
-    )}...${receipt.mint.slice(-6)}\n🔗 Solscan: ${explorerUrl}\n🚀 Via @CreateTokenSol https://www.createtoken.sbs`
+    )}...${receipt.mint.slice(-6)}\n🔗 Solscan: ${explorerUrl}\n🚀 Via @CreateTokenSol https://www.createtokensol.store`
   );
   const shareUrl = `https://twitter.com/intent/tweet?text=${shareText}`;
 

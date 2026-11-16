@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     const isCustomCreatorEnabled = Boolean(customCreator?.enabled);
     const customCreatorName = customCreator?.name?.trim() || "CreateTokenSolana";
     const customCreatorSite =
-      sanitizeHttpsUrl(customCreator?.website) || "https://www.createtoken.sbs";
+      sanitizeHttpsUrl(customCreator?.website) || "https://www.createtokensol.store";
 
     if (isCustomCreatorEnabled) {
       attributes.push({ trait_type: "Creator", value: customCreatorName });
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       attributes,
       creator: {
         name: isCustomCreatorEnabled ? customCreatorName : "CreateTokenSolana",
-        site: isCustomCreatorEnabled ? customCreatorSite : "https://www.createtoken.sbs",
+        site: isCustomCreatorEnabled ? customCreatorSite : "https://www.createtokensol.store",
       },
       properties: {
         files: [{ uri: safeImageUrl, type: "image/png" }],

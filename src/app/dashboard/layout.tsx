@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
-import { buildRouteMetadata } from "@/lib/seo";
+import { buildRouteMetadata, MULTILINGUAL_ROUTE_SEO } from "@/lib/seo";
+
+const seo = MULTILINGUAL_ROUTE_SEO["/dashboard"].en;
 
 export const metadata = buildRouteMetadata({
-  title: 'Revoke Solana Mint & Freeze Authority — Token Security Dashboard',
-  description: 'Inspect and permanently revoke Mint Authority and Freeze Authority on your Solana SPL and Token-2022 tokens for a flat 0.07 SOL fee to make your token DEX-ready.',
-  path: '/dashboard',
-  keywords: ['revoke mint authority solana', 'revoke freeze authority solana', 'renounce solana token ownership', 'make solana token immutable'],
+  title: seo.title,
+  description: seo.description,
+  path: "/dashboard",
+  keywords: seo.keywords,
 });
 
 export default function RouteLayout({ children }: { children: ReactNode }) {

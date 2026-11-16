@@ -1,7 +1,7 @@
 import { MetadataRoute } from "next";
-import { SITE_URL } from "@/lib/seo";
+import { SITE_URL, getLanguageAlternates } from "@/lib/seo";
 
-const BASE_URL = SITE_URL || "https://www.createtoken.sbs";
+const BASE_URL = SITE_URL || "https://www.createtokensol.store";
 
 interface CanonicalRouteEntry {
   path: string;
@@ -9,6 +9,10 @@ interface CanonicalRouteEntry {
   priority: number;
 }
 
+/**
+ * Only 200 OK canonical indexable routes are included here (no /create redirect or
+ * /affiliates /docs alias paths) so Google Search Console never reports redirect/duplicate errors.
+ */
 const CANONICAL_ROUTES: ReadonlyArray<CanonicalRouteEntry> = [
   { path: "/", changeFrequency: "daily", priority: 1.0 },
   { path: "/add-liquidity", changeFrequency: "weekly", priority: 0.95 },
@@ -16,7 +20,7 @@ const CANONICAL_ROUTES: ReadonlyArray<CanonicalRouteEntry> = [
   { path: "/airdrop", changeFrequency: "weekly", priority: 0.9 },
   { path: "/dashboard", changeFrequency: "weekly", priority: 0.85 },
   { path: "/afiliates", changeFrequency: "monthly", priority: 0.85 },
-  { path: "/costs", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/costs", changeFrequency: "monthly", priority: 0.85 },
   { path: "/documentacao", changeFrequency: "monthly", priority: 0.8 },
 ];
 
@@ -32,13 +36,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: route.changeFrequency,
       priority: route.priority,
       alternates: {
-        languages: {
-          en: `${routeUrl}?lang=en`,
-          es: `${routeUrl}?lang=es`,
-          ru: `${routeUrl}?lang=ru`,
-          zh: `${routeUrl}?lang=zh`,
-          "pt-BR": `${routeUrl}?lang=pt-BR`,
-        },
+        languages: getLanguageAlternates(routeUrl),
       },
     };
   });

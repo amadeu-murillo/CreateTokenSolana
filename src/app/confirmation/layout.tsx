@@ -1,18 +1,17 @@
 import type { ReactNode } from "react";
-import { buildRouteMetadata } from "@/lib/seo";
+import { buildRouteMetadata, MULTILINGUAL_ROUTE_SEO } from "@/lib/seo";
+
+const seo = MULTILINGUAL_ROUTE_SEO["/"].en;
 
 export const metadata = buildRouteMetadata({
-  title: "Token Deployment Confirmation & Next Steps — CreateTokenSolana",
-  description:
-    "View your verified on-chain Solana token mint address, transaction signature, and proceed to liquidity pool initialization, LP burning, and community airdrops.",
+  title: "Transaction Confirmation — CreateTokenSolana",
+  description: seo.description,
   path: "/confirmation",
-  keywords: [
-    "solana token confirmation",
-    "solscan token verification",
-    "post launch liquidity steps",
-  ],
+  canonicalOverride: "/",
+  noIndex: true,
+  keywords: seo.keywords,
 });
 
-export default function ConfirmationLayout({ children }: { children: ReactNode }) {
+export default function RouteLayout({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
