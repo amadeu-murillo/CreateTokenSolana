@@ -5,12 +5,14 @@ import {
   signerIdentity,
   Umi,
 } from "@metaplex-foundation/umi";
+import { bundlrUploader } from "@metaplex-foundation/umi-uploader-bundlr";
 import { SolanaCluster, getRpcEndpoint } from "@/lib/constants";
 
 export const IRYS_NODE_MAINNET = "https://node1.irys.xyz";
 export const IRYS_NODE_DEVNET = "https://devnet.irys.xyz";
 
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const umiCache = new Map<string, Umi>();
 
 function decodeBase58(input: string): Uint8Array {
   if (!input) return new Uint8Array(0);
@@ -54,40 +56,33 @@ export function normalizeArweaveUri(uri: string): string {
 }
 
 /**
- * Creates a server-side Umi instance configured with the Irys/Bundlr Arweave uploader
- * loaded dynamically at runtime so Webpack never bundles native arbundles dependencies.
+ * Creates (or reuses cached) server-side Umi instance configured with the Irys/Bundlr uploader.
+ * Declared in next.config.js -> experimental.serverComponentsExternalPackages so Vercel
+ * traces @metaplex-foundation/umi-uploader-bundlr into the serverless function bundle.
  */
 export function getServerArweaveUmi(cluster: SolanaCluster = "mainnet-beta"): Umi {
   const rpcEndpoint = getRpcEndpoint(cluster);
   const irysAddress = getIrysNodeAddress(cluster);
+  const secretKeyBase58 = process.env.IRYS_UPLOADER_PRIVATE_KEY?.trim() || "";
+  const cacheKey = `${cluster}:${rpcEndpoint}:${secretKeyBase58.slice(0, 8)}`;
+
+  const cached = umiCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
   const umi = createUmi(rpcEndpoint);
 
-  try {
-    const dynamicRequire = eval("require") as NodeRequire;
-    const bundlrPkg = dynamicRequire("@metaplex-foundation/umi-uploader-bundlr") as {
-      bundlrUploader: (options: {
-        address: string;
-        providerUrl: string;
-        timeout: number;
-      }) => Parameters<Umi["use"]>[0];
-    };
-    if (bundlrPkg && typeof bundlrPkg.bundlrUploader === "function") {
-      umi.use(
-        bundlrPkg.bundlrUploader({
-          address: irysAddress,
-          providerUrl: rpcEndpoint,
-          timeout: 60_000,
-        })
-      );
-    }
-  } catch (err) {
-    console.warn("Dynamic bundlrUploader load skipped (falling back to HTTPS CDN):", err);
-  }
+  umi.use(
+    bundlrUploader({
+      address: irysAddress,
+      providerUrl: rpcEndpoint,
+      timeout: 30_000,
+    })
+  );
 
-  const secretKeyBase58 = process.env.IRYS_UPLOADER_PRIVATE_KEY;
   if (secretKeyBase58) {
-    const secretKeyBytes = decodeBase58(secretKeyBase58.trim());
+    const secretKeyBytes = decodeBase58(secretKeyBase58);
     const umiKeypair = umi.eddsa.createKeypairFromSecretKey(secretKeyBytes);
     const signer = createSignerFromKeypair(umi, umiKeypair);
     umi.use(signerIdentity(signer));
@@ -97,6 +92,7 @@ export function getServerArweaveUmi(cluster: SolanaCluster = "mainnet-beta"): Um
     umi.use(signerIdentity(signer));
   }
 
+  umiCache.set(cacheKey, umi);
   return umi;
 }
 

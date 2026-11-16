@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCluster } from "@/context/WalletContext";
+import { optimizeTokenLogo } from "@/lib/utils/imageOptimizer";
 
 export interface ArweaveUploadResult {
   imageUri: string;
@@ -11,9 +12,8 @@ export interface ArweaveUploadResult {
 }
 
 /**
- * Uploads the token image via the server API (/api/upload-image), which automatically
- * uses Arweave/Irys when configured and falls back to guaranteed HTTPS CDN hosting
- * so images NEVER fail to appear on Devnet or Mainnet-Beta.
+ * Optimizes the token logo client-side (< 95 KiB / 512px WebP) and uploads via /api/upload-image,
+ * hitting the Irys free tier (< 100 KiB) with much faster transfer times and automatic HTTPS fallback.
  */
 export const useArweaveUpload = () => {
   const wallet = useWallet();
@@ -21,6 +21,7 @@ export const useArweaveUpload = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [optimizationSummary, setOptimizationSummary] = useState<string | null>(null);
 
   const uploadImageDecentralized = useCallback(
     async (
@@ -30,14 +31,23 @@ export const useArweaveUpload = () => {
       setIsUploading(true);
       setUploadProgress(15);
       setUploadError(null);
+      setOptimizationSummary(null);
 
       try {
+        const optimized = await optimizeTokenLogo(file);
+        if (optimized.wasOptimized) {
+          const origKb = Math.round(optimized.originalSize / 1024);
+          const nextKb = Math.round(optimized.optimizedSize / 1024);
+          setOptimizationSummary(`${origKb} KB → ${nextKb} KB (${optimized.width}x${optimized.height})`);
+        }
+
+        setUploadProgress(35);
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", optimized.file);
         formData.append("network", cluster);
         formData.append("storage", mode === "wallet-irys" ? "arweave" : "cloudinary");
 
-        setUploadProgress(55);
+        setUploadProgress(60);
         const response = await fetch("/api/upload-image", {
           method: "POST",
           body: formData,
@@ -68,5 +78,6 @@ export const useArweaveUpload = () => {
     uploadProgress,
     uploadError,
     setUploadError,
+    optimizationSummary,
   };
 };

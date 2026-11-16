@@ -9,6 +9,13 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  experimental: {
+    serverComponentsExternalPackages: [
+      "@metaplex-foundation/umi-uploader-bundlr",
+      "@irys/sdk",
+      "arbundles",
+    ],
+  },
   images: {
     remotePatterns: [
       {
