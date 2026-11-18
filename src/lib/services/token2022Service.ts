@@ -3,7 +3,6 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
-  ComputeBudgetProgram,
   TransactionMessage,
   VersionedTransaction,
   TransactionInstruction,
@@ -29,6 +28,7 @@ import {
 } from "@/lib/constants";
 import { toRawTokenAmount } from "@/lib/security";
 import {
+  buildDynamicComputeBudgetInstructions,
   buildMetaplexMetadataInstructions,
   buildServiceFeeInstructions,
   getSolanaConnection,
@@ -53,9 +53,10 @@ export interface CreateToken2022Params {
   };
   soulbound?: boolean;
   permanentDelegate?: boolean;
-  vanitySecretKey?: number[];
+  vanityPublicKey?: string;
   vanityCharLength?: number;
   hasJitoBundle?: boolean;
+  isMultiWalletBundle?: boolean;
   affiliate?: string | null;
   network?: SolanaCluster;
 }
@@ -126,25 +127,25 @@ function createUpdateNativeMetadataFieldIx(params: {
   });
 }
 
-function calculateNativeMetadataTlvByteLength(
-  name: string,
-  symbol: string,
-  uri: string,
-  additionalMetadata: Array<[string, string]> = []
-): number {
-  let size =
-    4 +
-    32 +
-    32 +
-    (4 + Buffer.byteLength(name, "utf-8")) +
-    (4 + Buffer.byteLength(symbol, "utf-8")) +
-    (4 + Buffer.byteLength(uri, "utf-8")) +
-    4;
+function calculateToken2022MetadataRentBytes(params: {
+  name: string;
+  symbol: string;
+  uri: string;
+  additionalMetadata?: Array<[string, string]>;
+}): number {
+  const baseBytes =
+    112 +
+    Buffer.byteLength(params.name, "utf-8") +
+    Buffer.byteLength(params.symbol, "utf-8") +
+    Buffer.byteLength(params.uri, "utf-8");
 
-  for (const [k, v] of additionalMetadata) {
-    size += 4 + Buffer.byteLength(k, "utf-8") + (4 + Buffer.byteLength(v, "utf-8"));
-  }
-  return size + 16;
+  const extraBytes = (params.additionalMetadata || []).reduce(
+    (acc, [k, v]) =>
+      acc + 16 + Buffer.byteLength(k, "utf-8") + Buffer.byteLength(v, "utf-8"),
+    0
+  );
+
+  return baseBytes + extraBytes;
 }
 
 export async function createToken2022Transaction(params: CreateToken2022Params) {
@@ -164,37 +165,25 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     transferFee,
     soulbound = false,
     permanentDelegate = false,
-    vanitySecretKey,
+    vanityPublicKey,
     vanityCharLength = 0,
     hasJitoBundle = false,
+    isMultiWalletBundle = false,
     affiliate,
     network = "mainnet-beta",
   } = params;
 
   const userPublicKey = new PublicKey(wallet);
-  const mintKeypair =
-    Array.isArray(vanitySecretKey) && vanitySecretKey.length === 64
-      ? Keypair.fromSecretKey(Uint8Array.from(vanitySecretKey))
-      : Keypair.generate();
+  const serverGeneratedMintKeypair = vanityPublicKey ? null : Keypair.generate();
+  const mintPublicKey = vanityPublicKey
+    ? new PublicKey(vanityPublicKey)
+    : serverGeneratedMintKeypair!.publicKey;
+
   const connection = getSolanaConnection(network);
 
-  const rawSupply = toRawTokenAmount(supply, decimals);
   const hasTransferFee = Boolean(transferFee && transferFee.basisPoints > 0);
-
-  const { totalLamports: modularFeeLamports, totalSol: modularFeeSol } =
-    calculateModularTokenCreationFee({
-      revokeFreeze: !freezeAuthority,
-      revokeMint: !mintAuthority,
-      immutableMetadata: !isMetadataMutable,
-      customCreatorInfo: Boolean(customCreatorInfo),
-      hasTransferFeeExtension: hasTransferFee,
-      hasSoulboundExtension: Boolean(soulbound),
-      hasPermanentDelegateExtension: Boolean(permanentDelegate),
-      vanityCharLength,
-      hasJitoBundle,
-    });
-
   const extensions: ExtensionType[] = [];
+
   if (hasTransferFee) {
     extensions.push(ExtensionType.TransferFeeConfig);
   }
@@ -208,18 +197,38 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     extensions.push(ExtensionType.MetadataPointer);
   }
 
-  const baseMintLen = getMintLen(extensions);
-  const extraTlvBytes = useNativeMetadataExtension
-    ? calculateNativeMetadataTlvByteLength(name, symbol, metadataUri, additionalMetadata)
+  const mintSpace = extensions.length > 0 ? getMintLen(extensions) : getMintLen([]);
+  const extraMetadataSpace = useNativeMetadataExtension
+    ? calculateToken2022MetadataRentBytes({
+        name,
+        symbol,
+        uri: metadataUri,
+        additionalMetadata,
+      })
     : 0;
 
-  const [totalRentLamports, userSolBalance] = await Promise.all([
-    connection.getMinimumBalanceForRentExemption(baseMintLen + extraTlvBytes),
+  const rawSupply = toRawTokenAmount(supply, decimals);
+  const [rentLamports, userSolBalance] = await Promise.all([
+    connection.getMinimumBalanceForRentExemption(mintSpace + extraMetadataSpace),
     connection.getBalance(userPublicKey, "confirmed"),
   ]);
 
+  const { totalLamports: modularFeeLamports, totalSol: modularFeeSol } =
+    calculateModularTokenCreationFee({
+      revokeFreeze: !freezeAuthority,
+      revokeMint: !mintAuthority,
+      immutableMetadata: !isMetadataMutable,
+      customCreatorInfo: Boolean(customCreatorInfo),
+      hasTransferFeeExtension: hasTransferFee,
+      hasSoulboundExtension: Boolean(soulbound),
+      hasPermanentDelegateExtension: Boolean(permanentDelegate),
+      vanityCharLength,
+      hasJitoBundle,
+      isMultiWalletBundle,
+    });
+
   const estimatedExtraLamports =
-    totalRentLamports + Math.round((useNativeMetadataExtension ? 0.005 : 0.018) * LAMPORTS_PER_SOL);
+    rentLamports + (useNativeMetadataExtension ? 5_000_000 : Math.round(0.018 * LAMPORTS_PER_SOL));
   const totalRequiredLamports = modularFeeLamports + estimatedExtraLamports;
 
   if (userSolBalance < totalRequiredLamports) {
@@ -228,37 +237,36 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     throw new Error(
       `Insufficient SOL balance on ${network}: your wallet has ${haveSol} SOL, but creating this Token-2022 asset requires ~${needSol} SOL (${modularFeeSol.toFixed(
         2
-      )} SOL modular service fee + account rent).`
+      )} SOL modular service fee + Solana account rent).`
     );
   }
 
   const associatedTokenAccount = await getAssociatedTokenAddress(
-    mintKeypair.publicKey,
+    mintPublicKey,
     userPublicKey,
     false,
     TOKEN_2022_PROGRAM_ID
   );
 
-  const instructions: TransactionInstruction[] = [
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 550_000 }),
-    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
+  const coreInstructions: TransactionInstruction[] = [
     ...buildServiceFeeInstructions(userPublicKey, modularFeeLamports, affiliate),
     SystemProgram.createAccount({
       fromPubkey: userPublicKey,
-      newAccountPubkey: mintKeypair.publicKey,
-      space: baseMintLen,
-      lamports: totalRentLamports,
+      newAccountPubkey: mintPublicKey,
+      space: mintSpace,
+      lamports: rentLamports,
       programId: TOKEN_2022_PROGRAM_ID,
     }),
   ];
 
+  // Extension initialization instructions MUST precede createInitializeMint2Instruction
   if (hasTransferFee && transferFee) {
     const rawMaxFee =
-      transferFee.maxFee > 0 ? toRawTokenAmount(transferFee.maxFee, decimals) : BigInt(0);
+      transferFee.maxFee > 0 ? toRawTokenAmount(transferFee.maxFee, decimals) : rawSupply;
 
-    instructions.push(
+    coreInstructions.push(
       createInitializeTransferFeeConfigInstruction(
-        mintKeypair.publicKey,
+        mintPublicKey,
         userPublicKey,
         userPublicKey,
         transferFee.basisPoints,
@@ -269,18 +277,15 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
   }
 
   if (soulbound) {
-    instructions.push(
-      createInitializeNonTransferableMintInstruction(
-        mintKeypair.publicKey,
-        TOKEN_2022_PROGRAM_ID
-      )
+    coreInstructions.push(
+      createInitializeNonTransferableMintInstruction(mintPublicKey, TOKEN_2022_PROGRAM_ID)
     );
   }
 
   if (permanentDelegate) {
-    instructions.push(
+    coreInstructions.push(
       createInitializePermanentDelegateInstruction(
-        mintKeypair.publicKey,
+        mintPublicKey,
         userPublicKey,
         TOKEN_2022_PROGRAM_ID
       )
@@ -288,19 +293,19 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
   }
 
   if (useNativeMetadataExtension) {
-    instructions.push(
+    coreInstructions.push(
       createInitializeMetadataPointerInstruction(
-        mintKeypair.publicKey,
-        isMetadataMutable ? userPublicKey : null,
-        mintKeypair.publicKey,
+        mintPublicKey,
+        userPublicKey,
+        mintPublicKey,
         TOKEN_2022_PROGRAM_ID
       )
     );
   }
 
-  instructions.push(
+  coreInstructions.push(
     createInitializeMint2Instruction(
-      mintKeypair.publicKey,
+      mintPublicKey,
       decimals,
       userPublicKey,
       userPublicKey,
@@ -309,9 +314,9 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
   );
 
   if (useNativeMetadataExtension) {
-    instructions.push(
+    coreInstructions.push(
       createInitializeNativeTokenMetadataIx({
-        mint: mintKeypair.publicKey,
+        mint: mintPublicKey,
         updateAuthority: userPublicKey,
         mintAuthority: userPublicKey,
         name,
@@ -322,9 +327,9 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
 
     for (const [fieldKey, fieldValue] of additionalMetadata) {
       if (fieldKey && fieldValue) {
-        instructions.push(
+        coreInstructions.push(
           createUpdateNativeMetadataFieldIx({
-            mint: mintKeypair.publicKey,
+            mint: mintPublicKey,
             updateAuthority: userPublicKey,
             fieldKey,
             fieldValue,
@@ -333,10 +338,10 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
       }
     }
   } else {
-    instructions.push(
+    coreInstructions.push(
       ...buildMetaplexMetadataInstructions({
         userPublicKey,
-        mintPublicKey: mintKeypair.publicKey,
+        mintPublicKey,
         name,
         symbol,
         metadataUri,
@@ -347,16 +352,16 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
     );
   }
 
-  instructions.push(
+  coreInstructions.push(
     createAssociatedTokenAccountIdempotentInstruction(
       userPublicKey,
       associatedTokenAccount,
       userPublicKey,
-      mintKeypair.publicKey,
+      mintPublicKey,
       TOKEN_2022_PROGRAM_ID
     ),
     createMintToInstruction(
-      mintKeypair.publicKey,
+      mintPublicKey,
       associatedTokenAccount,
       userPublicKey,
       rawSupply,
@@ -366,9 +371,9 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
   );
 
   if (!freezeAuthority) {
-    instructions.push(
+    coreInstructions.push(
       createSetAuthorityInstruction(
-        mintKeypair.publicKey,
+        mintPublicKey,
         userPublicKey,
         AuthorityType.FreezeAccount,
         null,
@@ -379,9 +384,9 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
   }
 
   if (!mintAuthority) {
-    instructions.push(
+    coreInstructions.push(
       createSetAuthorityInstruction(
-        mintKeypair.publicKey,
+        mintPublicKey,
         userPublicKey,
         AuthorityType.MintTokens,
         null,
@@ -390,6 +395,16 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
       )
     );
   }
+
+  const computeBudgetIxs = await buildDynamicComputeBudgetInstructions({
+    connection,
+    payerKey: userPublicKey,
+    instructions: coreInstructions,
+    defaultUnits: 520_000,
+    defaultMicroLamports: 25_000,
+  });
+
+  const instructions: TransactionInstruction[] = [...computeBudgetIxs, ...coreInstructions];
 
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
 
@@ -400,16 +415,17 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
   }).compileToV0Message();
 
   const transaction = new VersionedTransaction(messageV0);
-  transaction.sign([mintKeypair]);
+  if (serverGeneratedMintKeypair) {
+    transaction.sign([serverGeneratedMintKeypair]);
+  }
 
   const serializedTransaction = transaction.serialize();
   const base64Transaction = Buffer.from(serializedTransaction).toString("base64");
 
   return {
     transaction: base64Transaction,
-    mintAddress: mintKeypair.publicKey.toBase58(),
-    metadataMode: useNativeMetadataExtension ? "token-2022-native-extension" : "metaplex-pda",
-    metadataUri,
+    mintAddress: mintPublicKey.toBase58(),
+    requiresClientMintSignature: Boolean(vanityPublicKey),
     serviceFeeSol: modularFeeSol,
     blockhash,
     lastValidBlockHeight,

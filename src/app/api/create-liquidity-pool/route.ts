@@ -4,10 +4,10 @@ import {
   checkRateLimit,
   createLiquidityPoolRequestSchema,
   getClientIp,
+  sanitizeErrorMessage,
 } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
-
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,10 +36,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error in /api/create-liquidity-pool:", error);
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "Internal server error while preparing the liquidity pool transaction.";
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: sanitizeErrorMessage(
+          error,
+          "Internal server error while preparing the Raydium CPMM liquidity pool transaction."
+        ),
+      },
+      { status: 500 }
+    );
   }
 }

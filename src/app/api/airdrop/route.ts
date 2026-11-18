@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  AddressLookupTableAccount,
   PublicKey,
   TransactionMessage,
   VersionedTransaction,
@@ -12,11 +13,15 @@ import {
   createTransferCheckedInstruction,
   getMint,
 } from "@solana/spl-token";
-import { SERVICE_FEE_AIRDROP_LAMPORTS } from "@/lib/constants";
+import {
+  SERVICE_FEE_AIRDROP_LAMPORTS,
+  SERVICE_FEE_SNAPSHOT_HOLDERS_LAMPORTS,
+} from "@/lib/constants";
 import {
   airdropRequestSchema,
   checkRateLimit,
   getClientIp,
+  isValidPublicKey,
   toRawTokenAmount,
 } from "@/lib/security";
 import {
@@ -25,7 +30,6 @@ import {
 } from "@/lib/services/solanaHelpers";
 
 export const dynamic = "force-dynamic";
-
 
 export async function POST(request: Request) {
   try {
@@ -58,6 +62,10 @@ export async function POST(request: Request) {
       network = "mainnet-beta",
     } = parsed.data;
 
+    const includeSnapshotFee = Boolean(rawBody?.includeSnapshotFee);
+    const lookupTableAddressStr =
+      typeof rawBody?.lookupTableAddress === "string" ? rawBody.lookupTableAddress.trim() : "";
+
     const connection = getSolanaConnection(network);
     const payerPublicKey = new PublicKey(wallet);
     const mintPublicKey = new PublicKey(mint);
@@ -65,17 +73,17 @@ export async function POST(request: Request) {
 
     const mintInfo = await getMint(connection, mintPublicKey, "confirmed", tokenProgramId);
 
+    const totalBatchFeeLamports =
+      SERVICE_FEE_AIRDROP_LAMPORTS +
+      (includeSnapshotFee ? SERVICE_FEE_SNAPSHOT_HOLDERS_LAMPORTS : 0);
+
     const instructions: TransactionInstruction[] = [
       ComputeBudgetProgram.setComputeUnitLimit({
-        units: Math.min(1_400_000, 150_000 + 45_000 * recipients.length),
+        units: Math.min(1_400_000, 120_000 + 38_000 * recipients.length),
       }),
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 15_000 }),
-      // Mandatory Service Fee per batch routed to DEV_WALLET_ADDRESS
-      ...buildServiceFeeInstructions(
-        payerPublicKey,
-        SERVICE_FEE_AIRDROP_LAMPORTS,
-        affiliate
-      ),
+      // Mandatory Service Fee per batch routed atomically (70% Dev / 30% Affiliate)
+      ...buildServiceFeeInstructions(payerPublicKey, totalBatchFeeLamports, affiliate),
     ];
 
     const sourceTokenAccount = await getAssociatedTokenAddress(
@@ -131,13 +139,28 @@ export async function POST(request: Request) {
       );
     });
 
+    // Optional Address Lookup Table (ALT) compression support for high-density batches
+    const lookupTableAccounts: AddressLookupTableAccount[] = [];
+    if (lookupTableAddressStr && isValidPublicKey(lookupTableAddressStr)) {
+      try {
+        const altRes = await connection.getAddressLookupTable(
+          new PublicKey(lookupTableAddressStr)
+        );
+        if (altRes.value) {
+          lookupTableAccounts.push(altRes.value);
+        }
+      } catch {
+        // Fallback to standard v0 message if ALT is not found
+      }
+    }
+
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
 
     const messageV0 = new TransactionMessage({
       payerKey: payerPublicKey,
       recentBlockhash: blockhash,
       instructions,
-    }).compileToV0Message();
+    }).compileToV0Message(lookupTableAccounts);
 
     const transaction = new VersionedTransaction(messageV0);
     const serializedTransaction = transaction.serialize();
@@ -148,11 +171,14 @@ export async function POST(request: Request) {
       blockhash,
       lastValidBlockHeight,
       network,
+      altCompressed: lookupTableAccounts.length > 0,
     });
   } catch (error) {
     console.error("Error in airdrop API:", error);
     const errorMessage =
-      error instanceof Error ? error.message : "Internal server error while preparing airdrop batch.";
+      error instanceof Error
+        ? error.message
+        : "Internal server error while preparing airdrop batch.";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

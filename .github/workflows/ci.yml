@@ -1,0 +1,40 @@
+name: CI — Lint, Typecheck, Unit Tests & Production Build
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  quality-and-security:
+    name: Lint, Typecheck, Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript Typecheck
+        run: npm run typecheck
+
+      - name: Run Unit & Security Test Suite (Vitest)
+        run: npm run test
+
+      - name: Verify Next.js Production Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SOLANA_NETWORK: "mainnet-beta"
+          NEXT_PUBLIC_DEV_WALLET_ADDRESS: "CP6teSg2LUxQsSBBtwZ9xjG2aZjjznhfCvGED9LNgjrJ"

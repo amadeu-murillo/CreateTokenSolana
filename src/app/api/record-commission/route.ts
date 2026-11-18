@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
 import { db, inMemoryCommissionStore, isFirebaseConfigured } from "@/lib/firebase";
 import {
-  checkRateLimit,
+  AFFILIATE_COMMISSION_RATE,
+  DEV_AFFILIATE_SHARE_RATE,
+  DEV_WALLET_ADDRESS_STRING,
+} from "@/lib/constants";
+import {
+  checkRateLimitAsync,
   getClientIp,
   recordCommissionRequestSchema,
   sanitizeErrorMessage,
@@ -12,11 +17,94 @@ import { getSolanaConnection } from "@/lib/services/solanaHelpers";
 
 export const dynamic = "force-dynamic";
 
+const SYSTEM_PROGRAM_ID_STR = SystemProgram.programId.toBase58();
+
+/**
+ * Extracts verified SystemProgram.transfer lamports sent by `tokenCreatorWallet`
+ * to `DEV_WALLET_ADDRESS_STRING` and `affiliateWallet` from a parsed on-chain transaction.
+ */
+function extractVerifiedAffiliateSplitFromParsedTx(params: {
+  parsedTx: NonNullable<Awaited<ReturnType<ReturnType<typeof getSolanaConnection>["getParsedTransaction"]>>>;
+  tokenCreatorWallet: string;
+  affiliateWallet: string;
+}): {
+  devLamports: number;
+  affiliateLamports: number;
+  validSplit: boolean;
+} {
+  const { parsedTx, tokenCreatorWallet, affiliateWallet } = params;
+  let devLamports = 0;
+  let affiliateLamports = 0;
+
+  const inspectInstructionList = (instructions: unknown[]) => {
+    for (const rawIx of instructions) {
+      if (!rawIx || typeof rawIx !== "object") continue;
+      const ix = rawIx as {
+        programId?: { toBase58?: () => string } | string;
+        parsed?: {
+          type?: string;
+          info?: {
+            source?: string;
+            destination?: string;
+            lamports?: number | string;
+          };
+        };
+      };
+
+      const progId =
+        typeof ix.programId === "string"
+          ? ix.programId
+          : typeof ix.programId?.toBase58 === "function"
+          ? ix.programId.toBase58()
+          : "";
+
+      if (progId === SYSTEM_PROGRAM_ID_STR && ix.parsed?.type === "transfer") {
+        const source = ix.parsed.info?.source;
+        const destination = ix.parsed.info?.destination;
+        const lamports = Number(ix.parsed.info?.lamports || 0);
+
+        if (source === tokenCreatorWallet && lamports > 0) {
+          if (destination === DEV_WALLET_ADDRESS_STRING) {
+            devLamports += lamports;
+          } else if (destination === affiliateWallet) {
+            affiliateLamports += lamports;
+          }
+        }
+      }
+    }
+  };
+
+  inspectInstructionList(parsedTx.transaction.message.instructions as unknown[]);
+  if (Array.isArray(parsedTx.meta?.innerInstructions)) {
+    for (const inner of parsedTx.meta.innerInstructions) {
+      if (Array.isArray(inner?.instructions)) {
+        inspectInstructionList(inner.instructions as unknown[]);
+      }
+    }
+  }
+
+  if (devLamports <= 0 || affiliateLamports <= 0) {
+    return { devLamports, affiliateLamports, validSplit: false };
+  }
+
+  // Verify the 30% affiliate / 70% dev wallet split ratio on-chain (within 5 lamports rounding tolerance)
+  const totalFeeLamports = devLamports + affiliateLamports;
+  const expectedAffiliateLamports = Math.round(
+    totalFeeLamports * AFFILIATE_COMMISSION_RATE
+  );
+  const expectedDevLamports = Math.round(totalFeeLamports * DEV_AFFILIATE_SHARE_RATE);
+
+  const validSplit =
+    Math.abs(affiliateLamports - expectedAffiliateLamports) <= 5 &&
+    Math.abs(devLamports - expectedDevLamports) <= 5;
+
+  return { devLamports, affiliateLamports, validSplit };
+}
 
 export async function POST(request: Request) {
   try {
     const clientIp = getClientIp(request);
-    const rateLimit = checkRateLimit(`record-commission:${clientIp}`, 10, 60_000);
+    const rateLimit = await checkRateLimitAsync(`record-commission:${clientIp}`, 10, 60_000);
 
     if (!rateLimit.allowed) {
       return NextResponse.json(
@@ -37,20 +125,24 @@ export async function POST(request: Request) {
 
     const {
       affiliateWallet,
-      commissionAmountSOL,
       transactionSignature,
       tokenCreatorWallet,
       mintAddress,
       network = "mainnet-beta",
     } = parsed.data;
 
-    if (affiliateWallet === tokenCreatorWallet) {
+    // 1. Block self-affiliation and Dev Wallet spoofing
+    if (
+      affiliateWallet === tokenCreatorWallet ||
+      affiliateWallet === DEV_WALLET_ADDRESS_STRING
+    ) {
       return NextResponse.json(
-        { error: "Self-referral is not permitted." },
+        { error: "Self-referral or Dev Wallet referral is not permitted." },
         { status: 400 }
       );
     }
 
+    // 2. Prevent duplicate recording by signature
     if (inMemoryCommissionStore.has(transactionSignature)) {
       return NextResponse.json(
         { error: "This transaction signature has already been recorded." },
@@ -69,6 +161,7 @@ export async function POST(request: Request) {
       }
     }
 
+    // 3. Fetch transaction from RPC and verify on-chain transfers (NEVER trust client commissionAmountSOL)
     const connection = getSolanaConnection(network);
     const parsedTx = await connection.getParsedTransaction(transactionSignature, {
       maxSupportedTransactionVersion: 0,
@@ -86,21 +179,45 @@ export async function POST(request: Request) {
       typeof k === "string" ? k : k.pubkey.toBase58()
     );
 
-    if (!accountKeys.includes(tokenCreatorWallet) || !accountKeys.includes(affiliateWallet)) {
+    if (accountKeys[0] !== tokenCreatorWallet) {
       return NextResponse.json(
-        { error: "Provided wallets did not participate in the verified on-chain transaction." },
+        { error: "Transaction fee payer does not match tokenCreatorWallet." },
         { status: 400 }
       );
     }
 
-    const affiliateKeyIndex = accountKeys.indexOf(affiliateWallet);
-    const preBalance = parsedTx.meta?.preBalances?.[affiliateKeyIndex] ?? 0;
-    const postBalance = parsedTx.meta?.postBalances?.[affiliateKeyIndex] ?? 0;
-    const actualReceivedLamports = Math.max(0, postBalance - preBalance);
-    const verifiedCommissionSol =
-      actualReceivedLamports > 0
-        ? actualReceivedLamports / LAMPORTS_PER_SOL
-        : Number(commissionAmountSOL);
+    if (
+      !accountKeys.includes(affiliateWallet) ||
+      !accountKeys.includes(DEV_WALLET_ADDRESS_STRING)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "On-chain transaction does not contain verified transfers to both the Dev Wallet and Affiliate Wallet.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { devLamports, affiliateLamports, validSplit } =
+      extractVerifiedAffiliateSplitFromParsedTx({
+        parsedTx,
+        tokenCreatorWallet,
+        affiliateWallet,
+      });
+
+    if (!validSplit) {
+      return NextResponse.json(
+        {
+          error: `On-chain transfer verification failed: expected atomic 30%/70% split from ${tokenCreatorWallet}, but found ${affiliateLamports} affiliate lamports and ${devLamports} dev lamports.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const verifiedCommissionSol = Number(
+      (affiliateLamports / LAMPORTS_PER_SOL).toFixed(6)
+    );
 
     inMemoryCommissionStore.set(transactionSignature, {
       affiliateWallet,
@@ -117,6 +234,7 @@ export async function POST(request: Request) {
       await setDoc(commissionRef, {
         affiliateWallet,
         commissionAmountSOL: verifiedCommissionSol,
+        devWalletAmountSOL: Number((devLamports / LAMPORTS_PER_SOL).toFixed(6)),
         transactionSignature,
         tokenCreatorWallet,
         mintAddress,
@@ -128,6 +246,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
+      verifiedCommissionSol,
       message: "Commission verified on-chain and recorded successfully.",
     });
   } catch (error) {

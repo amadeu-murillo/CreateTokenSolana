@@ -3,7 +3,6 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
-  ComputeBudgetProgram,
   TransactionMessage,
   VersionedTransaction,
   TransactionInstruction,
@@ -24,6 +23,7 @@ import {
 } from "@/lib/constants";
 import { toRawTokenAmount } from "@/lib/security";
 import {
+  buildDynamicComputeBudgetInstructions,
   buildMetaplexMetadataInstructions,
   buildServiceFeeInstructions,
   getSolanaConnection,
@@ -40,9 +40,10 @@ export interface CreateSplTokenParams {
   freezeAuthority: boolean;
   isMetadataMutable: boolean;
   customCreatorInfo?: boolean;
-  vanitySecretKey?: number[];
+  vanityPublicKey?: string;
   vanityCharLength?: number;
   hasJitoBundle?: boolean;
+  isMultiWalletBundle?: boolean;
   affiliate?: string | null;
   network?: SolanaCluster;
 }
@@ -59,18 +60,22 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
     freezeAuthority,
     isMetadataMutable,
     customCreatorInfo = false,
-    vanitySecretKey,
+    vanityPublicKey,
     vanityCharLength = 0,
     hasJitoBundle = false,
+    isMultiWalletBundle = false,
     affiliate,
     network = "mainnet-beta",
   } = params;
 
   const userPublicKey = new PublicKey(wallet);
-  const mintKeypair =
-    Array.isArray(vanitySecretKey) && vanitySecretKey.length === 64
-      ? Keypair.fromSecretKey(Uint8Array.from(vanitySecretKey))
-      : Keypair.generate();
+  // Phase 1.6: If the client generated a vanity mint, only its PublicKey is sent to the server;
+  // the client signs partially with the vanity Keypair locally in the browser.
+  const serverGeneratedMintKeypair = vanityPublicKey ? null : Keypair.generate();
+  const mintPublicKey = vanityPublicKey
+    ? new PublicKey(vanityPublicKey)
+    : serverGeneratedMintKeypair!.publicKey;
+
   const connection = getSolanaConnection(network);
 
   const rawSupply = toRawTokenAmount(supply, decimals);
@@ -88,6 +93,7 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
       hasTransferFeeExtension: false,
       vanityCharLength,
       hasJitoBundle,
+      isMultiWalletBundle,
     });
 
   const estimatedRentAndMetaplexLamports = rentLamports + Math.round(0.018 * LAMPORTS_PER_SOL);
@@ -104,25 +110,23 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
   }
 
   const associatedTokenAccount = await getAssociatedTokenAddress(
-    mintKeypair.publicKey,
+    mintPublicKey,
     userPublicKey,
     false,
     TOKEN_PROGRAM_ID
   );
 
-  const instructions: TransactionInstruction[] = [
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 420_000 }),
-    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
+  const coreInstructions: TransactionInstruction[] = [
     ...buildServiceFeeInstructions(userPublicKey, modularFeeLamports, affiliate),
     SystemProgram.createAccount({
       fromPubkey: userPublicKey,
-      newAccountPubkey: mintKeypair.publicKey,
+      newAccountPubkey: mintPublicKey,
       space: MINT_SIZE,
       lamports: rentLamports,
       programId: TOKEN_PROGRAM_ID,
     }),
     createInitializeMint2Instruction(
-      mintKeypair.publicKey,
+      mintPublicKey,
       decimals,
       userPublicKey,
       userPublicKey,
@@ -132,11 +136,11 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
       userPublicKey,
       associatedTokenAccount,
       userPublicKey,
-      mintKeypair.publicKey,
+      mintPublicKey,
       TOKEN_PROGRAM_ID
     ),
     createMintToInstruction(
-      mintKeypair.publicKey,
+      mintPublicKey,
       associatedTokenAccount,
       userPublicKey,
       rawSupply,
@@ -145,7 +149,7 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
     ),
     ...buildMetaplexMetadataInstructions({
       userPublicKey,
-      mintPublicKey: mintKeypair.publicKey,
+      mintPublicKey,
       name,
       symbol,
       metadataUri,
@@ -156,9 +160,9 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
   ];
 
   if (!freezeAuthority) {
-    instructions.push(
+    coreInstructions.push(
       createSetAuthorityInstruction(
-        mintKeypair.publicKey,
+        mintPublicKey,
         userPublicKey,
         AuthorityType.FreezeAccount,
         null,
@@ -169,9 +173,9 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
   }
 
   if (!mintAuthority) {
-    instructions.push(
+    coreInstructions.push(
       createSetAuthorityInstruction(
-        mintKeypair.publicKey,
+        mintPublicKey,
         userPublicKey,
         AuthorityType.MintTokens,
         null,
@@ -180,6 +184,16 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
       )
     );
   }
+
+  const computeBudgetIxs = await buildDynamicComputeBudgetInstructions({
+    connection,
+    payerKey: userPublicKey,
+    instructions: coreInstructions,
+    defaultUnits: 420_000,
+    defaultMicroLamports: 25_000,
+  });
+
+  const instructions: TransactionInstruction[] = [...computeBudgetIxs, ...coreInstructions];
 
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
 
@@ -190,14 +204,17 @@ export async function createSplTokenTransaction(params: CreateSplTokenParams) {
   }).compileToV0Message();
 
   const transaction = new VersionedTransaction(messageV0);
-  transaction.sign([mintKeypair]);
+  if (serverGeneratedMintKeypair) {
+    transaction.sign([serverGeneratedMintKeypair]);
+  }
 
   const serializedTransaction = transaction.serialize();
   const base64Transaction = Buffer.from(serializedTransaction).toString("base64");
 
   return {
     transaction: base64Transaction,
-    mintAddress: mintKeypair.publicKey.toBase58(),
+    mintAddress: mintPublicKey.toBase58(),
+    requiresClientMintSignature: Boolean(vanityPublicKey),
     serviceFeeSol: modularFeeSol,
     blockhash,
     lastValidBlockHeight,

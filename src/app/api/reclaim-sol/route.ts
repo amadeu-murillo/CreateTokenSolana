@@ -31,7 +31,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-
 interface ReclaimAccountItem {
   pubkey: string;
   programId: string;
@@ -116,7 +115,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Phase 4: Deduct 15% service fee from total reclaimed rent atomically in the same transaction
+    // Deduct 8% platform fee (92% net to user) from total reclaimed rent atomically in the same transaction
+    // with 30% affiliate / 70% Dev Wallet split via buildServiceFeeInstructions
     const serviceFeeLamports = Math.max(
       1_000,
       Math.round(totalReclaimedLamports * RECLAIM_SOL_SERVICE_FEE_RATE)
@@ -147,6 +147,8 @@ export async function POST(request: NextRequest) {
       grossReclaimedSol: Number(grossSol.toFixed(6)),
       serviceFeeSol: Number(feeSol.toFixed(6)),
       netUserSol: Number(netUserSol.toFixed(6)),
+      platformFeeRate: RECLAIM_SOL_SERVICE_FEE_RATE,
+      netUserRate: Number((1 - RECLAIM_SOL_SERVICE_FEE_RATE).toFixed(2)),
       blockhash,
       lastValidBlockHeight,
       network: targetNetwork,

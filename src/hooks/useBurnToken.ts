@@ -2,7 +2,11 @@ import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import { useCluster } from "@/context/WalletContext";
-import { MAX_CLOSE_ACCOUNTS_PER_TX } from "@/lib/constants";
+import {
+  MAX_CLOSE_ACCOUNTS_PER_TX,
+  SERVICE_FEE_BURN_AND_EARN_SOL,
+  SERVICE_FEE_BURN_TOKEN_SOL,
+} from "@/lib/constants";
 import { verifyTransactionIntegrity } from "@/lib/security";
 import { parseSolanaError } from "./useErrorHandler";
 import type { EmptyTokenAccount } from "./useUserTokens";
@@ -28,7 +32,12 @@ export const useBurnToken = () => {
   const [reclaimResult, setReclaimResult] = useState<ReclaimSolResult | null>(null);
 
   const burnToken = useCallback(
-    async (mint: string, amount: number, programId: string) => {
+    async (
+      mint: string,
+      amount: number | string,
+      programId: string,
+      burnMode: "burn" | "burn-and-earn" = "burn"
+    ) => {
       if (!publicKey || !sendTransaction) {
         setError("Wallet not connected.");
         return null;
@@ -52,14 +61,20 @@ export const useBurnToken = () => {
           affiliateRef = null;
         }
 
+        const expectedFeeSol =
+          burnMode === "burn-and-earn"
+            ? SERVICE_FEE_BURN_AND_EARN_SOL
+            : SERVICE_FEE_BURN_TOKEN_SOL;
+
         const response = await fetch("/api/burn-token", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             mint,
-            amount,
+            amount: String(amount),
             wallet: publicKey.toBase58(),
             programId,
+            burnMode,
             affiliate: affiliateRef,
             network: cluster,
           }),
@@ -74,29 +89,51 @@ export const useBurnToken = () => {
         const transactionBuffer = Buffer.from(result.transaction, "base64");
         const transaction = VersionedTransaction.deserialize(new Uint8Array(transactionBuffer));
 
-        const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58());
+        const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58(), {
+          operation: burnMode === "burn-and-earn" ? "burnAndEarn" : "burnToken",
+          expectedServiceFeeSol: result.serviceFeeSol ?? expectedFeeSol,
+          affiliateWallet: affiliateRef,
+        });
         if (!integrity.valid) {
           throw new Error(
             integrity.reason || "Transaction failed client-side security verification."
           );
         }
 
-        const simulation = await connection.simulateTransaction(transaction, {
-          sigVerify: false,
-          replaceRecentBlockhash: true,
-          commitment: "confirmed",
-        });
+        try {
+          const simulation = await connection.simulateTransaction(transaction, {
+            sigVerify: false,
+            replaceRecentBlockhash: true,
+            commitment: "confirmed",
+          });
 
-        if (simulation.value.err) {
-          throw new Error(
-            `Burn simulation failed before signing: ${JSON.stringify(simulation.value.err)}`
-          );
+          if (simulation?.value?.err) {
+            console.error(
+              "Burn simulation failed:",
+              simulation.value.err,
+              simulation.value.logs
+            );
+            const logsStr = Array.isArray(simulation.value.logs)
+              ? simulation.value.logs.join(" | ")
+              : "";
+            throw new Error(
+              `Burn simulation failed: ${JSON.stringify(simulation.value.err)} ${logsStr}`
+            );
+          }
+        } catch (simErr) {
+          if (simErr instanceof Error && simErr.message.startsWith("Burn simulation failed:")) {
+            throw simErr;
+          }
+          console.warn("Non-fatal burn pre-simulation warning (proceeding to wallet):", simErr);
         }
 
         setProgressStep(3);
         setStatusStep("Stage 3/5: Waiting for signature approval in your wallet...");
 
-        const sig = await sendTransaction(transaction, connection);
+        const sig = await sendTransaction(transaction, connection, {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
 
         setProgressStep(4);
         setStatusStep("Stage 4/5: Confirming permanent burn on Solana blockchain...");
@@ -123,7 +160,7 @@ export const useBurnToken = () => {
         setSignature(sig);
         return sig;
       } catch (err) {
-        setError(parseSolanaError(err, "burn tokens"));
+        setError(parseSolanaError(err, "queimar os tokens"));
         return null;
       } finally {
         setIsLoading(false);
@@ -136,7 +173,7 @@ export const useBurnToken = () => {
 
   /**
    * Phase 4: Closes up to 20 empty token accounts per transaction, returning rent SOL
-   * to the user and routing a 15% service fee atomically to DEV_WALLET_ADDRESS.
+   * to the user and routing an 8% service fee (92% net to user) atomically to DEV_WALLET_ADDRESS.
    */
   const reclaimEmptyAccounts = useCallback(
     async (emptyAccounts: EmptyTokenAccount[]): Promise<ReclaimSolResult | null> => {
@@ -202,7 +239,10 @@ export const useBurnToken = () => {
           const txBuffer = Buffer.from(data.transaction, "base64");
           const transaction = VersionedTransaction.deserialize(new Uint8Array(txBuffer));
 
-          const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58());
+          const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58(), {
+            operation: "reclaimSol",
+            affiliateWallet: affiliateRef,
+          });
           if (!integrity.valid) {
             throw new Error(
               integrity.reason || "Transaction failed client-side security verification."

@@ -4,7 +4,12 @@ import React, { Suspense, useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { getMint, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import {
+  getAssociatedTokenAddress,
+  getMint,
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import {
   Card,
   CardContent,
@@ -62,6 +67,18 @@ interface SnapshotTokenDossier {
   launchScheduleLabel: string;
 }
 
+interface StoredLpPoolRecord {
+  poolId?: string;
+  poolAddress?: string;
+  lpMintAddress?: string;
+  baseVaultAddress?: string;
+  quoteVaultAddress?: string;
+  baseMint?: string;
+  quoteToken?: QuoteAsset;
+  quoteAmount?: number | string;
+  network?: string;
+}
+
 function AddLiquidityPageInner() {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
@@ -110,9 +127,7 @@ function AddLiquidityPageInner() {
   );
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  // Phase 4.1: Raydium CPMM Creator Swap Fee state
-  const [creatorFeeEnabled, setCreatorFeeEnabled] = useState<boolean>(true);
-  const [creatorFeeBps, setCreatorFeeBps] = useState<number>(10); // 0.10% creator fee
+  const [detectedQuoteAsset, setDetectedQuoteAsset] = useState<QuoteAsset>("SOL");
 
   // Phase 3: Jito Anti-Sniper Bundle toggle on Pool Launch
   const [jitoPoolBundleEnabled, setJitoPoolBundleEnabled] = useState<boolean>(false);
@@ -120,8 +135,12 @@ function AddLiquidityPageInner() {
   const [jitoTipSol, setJitoTipSol] = useState<string>("0.002");
 
   const [withdrawPercentage, setWithdrawPercentage] = useState<number>(100);
-  const [derivedWsolVault, setDerivedWsolVault] = useState<string>("");
+  const [customPoolId, setCustomPoolId] = useState<string>("");
+  const [detectedPoolId, setDetectedPoolId] = useState<string>("");
+  const [detectedLpMint, setDetectedLpMint] = useState<string>("");
+  const [detectedQuoteVault, setDetectedQuoteVault] = useState<string>("");
   const [detectedVaultSol, setDetectedVaultSol] = useState<number | null>(null);
+  const [detectedLpBalance, setDetectedLpBalance] = useState<number | null>(null);
   const [isCheckingVault, setIsCheckingVault] = useState<boolean>(false);
 
   const baseLpFeeSol =
@@ -133,8 +152,9 @@ function AddLiquidityPageInner() {
   const feeTiers = useMemo(
     () => [
       { bps: 25, label: "0.25%", badge: t.liquidityPage.tierRecommended },
-      { bps: 30, label: "0.30%", badge: t.liquidityPage.tierStandard },
-      { bps: 100, label: "1.00%", badge: t.liquidityPage.tierHighVol },
+      { bps: 100, label: "1.00%", badge: t.liquidityPage.tierStandard },
+      { bps: 200, label: "2.00%", badge: t.liquidityPage.tierHighVol },
+      { bps: 400, label: "4.00%", badge: "400 bps" },
     ],
     [t]
   );
@@ -153,15 +173,19 @@ function AddLiquidityPageInner() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const mintFromQuery = params.get("mint");
+      const poolIdFromQuery = params.get("poolId");
       const modeFromQuery = params.get("mode");
       if (mintFromQuery && !selectedTokenMint) {
         setSelectedTokenMint(mintFromQuery);
+      }
+      if (poolIdFromQuery && !customPoolId) {
+        setCustomPoolId(poolIdFromQuery);
       }
       if (modeFromQuery === "withdraw") {
         setActiveMode("withdraw");
       }
     }
-  }, [selectedTokenMint]);
+  }, [selectedTokenMint, customPoolId]);
 
   const selectedToken = useMemo(
     () => userTokens.find((tk) => tk.mint === selectedTokenMint) || null,
@@ -177,16 +201,23 @@ function AddLiquidityPageInner() {
   }, [selectedToken, selectedTokenMint]);
 
   const resolvedWithdrawLpMint = useMemo(() => {
+    if (detectedLpMint) return detectedLpMint;
     if (!selectedToken) return undefined;
     if (selectedToken.isLpToken) {
       return selectedToken.mint;
     }
     if (selectedToken.pairedLpMint) {
-      const hasLpInWallet = userTokens.some((tk) => tk.mint === selectedToken.pairedLpMint);
-      if (hasLpInWallet) return selectedToken.pairedLpMint;
+      return selectedToken.pairedLpMint;
     }
     return undefined;
-  }, [selectedToken, userTokens]);
+  }, [selectedToken, detectedLpMint]);
+
+  const resolvedWithdrawPoolId = useMemo(() => {
+    const trimmedCustom = customPoolId.trim();
+    if (trimmedCustom) return trimmedCustom;
+    if (detectedPoolId) return detectedPoolId;
+    return undefined;
+  }, [customPoolId, detectedPoolId]);
 
   useEffect(() => {
     if (!publicKey || !connection) {
@@ -207,48 +238,99 @@ function AddLiquidityPageInner() {
     };
   }, [publicKey, connection, cluster, poolResult, removeResult]);
 
+  // Inspect cached Raydium CPMM pool record + live on-chain vault & LP balances
   useEffect(() => {
     if (!publicKey || !resolvedWithdrawBaseMint || !connection) {
-      setDerivedWsolVault("");
+      setDetectedPoolId("");
+      setDetectedLpMint("");
+      setDetectedQuoteVault("");
       setDetectedVaultSol(null);
+      setDetectedLpBalance(null);
       return;
     }
+
     let mounted = true;
     (async () => {
       setIsCheckingVault(true);
       try {
-        const wsolVaultSeed = `lp_wsol_${resolvedWithdrawBaseMint.slice(0, 16)}`;
-        const vaultPubkey = await PublicKey.createWithSeed(
-          publicKey,
-          wsolVaultSeed,
-          TOKEN_PROGRAM_ID
-        );
-        if (mounted) setDerivedWsolVault(vaultPubkey.toBase58());
+        let poolRecord: StoredLpPoolRecord | undefined;
+        try {
+          const rawMap = localStorage.getItem("createdLpPoolsMap");
+          if (rawMap) {
+            const parsedMap: Record<string, StoredLpPoolRecord> = JSON.parse(rawMap);
+            poolRecord =
+              parsedMap[resolvedWithdrawBaseMint] ||
+              (selectedTokenMint ? parsedMap[selectedTokenMint] : undefined);
+          }
+        } catch {
+          poolRecord = undefined;
+        }
 
-        const accountInfo = await connection.getAccountInfo(vaultPubkey, "confirmed");
-        if (accountInfo && mounted) {
+        const candidatePoolId = poolRecord?.poolId || poolRecord?.poolAddress || "";
+        const candidateLpMint =
+          poolRecord?.lpMintAddress ||
+          (selectedToken?.isLpToken ? selectedToken.mint : selectedToken?.pairedLpMint) ||
+          "";
+        const candidateQuoteVault = poolRecord?.quoteVaultAddress || "";
+
+        if (mounted) {
+          setDetectedPoolId(candidatePoolId);
+          setDetectedLpMint(candidateLpMint);
+          setDetectedQuoteVault(candidateQuoteVault);
+          setDetectedQuoteAsset(poolRecord?.quoteToken === "USDC" ? "USDC" : "SOL");
+        }
+
+        if (candidateQuoteVault) {
           try {
-            const tokenBal = await connection.getTokenAccountBalance(vaultPubkey, "confirmed");
-            setDetectedVaultSol(Number(tokenBal.value.uiAmount || 0));
+            const vaultBal = await connection.getTokenAccountBalance(
+              new PublicKey(candidateQuoteVault),
+              "confirmed"
+            );
+            if (mounted) {
+              setDetectedVaultSol(Number(vaultBal.value.uiAmount || 0));
+            }
           } catch {
-            setDetectedVaultSol(accountInfo.lamports / 1e9);
+            if (mounted) setDetectedVaultSol(null);
           }
         } else if (mounted) {
-          setDetectedVaultSol(0);
-        }
-      } catch {
-        if (mounted) {
-          setDerivedWsolVault("");
           setDetectedVaultSol(null);
+        }
+
+        if (candidateLpMint) {
+          try {
+            const userLpAta = await getAssociatedTokenAddress(
+              new PublicKey(candidateLpMint),
+              publicKey,
+              false,
+              TOKEN_PROGRAM_ID
+            );
+            const lpBal = await connection.getTokenAccountBalance(userLpAta, "confirmed");
+            if (mounted) {
+              setDetectedLpBalance(Number(lpBal.value.uiAmount || 0));
+            }
+          } catch {
+            if (mounted) setDetectedLpBalance(null);
+          }
+        } else if (mounted) {
+          setDetectedLpBalance(null);
         }
       } finally {
         if (mounted) setIsCheckingVault(false);
       }
     })();
+
     return () => {
       mounted = false;
     };
-  }, [publicKey, resolvedWithdrawBaseMint, connection, poolResult, removeResult]);
+  }, [
+    publicKey,
+    resolvedWithdrawBaseMint,
+    selectedTokenMint,
+    selectedToken,
+    connection,
+    poolResult,
+    removeResult,
+  ]);
 
   useEffect(() => {
     if (!selectedToken || !connection) {
@@ -376,12 +458,15 @@ function AddLiquidityPageInner() {
 
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resolvedWithdrawBaseMint) return;
+    const targetBaseMint = resolvedWithdrawBaseMint || resolvedWithdrawPoolId;
+    if (!targetBaseMint) return;
 
     const res = await removeLiquidity({
-      baseMint: resolvedWithdrawBaseMint,
+      baseMint: targetBaseMint,
+      poolId: resolvedWithdrawPoolId,
       lpMint: resolvedWithdrawLpMint,
       withdrawPercentage,
+      programId: selectedToken?.programId,
       network: cluster,
     });
 
@@ -391,6 +476,9 @@ function AddLiquidityPageInner() {
   };
 
   const handleSwitchToWithdrawFromDossier = () => {
+    if (poolResult?.poolAddress) {
+      setCustomPoolId(poolResult.poolAddress);
+    }
     resetPoolState();
     setActiveMode("withdraw");
   };
@@ -497,10 +585,10 @@ function AddLiquidityPageInner() {
                     <div className={styles.dossierHeroHeader}>
                       <div>
                         <span className={styles.livePoolBadge}>
-                          ✓ SOL LIQUIDITY WITHDRAWN ({cluster.toUpperCase()})
+                          ✓ RAYDIUM CPMM {removeResult.lpPairLabel} LIQUIDITY WITHDRAWN ({cluster.toUpperCase()})
                         </span>
                         <CardTitle className={styles.receiptTitle}>
-                          +{removeResult.withdrawnSol.toFixed(6)} SOL
+                          +{removeResult.withdrawnQuote.toFixed(removeResult.quoteToken === "USDC" ? 2 : 6)} {removeResult.quoteToken}
                         </CardTitle>
                       </div>
                     </div>
@@ -510,10 +598,14 @@ function AddLiquidityPageInner() {
                     <div className={styles.dossierSection}>
                       <div className={styles.dossierMetricsGrid}>
                         <div className={styles.dossierMetricBox}>
-                          <span>{t.liquidityPage.estimatedSolUnwrapped}</span>
+                          <span>{removeResult.quoteToken === "USDC" ? "USDC Retornado" : t.liquidityPage.estimatedSolUnwrapped}</span>
                           <strong className={styles.textEmerald}>
-                            {removeResult.withdrawnSol.toFixed(6)} SOL
+                            {removeResult.estimatedQuoteReturned} {removeResult.quoteToken}
                           </strong>
+                        </div>
+                        <div className={styles.dossierMetricBox}>
+                          <span>{isPt ? "Tokens Base Retornados" : "Base Tokens Returned"}</span>
+                          <strong>{removeResult.estimatedBaseReturned}</strong>
                         </div>
                         <div className={styles.dossierMetricBox}>
                           <span>{t.liquidityPage.selectedShareLabel}</span>
@@ -532,9 +624,21 @@ function AddLiquidityPageInner() {
                       <div className={styles.addressDirectory}>
                         {[
                           {
-                            key: "wsolVault",
-                            label: "WSOL Vault",
-                            value: removeResult.wsolVaultAddress,
+                            key: "poolId",
+                            label: "Raydium CPMM Pool ID",
+                            value: removeResult.poolId,
+                            explorerType: "account" as const,
+                          },
+                          {
+                            key: "lpMint",
+                            label: "LP Token Mint",
+                            value: removeResult.lpMint,
+                            explorerType: "token" as const,
+                          },
+                          {
+                            key: "quoteVault",
+                            label: `${removeResult.lpPairLabel} Quote Vault (${removeResult.quoteToken})`,
+                            value: removeResult.quoteVaultAddress,
                             explorerType: "account" as const,
                           },
                           {
@@ -543,31 +647,33 @@ function AddLiquidityPageInner() {
                             value: removeResult.signature,
                             explorerType: "tx" as const,
                           },
-                        ].map((item) => (
-                          <div key={item.key} className={styles.addressRow}>
-                            <div className={styles.addressHeader}>
-                              <span>{item.label}</span>
-                              <div className={styles.addressActions}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopy(item.value, item.key)}
-                                  className={styles.copyBtnSmall}
-                                >
-                                  {copiedKey === item.key ? t.common.copied : t.common.copy}
-                                </button>
-                                <a
-                                  href={getExplorerUrl(item.explorerType, item.value)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={styles.solscanBtnSmall}
-                                >
-                                  {t.common.viewOnSolscan}
-                                </a>
+                        ]
+                          .filter((item) => Boolean(item.value))
+                          .map((item) => (
+                            <div key={item.key} className={styles.addressRow}>
+                              <div className={styles.addressHeader}>
+                                <span>{item.label}</span>
+                                <div className={styles.addressActions}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopy(item.value, item.key)}
+                                    className={styles.copyBtnSmall}
+                                  >
+                                    {copiedKey === item.key ? t.common.copied : t.common.copy}
+                                  </button>
+                                  <a
+                                    href={getExplorerUrl(item.explorerType, item.value)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={styles.solscanBtnSmall}
+                                  >
+                                    {t.common.viewOnSolscan}
+                                  </a>
+                                </div>
                               </div>
+                              <code>{item.value}</code>
                             </div>
-                            <code>{item.value}</code>
-                          </div>
-                        ))}
+                          ))}
                       </div>
                     </div>
                   </CardContent>
@@ -646,6 +752,27 @@ function AddLiquidityPageInner() {
                       />
                     </div>
 
+                    <div className={styles.field}>
+                      <Label htmlFor="customPoolId">
+                        {isPt
+                          ? "Raydium CPMM Pool ID (Opcional — descoberto automaticamente via Token/LP Mint)"
+                          : "Raydium CPMM Pool ID (Optional — auto-discovered via Token/LP Mint)"}
+                      </Label>
+                      <Input
+                        id="customPoolId"
+                        type="text"
+                        placeholder={
+                          detectedPoolId ||
+                          (isPt
+                            ? "Ex: Endereço do Pool CPMM na Raydium..."
+                            : "e.g. Raydium CPMM Pool Address...")
+                        }
+                        value={customPoolId}
+                        onChange={(e) => setCustomPoolId(e.target.value)}
+                        disabled={isRemovingLiquidity}
+                      />
+                    </div>
+
                     {resolvedWithdrawBaseMint && (
                       <div className={styles.vaultStatusCard}>
                         <div className={styles.vaultStatusHeader}>
@@ -658,13 +785,25 @@ function AddLiquidityPageInner() {
                             {isCheckingVault
                               ? t.liquidityPage.inspectingVault
                               : detectedVaultSol !== null && detectedVaultSol > 0
-                                ? `${detectedVaultSol.toFixed(6)} WSOL`
-                                : t.liquidityPage.readyToUnwrap}
+                                ? `${detectedVaultSol.toFixed(4)} ${detectedQuoteAsset} in Pool Vault (LP-${detectedQuoteAsset})`
+                                : detectedLpBalance !== null && detectedLpBalance > 0
+                                  ? `${detectedLpBalance.toFixed(4)} LP-${detectedQuoteAsset}`
+                                  : t.liquidityPage.readyToUnwrap}
                           </span>
                         </div>
-                        {derivedWsolVault && (
+                        {resolvedWithdrawPoolId && (
                           <span className={styles.vaultAddressMono}>
-                            WSOL Vault: {derivedWsolVault}
+                            Pool ID: {resolvedWithdrawPoolId}
+                          </span>
+                        )}
+                        {resolvedWithdrawLpMint && (
+                          <span className={styles.vaultAddressMono}>
+                            LP Mint: {resolvedWithdrawLpMint}
+                          </span>
+                        )}
+                        {detectedQuoteVault && (
+                          <span className={styles.vaultAddressMono}>
+                            Quote Vault: {detectedQuoteVault}
                           </span>
                         )}
                       </div>
@@ -702,9 +841,9 @@ function AddLiquidityPageInner() {
                           <strong>{withdrawPercentage}%</strong>
                         </div>
                         <div className={styles.metricCard}>
-                          <span>{t.liquidityPage.estimatedSolUnwrapped}</span>
+                          <span>{detectedQuoteAsset === "USDC" ? "USDC Estimado (LP-USDC)" : t.liquidityPage.estimatedSolUnwrapped}</span>
                           <strong className={styles.textEmerald}>
-                            ~{simulatedGrossSol.toFixed(4)} SOL
+                            ~{simulatedGrossSol.toFixed(4)} {detectedQuoteAsset}
                           </strong>
                         </div>
                         <div className={styles.metricCard}>
@@ -727,7 +866,11 @@ function AddLiquidityPageInner() {
                     <Button
                       type="submit"
                       className="w-full"
-                      disabled={isRemovingLiquidity || !resolvedWithdrawBaseMint || !publicKey}
+                      disabled={
+                        isRemovingLiquidity ||
+                        (!resolvedWithdrawBaseMint && !resolvedWithdrawPoolId) ||
+                        !publicKey
+                      }
                     >
                       {isRemovingLiquidity
                         ? removeStatusStep || t.liquidityPage.withdrawingStatus
@@ -753,7 +896,7 @@ function AddLiquidityPageInner() {
                       />
                       <div>
                         <span className={styles.livePoolBadge}>
-                          ✓ LIQUIDITY POOL LIVE ({cluster.toUpperCase()})
+                          ✓ RAYDIUM CPMM POOL LIVE ({cluster.toUpperCase()})
                         </span>
                         <CardTitle className={styles.receiptTitle}>
                           {tokenDossierSnapshot?.name || "Token"} (
@@ -806,7 +949,7 @@ function AddLiquidityPageInner() {
                         },
                         {
                           key: "poolPda",
-                          label: "Pool PDA",
+                          label: "Raydium Pool ID",
                           value: poolResult.poolAddress,
                           explorerType: "account" as const,
                         },
@@ -815,6 +958,18 @@ function AddLiquidityPageInner() {
                           label: "LP Mint",
                           value: poolResult.lpMintAddress,
                           explorerType: "token" as const,
+                        },
+                        {
+                          key: "baseVault",
+                          label: "Base Vault",
+                          value: poolResult.baseVaultAddress,
+                          explorerType: "account" as const,
+                        },
+                        {
+                          key: "quoteVault",
+                          label: "Quote Vault",
+                          value: poolResult.quoteVaultAddress,
+                          explorerType: "account" as const,
                         },
                         {
                           key: "txSig",
@@ -918,84 +1073,16 @@ function AddLiquidityPageInner() {
                       <button
                         type="button"
                         onClick={() => setDex("raydium-cpmm")}
-                        className={`${styles.dexOption} ${
-                          dex === "raydium-cpmm" ? styles.dexOptionActive : ""
-                        }`}
+                        className={`${styles.dexOption} ${styles.dexOptionActive}`}
                       >
                         <div className={styles.dexHeader}>
                           <strong>Raydium CPMM Vault</strong>
-                          <span className={styles.dexBadge}>SPL & Token-2022 + Creator Fee</span>
+                          <span className={styles.dexBadge}>SPL & Token-2022 Official SDK v2</span>
                         </div>
                         <p>{t.liquidityPage.raydiumDesc}</p>
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setDex("meteora-damm")}
-                        className={`${styles.dexOption} ${
-                          dex === "meteora-damm" ? styles.dexOptionActive : ""
-                        }`}
-                      >
-                        <div className={styles.dexHeader}>
-                          <strong>Meteora Dynamic AMM</strong>
-                          <span className={styles.dexBadge}>Dynamic Fees</span>
-                        </div>
-                        <p>{t.liquidityPage.meteoraDesc}</p>
-                      </button>
                     </div>
                   </div>
-
-                  {/* Phase 4.1: Native Raydium CPMM Creator Swap Fee */}
-                  {dex === "raydium-cpmm" && (
-                    <div
-                      style={{
-                        padding: "0.85rem 1rem",
-                        borderRadius: "0.75rem",
-                        border: "1px solid rgba(20, 241, 149, 0.35)",
-                        background: "rgba(20, 241, 149, 0.06)",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                        gap: "0.75rem",
-                      }}
-                    >
-                      <div>
-                        <strong style={{ fontSize: "0.88rem", color: "#14f195" }}>
-                          💎 {isPt ? "Raydium CPMM Creator Swap Fee (Receita Passiva por Swap)" : "Raydium CPMM Creator Swap Fee (Passive Swap Revenue)"}
-                        </strong>
-                        <p style={{ fontSize: "0.78rem", color: "hsl(var(--muted-foreground))", marginTop: "0.15rem" }}>
-                          {isPt
-                            ? "Receba automaticamente uma fração das taxas de cada swap no pool (suportado para SPL e Token-2022)."
-                            : "Automatically earn a fraction of swap fees on every trade in the pool (supported for SPL & Token-2022)."}
-                        </p>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                        <select
-                          value={creatorFeeBps}
-                          onChange={(e) => setCreatorFeeBps(Number(e.target.value))}
-                          disabled={!creatorFeeEnabled}
-                          style={{
-                            padding: "0.35rem 0.6rem",
-                            borderRadius: "0.5rem",
-                            background: "#09090b",
-                            color: "#f8fafc",
-                            border: "1px solid rgba(255,255,255,0.2)",
-                            fontSize: "0.78rem",
-                          }}
-                        >
-                          <option value={5}>0.05% Creator Share</option>
-                          <option value={10}>0.10% Creator Share</option>
-                          <option value={25}>0.25% Creator Share</option>
-                        </select>
-                        <input
-                          type="checkbox"
-                          checked={creatorFeeEnabled}
-                          onChange={(e) => setCreatorFeeEnabled(e.target.checked)}
-                        />
-                      </div>
-                    </div>
-                  )}
 
                   <div className={styles.field}>
                     <div className={styles.labelRow}>
@@ -1117,10 +1204,20 @@ function AddLiquidityPageInner() {
                       background: "rgba(153, 69, 255, 0.08)",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "0.75rem",
+                      }}
+                    >
                       <div>
                         <strong style={{ fontSize: "0.88rem", color: "#c4b5fd" }}>
-                          ⚡ {isPt ? `Jito Atomic Bundle: Pool + 1ª Compra Anti-Sniper (+${MODULAR_FEE_JITO_BUNDLE_SOL.toFixed(2)} SOL)` : `Jito Atomic Bundle: Pool + Anti-Sniper First Buy (+${MODULAR_FEE_JITO_BUNDLE_SOL.toFixed(2)} SOL)`}
+                          ⚡{" "}
+                          {isPt
+                            ? `Jito Atomic Bundle: Pool + 1ª Compra Anti-Sniper (+${MODULAR_FEE_JITO_BUNDLE_SOL.toFixed(2)} SOL)`
+                            : `Jito Atomic Bundle: Pool + Anti-Sniper First Buy (+${MODULAR_FEE_JITO_BUNDLE_SOL.toFixed(2)} SOL)`}
                         </strong>
                         <p style={{ fontSize: "0.78rem", color: "hsl(var(--muted-foreground))" }}>
                           {isPt
@@ -1138,7 +1235,9 @@ function AddLiquidityPageInner() {
                     {jitoPoolBundleEnabled && (
                       <div className={styles.fieldGrid} style={{ marginTop: "0.75rem" }}>
                         <div className={styles.field}>
-                          <Label>{isPt ? "1ª Compra do Criador (SOL)" : "Creator First Buy (SOL)"}</Label>
+                          <Label>
+                            {isPt ? "1ª Compra do Criador (SOL)" : "Creator First Buy (SOL)"}
+                          </Label>
                           <Input
                             type="number"
                             step="0.05"
@@ -1148,7 +1247,11 @@ function AddLiquidityPageInner() {
                           />
                         </div>
                         <div className={styles.field}>
-                          <Label>{isPt ? "Gorjeta Jito (0.001–0.01 SOL)" : "Jito Validator Tip (SOL)"}</Label>
+                          <Label>
+                            {isPt
+                              ? "Gorjeta Jito (0.001–0.01 SOL)"
+                              : "Jito Validator Tip (SOL)"}
+                          </Label>
                           <Input
                             type="number"
                             step="0.001"
@@ -1265,6 +1368,7 @@ function AddLiquidityPageInner() {
         <aside className={styles.sidebar}>
           <CostSummary
             operation={activeMode === "add" ? "createLiquidityPool" : "removeLiquidity"}
+            liquiditySol={activeMode === "add" && quoteToken === "SOL" ? numericQuote : 0}
           />
 
           <Card>

@@ -350,10 +350,15 @@ function BurnPageContent() {
     reset();
 
     if (selectedToken && numericAmount > 0) {
+      const exactAmountToSend =
+        Math.abs(numericAmount - walletBalance) <= 1e-6
+          ? selectedToken.amount
+          : amount.trim();
       const signature = await burnToken(
         selectedToken.mint,
-        numericAmount,
-        selectedToken.programId
+        exactAmountToSend,
+        selectedToken.programId,
+        burnMode
       );
       if (signature) {
         const cleanSymbol =

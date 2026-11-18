@@ -4,74 +4,58 @@ import { useState, useEffect } from "react";
 import styles from "./CostSummary.module.css";
 import { useLanguage } from "@/context/LanguageContext";
 import {
+  DEFAULT_MODULAR_PRICING_OPTIONS,
   DEV_WALLET_ADDRESS,
   ESTIMATED_ATA_RENT_SOL,
+  ESTIMATED_LP_POOL_RENT_SOL,
   ModularPricingOptions,
+  OPERATION_SERVICE_FEES_SOL,
+  Operation,
+  RAYDIUM_PROTOCOL_CREATE_POOL_FEE_SOL,
+  RECLAIM_SOL_SERVICE_FEE_RATE,
   calculateModularTokenCreationFee,
-  SERVICE_FEE_BURN_TOKEN_SOL,
-  SERVICE_FEE_BURN_AND_EARN_SOL,
-  SERVICE_FEE_AIRDROP_SOL,
-  SERVICE_FEE_MANAGE_AUTHORITY_SOL,
-  SERVICE_FEE_CLAIM_WITHHELD_TAX_SOL,
-  SERVICE_FEE_CREATE_LP_SOL,
-  SERVICE_FEE_REMOVE_LP_SOL,
+  computeRateSplitPercent,
+  computeSplit,
+  formatSolAmount,
 } from "@/lib/constants";
+import { isValidPublicKey } from "@/lib/security";
 
-export interface Costs {
-  createToken: string;
-  burnToken: string;
-  burnAndEarn?: string;
-  airdrop: string;
-  manageAuthority: string;
-  claimWithheldTax?: string;
-  createLiquidityPool: string;
-  removeLiquidity: string;
-}
+export type { Operation };
 
-export type Operation = keyof Costs;
+export type Costs = Record<Operation, string>;
 
 export interface CostSummaryProps {
   operation?: Operation;
   modularOptions?: ModularPricingOptions;
+  liquiditySol?: number;
 }
 
-const DEFAULT_MODULAR_OPTIONS: ModularPricingOptions = {
-  revokeFreeze: true,
-  revokeMint: true,
-  immutableMetadata: true,
-  customCreatorInfo: false,
-  hasTransferFeeExtension: false,
-  hasSoulboundExtension: false,
-  hasPermanentDelegateExtension: false,
-  vanityCharLength: 0,
-  hasJitoBundle: false,
-};
-
 const SOLANA_ACCOUNT_RENT_SOL = Number(ESTIMATED_ATA_RENT_SOL.toFixed(4));
+const SOLANA_LP_POOL_RENT_SOL = Number(ESTIMATED_LP_POOL_RENT_SOL.toFixed(4));
 const SOLANA_NETWORK_TX_FEE_SOL = 0.00001;
 
-const serviceFeeByOperation: Record<Operation, number> = {
-  createToken: 0.35,
-  burnToken: SERVICE_FEE_BURN_TOKEN_SOL,
-  burnAndEarn: SERVICE_FEE_BURN_AND_EARN_SOL,
-  airdrop: SERVICE_FEE_AIRDROP_SOL,
-  manageAuthority: SERVICE_FEE_MANAGE_AUTHORITY_SOL,
-  claimWithheldTax: SERVICE_FEE_CLAIM_WITHHELD_TAX_SOL,
-  createLiquidityPool: SERVICE_FEE_CREATE_LP_SOL,
-  removeLiquidity: SERVICE_FEE_REMOVE_LP_SOL,
-};
+const OPERATIONS_WITHOUT_NEW_ACCOUNT_RENT = new Set<Operation>([
+  "burnToken",
+  "burnAndEarn",
+  "reclaimSol",
+  "removeLiquidity",
+  "manageAuthority",
+  "claimWithheldTax",
+]);
 
 const devWalletBase58 = DEV_WALLET_ADDRESS.toBase58();
 
 export default function CostSummary({
   operation = "createToken",
   modularOptions,
+  liquiditySol = 0,
 }: CostSummaryProps) {
   const langCtx = useLanguage();
   const t = langCtx?.t;
   const [liveModularOptions, setLiveModularOptions] = useState<ModularPricingOptions>(
-    modularOptions || DEFAULT_MODULAR_OPTIONS
+    modularOptions || DEFAULT_MODULAR_PRICING_OPTIONS
   );
+  const [hasActiveAffiliate, setHasActiveAffiliate] = useState<boolean>(false);
 
   useEffect(() => {
     if (modularOptions) {
@@ -80,6 +64,26 @@ export default function CostSummary({
   }, [modularOptions]);
 
   useEffect(() => {
+    const checkAffiliate = () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const fromQuery = urlParams.get("ref");
+        const stored = localStorage.getItem("affiliateRef");
+        const candidate = (fromQuery || stored || "").trim();
+        setHasActiveAffiliate(
+          Boolean(
+            candidate &&
+              isValidPublicKey(candidate) &&
+              candidate !== devWalletBase58
+          )
+        );
+      } catch {
+        setHasActiveAffiliate(false);
+      }
+    };
+
+    checkAffiliate();
+
     const handleModularUpdate = (event: Event) => {
       const customEvent = event as CustomEvent<ModularPricingOptions>;
       if (customEvent.detail) {
@@ -91,14 +95,40 @@ export default function CostSummary({
   }, []);
 
   const isCreateToken = operation === "createToken";
+  const isCreateLp = operation === "createLiquidityPool";
+  const isReclaimSol = operation === "reclaimSol";
+
   const modularCalculation = calculateModularTokenCreationFee(liveModularOptions);
 
-  const activeServiceFeeSol = isCreateToken
+  // Strict lookup in OPERATION_SERVICE_FEES_SOL (no hardcoded 0.35 or ?? 0.07 fallback)
+  const activeServiceFeeSol: number = isCreateToken
     ? modularCalculation.totalSol
-    : (serviceFeeByOperation[operation] ?? 0.07);
+    : OPERATION_SERVICE_FEES_SOL[operation];
+
+  const activeSplit = isCreateToken
+    ? {
+        affiliateSol: modularCalculation.affiliateSol,
+        devWalletSol: modularCalculation.devWalletSol,
+      }
+    : computeSplit(activeServiceFeeSol);
+
+  const reclaimRateSplit = computeRateSplitPercent(RECLAIM_SOL_SERVICE_FEE_RATE);
+
+  const effectiveAccountRentSol = OPERATIONS_WITHOUT_NEW_ACCOUNT_RENT.has(operation)
+    ? 0
+    : isCreateLp
+    ? SOLANA_LP_POOL_RENT_SOL
+    : SOLANA_ACCOUNT_RENT_SOL;
+
+  const raydiumProtocolFeeSol = isCreateLp ? RAYDIUM_PROTOCOL_CREATE_POOL_FEE_SOL : 0;
+  const safeLiquiditySol = isCreateLp && liquiditySol > 0 ? Number(liquiditySol) : 0;
 
   const estimatedTotalSol =
-    activeServiceFeeSol + SOLANA_ACCOUNT_RENT_SOL + SOLANA_NETWORK_TX_FEE_SOL;
+    activeServiceFeeSol +
+    raydiumProtocolFeeSol +
+    safeLiquiditySol +
+    effectiveAccountRentSol +
+    SOLANA_NETWORK_TX_FEE_SOL;
 
   const localizedLabelMap: Record<string, string> = {
     base: t?.costs?.baseCreate || "Base Token Creation Fee (Mint)",
@@ -111,6 +141,7 @@ export default function CostSummary({
     permanentDelegateExt: "Permanent Delegate (Token-2022)",
     vanityMint: "Vanity Mint Address (3–4 chars)",
     jitoBundle: "Jito Atomic Bundle (Mint + Pool + Buy)",
+    jitoMultiWalletBundle: "Jito Multi-Wallet Bundle (Anti-Bubblemaps 4–8 Wallets)",
   };
 
   return (
@@ -123,17 +154,45 @@ export default function CostSummary({
       </div>
 
       <ul className={styles.costList}>
-        <li className={styles.costListItem}>
-          <span>{t?.costs?.rentLabel || "Network account rent (Est.):"}</span>
-          <span className={styles.costValueMono}>~{SOLANA_ACCOUNT_RENT_SOL.toFixed(3)} SOL</span>
-        </li>
+        {effectiveAccountRentSol > 0 && (
+          <li className={styles.costListItem}>
+            <span>{t?.costs?.rentLabel || "Network account rent (Est.):"}</span>
+            <span className={styles.costValueMono}>
+              ~{formatSolAmount(effectiveAccountRentSol, 3, 4)} SOL
+            </span>
+          </li>
+        )}
+
+        {isCreateLp && (
+          <li className={styles.costListItem}>
+            <span>Raydium CPMM Protocol Fee (createPoolFee):</span>
+            <span className={styles.costValueMono}>
+              {formatSolAmount(raydiumProtocolFeeSol)} SOL
+            </span>
+          </li>
+        )}
+
+        {isCreateLp && safeLiquiditySol > 0 && (
+          <li className={styles.costListItem}>
+            <span>Initial Pool Liquidity (SOL):</span>
+            <span className={styles.costValueMono}>
+              {formatSolAmount(safeLiquiditySol, 2, 4)} SOL
+            </span>
+          </li>
+        )}
+
         <li className={styles.costListItem}>
           <span>{t?.costs?.networkFeeLabel || "Network tx fee:"}</span>
           <span className={styles.costValueMono}>~{SOLANA_NETWORK_TX_FEE_SOL.toFixed(5)} SOL</span>
         </li>
+
         <li className={styles.costListItem}>
           <span>{t?.costs?.serviceFeeLabel || "Service fee:"}</span>
-          <span className={styles.costValueMono}>{activeServiceFeeSol.toFixed(2)} SOL</span>
+          <span className={styles.costValueMono}>
+            {isReclaimSol
+              ? `${reclaimRateSplit.totalRatePercent}% (${reclaimRateSplit.netUserRatePercent}% Net)`
+              : `${formatSolAmount(activeServiceFeeSol)} SOL`}
+          </span>
         </li>
       </ul>
 
@@ -147,7 +206,7 @@ export default function CostSummary({
               <span>
                 {item.active ? "✓" : "○"} {localizedLabelMap[item.key] || item.label}
               </span>
-              <strong>+{item.sol.toFixed(2)} SOL</strong>
+              <strong>+{formatSolAmount(item.sol)} SOL</strong>
             </div>
           ))}
         </div>
@@ -157,19 +216,25 @@ export default function CostSummary({
         <div className={styles.estimatedTotalLabel}>
           <strong>{t?.costs?.estimatedWalletTotal || "Estimated Total"}</strong>
           <span>
-            {t?.costs?.singleSignatureSub || "Single wallet signature"} · 30% Aff (
-            {modularCalculation.affiliateSol.toFixed(3)} SOL) / 70% Dev (
-            {modularCalculation.devWalletSol.toFixed(3)} SOL)
+            {t?.costs?.singleSignatureSub || "Single wallet signature"}
+            {hasActiveAffiliate &&
+              (isReclaimSol
+                ? ` · 30% Aff (${reclaimRateSplit.affiliateRatePercent}%) / 70% Dev (${reclaimRateSplit.devWalletRatePercent}%)`
+                : ` · 30% Aff (${formatSolAmount(activeSplit.affiliateSol, 3, 4)} SOL) / 70% Dev (${formatSolAmount(activeSplit.devWalletSol, 3, 4)} SOL)`)}
           </span>
         </div>
         <span className={styles.estimatedTotalValue}>
-          ~{estimatedTotalSol.toFixed(4)} SOL
+          {isReclaimSol
+            ? `${reclaimRateSplit.netUserRatePercent}% Net to Wallet`
+            : `~${formatSolAmount(estimatedTotalSol, 4, 4)} SOL`}
         </span>
       </div>
 
       <p className={styles.disclaimer}>
-        {t?.costs?.atomicDisclaimer ||
-          "Charged atomically in the same transaction with an instant 30% affiliate / 70% Dev Wallet split."}{" "}
+        {hasActiveAffiliate
+          ? t?.costs?.atomicDisclaimer ||
+            "Charged atomically in the same transaction with an instant 30% affiliate / 70% Dev Wallet split."
+          : "Charged atomically in the same on-chain transaction."}{" "}
         ({devWalletBase58.slice(0, 6)}...{devWalletBase58.slice(-4)}).
       </p>
     </div>

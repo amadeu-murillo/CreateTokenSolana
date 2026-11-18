@@ -3,7 +3,7 @@ import { SendTransactionError } from "@solana/web3.js";
 
 /**
  * Mapa de erros amigáveis da Solana e carteiras Web3 (Phantom / Solflare).
- * Intercepta falhas técnicas de RPC, simulação e assinatura e retorna strings claras para o usuário.
+ * Distingue claramente entre falta de SOL para taxas/rent e falta de saldo de Token na ATA.
  */
 export function parseSolanaError(
   error: unknown,
@@ -23,6 +23,18 @@ export function parseSolanaError(
     return "SUCCESS_ALREADY_PROCESSED";
   }
 
+  // If the server already returned a detailed Portuguese or explicit diagnostic message, preserve it verbatim
+  if (
+    rawMessage.startsWith("Saldo de SOL insuficiente") ||
+    rawMessage.startsWith("Quantidade de tokens insuficiente") ||
+    rawMessage.startsWith("Sua carteira não possui saldo") ||
+    rawMessage.startsWith("O contrato do token") ||
+    rawMessage.startsWith("Insufficient SOL balance on") ||
+    rawMessage.startsWith("Insufficient token balance")
+  ) {
+    return rawMessage;
+  }
+
   // 1. User rejected signature in wallet
   if (
     combined.includes("User rejected") ||
@@ -34,29 +46,35 @@ export function parseSolanaError(
     return "Transação cancelada na carteira.";
   }
 
-  // 2. Insufficient funds or hex equivalent (0x1 / custom program error 0x1 / insufficient lamports)
+  // 2. SPL Token Error: Insufficient token units in ATA (TokenError::InsufficientFunds)
   if (
-    lower.includes("insufficient funds") ||
-    lower.includes("insufficient lamports") ||
-    lower.includes("insufficient sol") ||
-    lower.includes("0x1") ||
-    combined.includes('"Custom":1}')
+    combined.includes("Error: insufficient funds") &&
+    (combined.includes("Tokenkeg") || combined.includes("TokenzQd"))
   ) {
-    return "Saldo insuficiente para cobrir a transação e as taxas.";
+    return "Saldo insuficiente do token selecionado na carteira para realizar esta operação. Clique em Atualizar Carteira e tente novamente.";
   }
 
-  // 3. Blockhash expired or not found
+  // 3. SystemProgram: Insufficient SOL lamports for transfer or rent
+  if (
+    lower.includes("insufficient lamports") ||
+    lower.includes("insufficientfundsforfee") ||
+    lower.includes("insufficientfundsforrent") ||
+    lower.includes("resultwithnegativelamports")
+  ) {
+    return "Saldo de SOL insuficiente na rede selecionada para cobrir a taxa e o aluguel de conta. Verifique se sua carteira (Phantom/Solflare) está na mesma rede selecionada no topo da página (Mainnet ou Devnet).";
+  }
+
+  // 4. Blockhash expired or not found
   if (
     lower.includes("blockhash not found") ||
     lower.includes("blockhashnotfound") ||
-    lower.includes("block height exceeded") ||
-    lower.includes("blockhash")
+    lower.includes("block height exceeded")
   ) {
-    return "A rede demorou a responder. Tente novamente.";
+    return "A rede demorou a responder (blockhash expirado). Tente novamente.";
   }
 
   if (combined.includes("AccountNotFound")) {
-    return "Conta não encontrada na rede selecionada. Verifique se sua carteira possui SOL na rede ativa (Mainnet ou Devnet).";
+    return "Conta não encontrada na rede selecionada. Verifique se sua carteira possui SOL na rede ativa (Mainnet ou Devnet — e não em Testnet).";
   }
 
   if (lower.includes("already in use")) {

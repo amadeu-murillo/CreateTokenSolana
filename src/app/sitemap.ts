@@ -15,13 +15,16 @@ interface CanonicalRouteEntry {
  */
 const CANONICAL_ROUTES: ReadonlyArray<CanonicalRouteEntry> = [
   { path: "/", changeFrequency: "daily", priority: 1.0 },
+  { path: "/reclaim", changeFrequency: "weekly", priority: 0.90 },
+  { path: "/volume-bot", changeFrequency: "weekly", priority: 0.90 },
+  { path: "/vesting", changeFrequency: "weekly", priority: 0.90 },
   { path: "/add-liquidity", changeFrequency: "weekly", priority: 0.95 },
-  { path: "/burn", changeFrequency: "weekly", priority: 0.9 },
-  { path: "/airdrop", changeFrequency: "weekly", priority: 0.9 },
+  { path: "/burn", changeFrequency: "weekly", priority: 0.90 },
+  { path: "/airdrop", changeFrequency: "weekly", priority: 0.90 },
   { path: "/dashboard", changeFrequency: "weekly", priority: 0.85 },
   { path: "/afiliates", changeFrequency: "monthly", priority: 0.85 },
   { path: "/costs", changeFrequency: "monthly", priority: 0.85 },
-  { path: "/documentacao", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/documentacao", changeFrequency: "monthly", priority: 0.80 },
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

@@ -62,7 +62,7 @@ export const useManageAuthority = () => {
         const transactionBuffer = Buffer.from(result.transaction, "base64");
         const transaction = VersionedTransaction.deserialize(new Uint8Array(transactionBuffer));
 
-        const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58());
+        const integrity = verifyTransactionIntegrity(transaction, publicKey.toBase58(), { operation: "manageAuthority", affiliateWallet: affiliateRef });
         if (!integrity.valid) {
           throw new Error(
             integrity.reason || "Transaction failed client-side security verification."

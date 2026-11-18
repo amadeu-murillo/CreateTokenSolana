@@ -3,12 +3,11 @@ import { removeLiquidityTransaction } from "@/lib/services/liquidityPoolService"
 import {
   checkRateLimit,
   getClientIp,
-   isValidPublicKey,
+  removeLiquidityRequestSchema,
   sanitizeErrorMessage,
 } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
-
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,41 +21,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const {
-      baseMint,
-      lpMint,
-      withdrawPercentage = 100,
-      wallet,
-      programId,
-      affiliate,
-      network = "mainnet-beta",
-    } = body || {};
+    const rawBody = await request.json();
+    const parsed = removeLiquidityRequestSchema.safeParse(rawBody);
 
-    if (!baseMint || !isValidPublicKey(baseMint)) {
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
       return NextResponse.json(
-        { error: "A valid Token or Pool Mint address is required." },
+        { error: firstIssue?.message || "Invalid parameters for liquidity withdrawal." },
         { status: 400 }
       );
     }
 
-    if (!wallet || !isValidPublicKey(wallet)) {
-      return NextResponse.json(
-        { error: "A valid connected Solana wallet address is required." },
-        { status: 400 }
-      );
-    }
-
-    const result = await removeLiquidityTransaction({
-      baseMint,
-      lpMint: lpMint && isValidPublicKey(lpMint) ? lpMint : undefined,
-      withdrawPercentage: Number(withdrawPercentage) || 100,
-      wallet,
-      programId,
-      affiliate,
-      network: network === "devnet" ? "devnet" : "mainnet-beta",
-    });
-
+    const result = await removeLiquidityTransaction(parsed.data);
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error building remove-liquidity transaction:", error);
@@ -64,7 +40,7 @@ export async function POST(request: NextRequest) {
       {
         error: sanitizeErrorMessage(
           error,
-          "Failed to prepare liquidity withdrawal transaction."
+          "Failed to prepare Raydium CPMM liquidity withdrawal transaction."
         ),
       },
       { status: 500 }

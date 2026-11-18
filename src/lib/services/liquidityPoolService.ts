@@ -1,44 +1,78 @@
 import {
   ComputeBudgetProgram,
-  Keypair,
+  Connection,
   LAMPORTS_PER_SOL,
   PublicKey,
+  SYSVAR_RENT_PUBKEY,
+  Signer,
   SystemProgram,
   TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 import {
-  ACCOUNT_SIZE,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   AuthorityType,
+  ExtensionType,
   MINT_SIZE,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
-  createAssociatedTokenAccountIdempotentInstruction,
-  createBurnCheckedInstruction,
-  createCloseAccountInstruction,
-  createInitializeAccountInstruction,
-  createInitializeMintInstruction,
-  createMintToInstruction,
   createSetAuthorityInstruction,
-  createSyncNativeInstruction,
-  createTransferCheckedInstruction,
   getAssociatedTokenAddress,
+  getExtensionTypes,
   getMint,
 } from "@solana/spl-token";
 import {
+  ApiCpmmConfigInfo,
+  ApiV3Token,
+  CREATE_CPMM_POOL_FEE_ACC,
+  CREATE_CPMM_POOL_PROGRAM,
+  CpmmConfigInfoLayout,
+  CpmmPoolInfoLayout,
+  DEVNET_PROGRAM_ID,
+  Percent,
+  Raydium,
+  TxVersion,
+  getCpmmPdaAmmConfigId,
+  getCpmmPdaPoolId,
+  parseTokenAccountResp,
+} from "@raydium-io/raydium-sdk-v2";
+import BN from "bn.js";
+import {
   SERVICE_FEE_REMOVE_LP_LAMPORTS,
   SERVICE_FEE_REMOVE_LP_SOL,
+  SPL_MEMO_PROGRAM_ID,
   SolanaCluster,
+  USDC_MINT_DEVNET,
+  USDC_MINT_MAINNET,
   WSOL_MINT,
   getClusterDexConfig,
   getLpServiceFeeLamports,
 } from "@/lib/constants";
-import { toRawTokenAmount } from "@/lib/security";
-import { buildServiceFeeInstructions, getSolanaConnection } from "./solanaHelpers";
+import { isValidPublicKey, toRawTokenAmount } from "@/lib/security";
+import {
+  buildDynamicComputeBudgetInstructions,
+  buildServiceFeeInstructions,
+  getSolanaConnection,
+} from "./solanaHelpers";
+
+/**
+ * Official Anchor discriminators for Raydium CPMM (CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C / Devnet DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb)
+ */
+export const RAYDIUM_CPMM_INITIALIZE_DISCRIMINATOR = Buffer.from([
+  175, 175, 109, 31, 13, 152, 155, 237,
+]);
+
+export const RAYDIUM_CPMM_SWAP_BASE_INPUT_DISCRIMINATOR = Buffer.from([
+  143, 190, 90, 218, 196, 30, 51, 222,
+]);
+
+export const RAYDIUM_CPMM_WITHDRAW_DISCRIMINATOR = Buffer.from([
+  183, 18, 70, 156, 148, 109, 161, 34,
+]);
 
 export interface CreateLiquidityPoolInput {
-  dex: "raydium-cpmm" | "meteora-damm";
+  dex?: "raydium-cpmm";
   baseMint: string;
   quoteToken: "SOL" | "USDC";
   baseAmount: number | string;
@@ -58,7 +92,7 @@ export interface CreateLiquidityPoolOutput {
   lpMintAddress: string;
   baseVaultAddress: string;
   quoteVaultAddress: string;
-  dex: "raydium-cpmm" | "meteora-damm";
+  dex: "raydium-cpmm";
   initialPrice: number;
   lpTokensMinted: string;
   serviceFeeSol: number;
@@ -70,6 +104,7 @@ export interface CreateLiquidityPoolOutput {
 
 export interface RemoveLiquidityInput {
   baseMint: string;
+  poolId?: string;
   lpMint?: string;
   withdrawPercentage: number; // 1 to 100
   wallet: string;
@@ -80,11 +115,15 @@ export interface RemoveLiquidityInput {
 
 export interface RemoveLiquidityOutput {
   transaction: string;
+  poolId: string;
+  lpMint: string;
   baseMint: string;
-  wsolVaultAddress: string;
-  withdrawnSol: number;
+  quoteToken: "SOL" | "USDC";
+  lpPairLabel: "LP-SOL" | "LP-USDC";
+  quoteVaultAddress: string;
+  withdrawnQuote: number;
   withdrawPercentage: number;
-  estimatedSolReturned: string;
+  estimatedQuoteReturned: string;
   estimatedBaseReturned: string;
   serviceFeeSol: number;
   blockhash: string;
@@ -92,9 +131,265 @@ export interface RemoveLiquidityOutput {
   network: SolanaCluster;
 }
 
+export function sortTokenMintsLexicographically(
+  mintA: PublicKey,
+  mintB: PublicKey
+): { token0Mint: PublicKey; token1Mint: PublicKey; isBaseToken0: boolean } {
+  const comparison = Buffer.compare(
+    new Uint8Array(mintA.toBuffer()),
+    new Uint8Array(mintB.toBuffer())
+  );
+  if (comparison < 0) {
+    return { token0Mint: mintA, token1Mint: mintB, isBaseToken0: true };
+  }
+  return { token0Mint: mintB, token1Mint: mintA, isBaseToken0: false };
+}
+
+export interface RaydiumCpmmAccountsPda {
+  raydiumProgramId: PublicKey;
+  ammConfigPubkey: PublicKey;
+  createPoolFeeReceiver: PublicKey;
+  token0Mint: PublicKey;
+  token1Mint: PublicKey;
+  isBaseToken0: boolean;
+  authPda: PublicKey;
+  poolStatePda: PublicKey;
+  lpMintPda: PublicKey;
+  token0VaultPda: PublicKey;
+  token1VaultPda: PublicKey;
+  observationStatePda: PublicKey;
+}
+
+/**
+ * Derives all canonical Raydium CPMM PDAs for a given pair of token mints.
+ */
+export function deriveRaydiumCpmmPdas(
+  baseMint: PublicKey,
+  quoteMint: PublicKey,
+  network: SolanaCluster = "mainnet-beta"
+): RaydiumCpmmAccountsPda {
+  const dexConfig = getClusterDexConfig(network);
+  const raydiumProgramId = dexConfig.raydiumProgramId;
+  const ammConfigPubkey = dexConfig.raydiumAmmConfig;
+  const createPoolFeeReceiver = dexConfig.raydiumFeeReceiver;
+
+  const { token0Mint, token1Mint, isBaseToken0 } = sortTokenMintsLexicographically(
+    baseMint,
+    quoteMint
+  );
+
+  const [authPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("vault_and_lp_mint_auth_seed")],
+    raydiumProgramId
+  );
+
+  const [poolStatePda] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("pool"),
+      ammConfigPubkey.toBuffer(),
+      token0Mint.toBuffer(),
+      token1Mint.toBuffer(),
+    ],
+    raydiumProgramId
+  );
+
+  const [lpMintPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_lp_mint"), poolStatePda.toBuffer()],
+    raydiumProgramId
+  );
+
+  const [token0VaultPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_vault"), poolStatePda.toBuffer(), token0Mint.toBuffer()],
+    raydiumProgramId
+  );
+
+  const [token1VaultPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_vault"), poolStatePda.toBuffer(), token1Mint.toBuffer()],
+    raydiumProgramId
+  );
+
+  const [observationStatePda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("observation"), poolStatePda.toBuffer()],
+    raydiumProgramId
+  );
+
+  return {
+    raydiumProgramId,
+    ammConfigPubkey,
+    createPoolFeeReceiver,
+    token0Mint,
+    token1Mint,
+    isBaseToken0,
+    authPda,
+    poolStatePda,
+    lpMintPda,
+    token0VaultPda,
+    token1VaultPda,
+    observationStatePda,
+  };
+}
+
+export function encodeU64LE(value: bigint): Buffer {
+  const buf = Buffer.alloc(8);
+  buf.writeBigUInt64LE(value < BigInt(0) ? BigInt(0) : value, 0);
+  return buf;
+}
+
+export function buildRaydiumCpmmInitializeInstruction(params: {
+  creator: PublicKey;
+  ammConfig: PublicKey;
+  authority: PublicKey;
+  poolState: PublicKey;
+  token0Mint: PublicKey;
+  token1Mint: PublicKey;
+  lpMint: PublicKey;
+  creatorToken0: PublicKey;
+  creatorToken1: PublicKey;
+  creatorLpToken: PublicKey;
+  token0Vault: PublicKey;
+  token1Vault: PublicKey;
+  createPoolFee: PublicKey;
+  observationState: PublicKey;
+  token0Program: PublicKey;
+  token1Program: PublicKey;
+  raydiumProgramId: PublicKey;
+  initAmount0: bigint;
+  initAmount1: bigint;
+  openTime: bigint;
+}): TransactionInstruction {
+  const data = Buffer.concat([
+    RAYDIUM_CPMM_INITIALIZE_DISCRIMINATOR,
+    encodeU64LE(params.initAmount0),
+    encodeU64LE(params.initAmount1),
+    encodeU64LE(params.openTime),
+  ]);
+
+  return new TransactionInstruction({
+    programId: params.raydiumProgramId,
+    keys: [
+      { pubkey: params.creator, isSigner: true, isWritable: true },
+      { pubkey: params.ammConfig, isSigner: false, isWritable: false },
+      { pubkey: params.authority, isSigner: false, isWritable: false },
+      { pubkey: params.poolState, isSigner: false, isWritable: true },
+      { pubkey: params.token0Mint, isSigner: false, isWritable: false },
+      { pubkey: params.token1Mint, isSigner: false, isWritable: false },
+      { pubkey: params.lpMint, isSigner: false, isWritable: true },
+      { pubkey: params.creatorToken0, isSigner: false, isWritable: true },
+      { pubkey: params.creatorToken1, isSigner: false, isWritable: true },
+      { pubkey: params.creatorLpToken, isSigner: false, isWritable: true },
+      { pubkey: params.token0Vault, isSigner: false, isWritable: true },
+      { pubkey: params.token1Vault, isSigner: false, isWritable: true },
+      { pubkey: params.createPoolFee, isSigner: false, isWritable: true },
+      { pubkey: params.observationState, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: params.token0Program, isSigner: false, isWritable: false },
+      { pubkey: params.token1Program, isSigner: false, isWritable: false },
+      { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+}
+
+export function buildRaydiumCpmmSwapBaseInputInstruction(params: {
+  payer: PublicKey;
+  authority: PublicKey;
+  ammConfig: PublicKey;
+  poolState: PublicKey;
+  inputTokenAccount: PublicKey;
+  outputTokenAccount: PublicKey;
+  inputVault: PublicKey;
+  outputVault: PublicKey;
+  inputTokenProgram: PublicKey;
+  outputTokenProgram: PublicKey;
+  inputTokenMint: PublicKey;
+  outputTokenMint: PublicKey;
+  observationState: PublicKey;
+  raydiumProgramId: PublicKey;
+  amountIn: bigint;
+  minimumAmountOut: bigint;
+}): TransactionInstruction {
+  const data = Buffer.concat([
+    RAYDIUM_CPMM_SWAP_BASE_INPUT_DISCRIMINATOR,
+    encodeU64LE(params.amountIn),
+    encodeU64LE(params.minimumAmountOut),
+  ]);
+
+  return new TransactionInstruction({
+    programId: params.raydiumProgramId,
+    keys: [
+      { pubkey: params.payer, isSigner: true, isWritable: false },
+      { pubkey: params.authority, isSigner: false, isWritable: false },
+      { pubkey: params.ammConfig, isSigner: false, isWritable: false },
+      { pubkey: params.poolState, isSigner: false, isWritable: true },
+      { pubkey: params.inputTokenAccount, isSigner: false, isWritable: true },
+      { pubkey: params.outputTokenAccount, isSigner: false, isWritable: true },
+      { pubkey: params.inputVault, isSigner: false, isWritable: true },
+      { pubkey: params.outputVault, isSigner: false, isWritable: true },
+      { pubkey: params.inputTokenProgram, isSigner: false, isWritable: false },
+      { pubkey: params.outputTokenProgram, isSigner: false, isWritable: false },
+      { pubkey: params.inputTokenMint, isSigner: false, isWritable: false },
+      { pubkey: params.outputTokenMint, isSigner: false, isWritable: false },
+      { pubkey: params.observationState, isSigner: false, isWritable: true },
+    ],
+    data,
+  });
+}
+
+export function buildRaydiumCpmmWithdrawInstruction(params: {
+  owner: PublicKey;
+  authority: PublicKey;
+  poolState: PublicKey;
+  ownerLpToken: PublicKey;
+  token0Account: PublicKey;
+  token1Account: PublicKey;
+  token0Vault: PublicKey;
+  token1Vault: PublicKey;
+  token0Mint: PublicKey;
+  token1Mint: PublicKey;
+  lpMint: PublicKey;
+  token0Program: PublicKey;
+  token1Program: PublicKey;
+  raydiumProgramId: PublicKey;
+  lpTokenAmount: bigint;
+  minimumToken0Amount: bigint;
+  minimumToken1Amount: bigint;
+}): TransactionInstruction {
+  const data = Buffer.concat([
+    RAYDIUM_CPMM_WITHDRAW_DISCRIMINATOR,
+    encodeU64LE(params.lpTokenAmount),
+    encodeU64LE(params.minimumToken0Amount),
+    encodeU64LE(params.minimumToken1Amount),
+  ]);
+
+  return new TransactionInstruction({
+    programId: params.raydiumProgramId,
+    keys: [
+      { pubkey: params.owner, isSigner: true, isWritable: false },
+      { pubkey: params.authority, isSigner: false, isWritable: false },
+      { pubkey: params.poolState, isSigner: false, isWritable: true },
+      { pubkey: params.ownerLpToken, isSigner: false, isWritable: true },
+      { pubkey: params.token0Account, isSigner: false, isWritable: true },
+      { pubkey: params.token1Account, isSigner: false, isWritable: true },
+      { pubkey: params.token0Vault, isSigner: false, isWritable: true },
+      { pubkey: params.token1Vault, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: params.token0Program, isSigner: false, isWritable: false },
+      { pubkey: params.token1Program, isSigner: false, isWritable: false },
+      { pubkey: params.token0Mint, isSigner: false, isWritable: false },
+      { pubkey: params.token1Mint, isSigner: false, isWritable: false },
+      { pubkey: params.lpMint, isSigner: false, isWritable: true },
+      { pubkey: SPL_MEMO_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+}
+
 interface ParsedSplAccountData {
   parsed?: {
     info?: {
+      mint?: string;
       owner?: string;
       tokenAmount?: {
         amount?: string;
@@ -128,42 +423,330 @@ function sortTokenMints(
   mintA: PublicKey,
   mintB: PublicKey
 ): { token0: PublicKey; token1: PublicKey; isBaseToken0: boolean } {
-  const comparison = Buffer.compare(new Uint8Array(mintA.toBuffer()), new Uint8Array(mintB.toBuffer()));
+  const comparison = Buffer.compare(
+    new Uint8Array(mintA.toBuffer()),
+    new Uint8Array(mintB.toBuffer())
+  );
   if (comparison < 0) {
     return { token0: mintA, token1: mintB, isBaseToken0: true };
   }
   return { token0: mintB, token1: mintA, isBaseToken0: false };
 }
 
+const RAYDIUM_CPMM_SUPPORTED_TOKEN_2022_EXTENSIONS = new Set<ExtensionType>([
+  ExtensionType.TransferFeeConfig,
+  ExtensionType.TransferFeeAmount,
+  ExtensionType.MetadataPointer,
+  ExtensionType.TokenMetadata,
+  ExtensionType.InterestBearingConfig,
+  ExtensionType.MintCloseAuthority,
+  ExtensionType.DefaultAccountState,
+  ExtensionType.MemoTransfer,
+  ExtensionType.ImmutableOwner,
+  ExtensionType.CpiGuard,
+]);
+
+function assertRaydiumToken2022Compatibility(mintAccountData: Buffer): void {
+  if (mintAccountData.length <= MINT_SIZE) return;
+  try {
+    const extTypes = getExtensionTypes(mintAccountData);
+    for (const ext of extTypes) {
+      if (ext === ExtensionType.NonTransferable) {
+        throw new Error(
+          "Soulbound (NonTransferable) tokens cannot be deposited into a Raydium CPMM liquidity pool because pool vaults require transferable tokens."
+        );
+      }
+      if (ext === ExtensionType.PermanentDelegate) {
+        throw new Error(
+          "Raydium CPMM rejects Token-2022 mints with the PermanentDelegate extension (Error: NotSupportMint). Disable Permanent Delegate when creating a token intended for Raydium liquidity pools."
+        );
+      }
+      if (ext === ExtensionType.TransferHook) {
+        throw new Error(
+          "Raydium CPMM does not support Token-2022 mints with an active TransferHook extension."
+        );
+      }
+      if (!RAYDIUM_CPMM_SUPPORTED_TOKEN_2022_EXTENSIONS.has(ext)) {
+        throw new Error(
+          `Raydium CPMM does not support Token-2022 extension type ${ExtensionType[ext] ?? ext}.`
+        );
+      }
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("Raydium CPMM")) {
+      throw err;
+    }
+  }
+}
+
+export function getFallbackCpmmConfigs(programId: PublicKey): ApiCpmmConfigInfo[] {
+  const tiers = [
+    { index: 0, tradeFeeRate: 2500, protocolFeeRate: 120000, fundFeeRate: 40000 }, // 0.25% (25 bps)
+    { index: 1, tradeFeeRate: 10000, protocolFeeRate: 120000, fundFeeRate: 40000 }, // 1.00% (100 bps)
+    { index: 2, tradeFeeRate: 20000, protocolFeeRate: 120000, fundFeeRate: 40000 }, // 2.00% (200 bps)
+    { index: 3, tradeFeeRate: 40000, protocolFeeRate: 120000, fundFeeRate: 40000 }, // 4.00% (400 bps)
+  ];
+
+  return tiers.map((tier) => ({
+    id: getCpmmPdaAmmConfigId(programId, tier.index).publicKey.toBase58(),
+    index: tier.index,
+    protocolFeeRate: tier.protocolFeeRate,
+    tradeFeeRate: tier.tradeFeeRate,
+    fundFeeRate: tier.fundFeeRate,
+    createPoolFee: "150000000", // 0.15 SOL protocol pool creation fee
+    creatorFeeRate: 0,
+  }));
+}
+
+async function initRaydiumSdkServerSide(params: {
+  userPublicKey: PublicKey;
+  connection: Connection;
+  network: SolanaCluster;
+}): Promise<{ raydium: Raydium; userSolLamports: number }> {
+  const { userPublicKey, connection, network } = params;
+  const isDevnet = network === "devnet";
+
+  const [raydium, solAccountResp, splTokenResp, token2022Resp] = await Promise.all([
+    Raydium.load({
+      owner: userPublicKey,
+      connection,
+      cluster: isDevnet ? "devnet" : "mainnet",
+      disableFeatureCheck: true,
+      disableLoadToken: true,
+    }),
+    connection.getAccountInfo(userPublicKey, "confirmed"),
+    connection.getTokenAccountsByOwner(
+      userPublicKey,
+      { programId: TOKEN_PROGRAM_ID },
+      "confirmed"
+    ),
+    connection.getTokenAccountsByOwner(
+      userPublicKey,
+      { programId: TOKEN_2022_PROGRAM_ID },
+      "confirmed"
+    ),
+  ]);
+
+  const tokenAccountData = parseTokenAccountResp({
+    owner: userPublicKey,
+    solAccountResp,
+    tokenAccountResp: {
+      context: splTokenResp.context,
+      value: [...splTokenResp.value, ...token2022Resp.value],
+    },
+  });
+
+  raydium.account.updateTokenAccount(tokenAccountData);
+
+  return {
+    raydium,
+    userSolLamports: solAccountResp?.lamports ?? 0,
+  };
+}
+
 /**
- * Deterministic vault seeds derived from the Base Token Mint so the pool creator can
- * withdraw SOL & Base Token liquidity on-chain (until LP tokens are permanently burned).
+ * Phase 2.8: Fetches Raydium CPMM fee configs and strictly selects the config matching `feeTierBps`.
+ * Throws an explicit error if the requested `feeTierBps` does not exist instead of silently picking the closest config.
  */
-export async function deriveCreatorPoolVaults(
-  userPublicKey: PublicKey,
-  baseMintPublicKey: PublicKey
-): Promise<{
-  wsolVaultAddress: PublicKey;
-  wsolVaultSeed: string;
-}> {
-  const wsolVaultSeed = `lp_wsol_${baseMintPublicKey.toBase58().slice(0, 16)}`;
-  const wsolVaultAddress = await PublicKey.createWithSeed(
-    userPublicKey,
-    wsolVaultSeed,
-    TOKEN_PROGRAM_ID
+export async function resolveCpmmFeeConfig(params: {
+  raydium?: Raydium;
+  connection?: Connection;
+  cpmmProgramId: PublicKey;
+  feeTierBps: number;
+  network: SolanaCluster;
+  overrideConfigs?: ApiCpmmConfigInfo[];
+}): Promise<{ selectedConfig: ApiCpmmConfigInfo; allConfigs: ApiCpmmConfigInfo[] }> {
+  const { raydium, connection, cpmmProgramId, feeTierBps, network, overrideConfigs } = params;
+  const isDevnet = network === "devnet";
+
+  let feeConfigs: ApiCpmmConfigInfo[] = Array.isArray(overrideConfigs)
+    ? [...overrideConfigs]
+    : [];
+
+  if (feeConfigs.length === 0 && raydium) {
+    try {
+      const cpmmWithOptionalConfigFetcher = raydium.cpmm as unknown as {
+        getCpmmConfigs?: () => Promise<ApiCpmmConfigInfo[]>;
+      };
+      if (typeof cpmmWithOptionalConfigFetcher.getCpmmConfigs === "function") {
+        feeConfigs = await cpmmWithOptionalConfigFetcher.getCpmmConfigs();
+      } else if (raydium.api && typeof raydium.api.getCpmmConfigs === "function") {
+        feeConfigs = await raydium.api.getCpmmConfigs();
+      }
+    } catch {
+      feeConfigs = [];
+    }
+  }
+
+  if (!Array.isArray(feeConfigs) || feeConfigs.length === 0) {
+    feeConfigs = getFallbackCpmmConfigs(cpmmProgramId);
+  } else if (isDevnet && !overrideConfigs) {
+    feeConfigs = feeConfigs.map((cfg) => ({
+      ...cfg,
+      id: getCpmmPdaAmmConfigId(cpmmProgramId, cfg.index).publicKey.toBase58(),
+    }));
+  }
+
+  if (isDevnet && connection && !overrideConfigs && feeConfigs.length > 0) {
+    try {
+      const configPubkeys = feeConfigs.map((c) => new PublicKey(c.id));
+      const accInfos = await connection.getMultipleAccountsInfo(configPubkeys, "confirmed");
+      const activeDevnetConfigs: ApiCpmmConfigInfo[] = [];
+
+      accInfos.forEach((acc, idx) => {
+        if (acc && acc.owner.equals(cpmmProgramId)) {
+          const baseCfg = feeConfigs[idx];
+          try {
+            const decoded = CpmmConfigInfoLayout.decode(acc.data);
+            activeDevnetConfigs.push({
+              ...baseCfg,
+              index: decoded.index,
+              tradeFeeRate: decoded.tradeFeeRate.toNumber(),
+              protocolFeeRate: decoded.protocolFeeRate.toNumber(),
+              fundFeeRate: decoded.fundFeeRate.toNumber(),
+              createPoolFee: decoded.createPoolFee.toString(),
+              creatorFeeRate: decoded.creatorFeeRate
+                ? decoded.creatorFeeRate.toNumber()
+                : baseCfg.creatorFeeRate,
+            });
+          } catch {
+            activeDevnetConfigs.push(baseCfg);
+          }
+        }
+      });
+
+      if (activeDevnetConfigs.length > 0) {
+        feeConfigs = activeDevnetConfigs;
+      }
+    } catch {
+      // Keep derived feeConfigs if RPC check fails
+    }
+  }
+
+  const targetTradeFeeRate = feeTierBps <= 1000 ? feeTierBps * 100 : feeTierBps;
+
+  const selectedConfig = feeConfigs.find(
+    (c) => c.tradeFeeRate === targetTradeFeeRate || c.tradeFeeRate === feeTierBps
   );
-  return { wsolVaultAddress, wsolVaultSeed };
+
+  if (!selectedConfig) {
+    const availableBps = Array.from(
+      new Set(feeConfigs.map((c) => Math.round(c.tradeFeeRate / 100)))
+    ).join(", ");
+    throw new Error(
+      `Unsupported Raydium CPMM fee tier: ${feeTierBps} bps on ${network}. Available fee tiers (bps): ${availableBps}.`
+    );
+  }
+
+  return { selectedConfig, allConfigs: feeConfigs };
+}
+
+async function resolveRaydiumTokenInfo(params: {
+  raydium: Raydium;
+  mint: PublicKey;
+  programId: PublicKey;
+  decimals: number;
+  symbol?: string;
+  name?: string;
+}): Promise<ApiV3Token> {
+  const { raydium, mint, programId, decimals, symbol = "", name = "" } = params;
+  try {
+    const info = await raydium.token.getTokenInfo(mint);
+    if (info && info.address) {
+      return {
+        ...info,
+        address: mint.toBase58(),
+        programId: programId.toBase58(),
+        decimals: typeof info.decimals === "number" ? info.decimals : decimals,
+      };
+    }
+  } catch {
+    // Fallback to explicit on-chain token descriptor below
+  }
+
+  return {
+    chainId: 101,
+    address: mint.toBase58(),
+    programId: programId.toBase58(),
+    logoURI: "",
+    symbol,
+    name,
+    decimals,
+    tags: [],
+    extensions: {},
+  };
+}
+
+function extractExtraSigners(
+  userPublicKey: PublicKey,
+  sdkSigners?: Signer[],
+  builderSigners?: Signer[]
+): Signer[] {
+  const combined = [...(sdkSigners || []), ...(builderSigners || [])];
+  const uniqueByPubkey = new Map<string, Signer>();
+
+  for (const signer of combined) {
+    if (
+      signer &&
+      signer.publicKey &&
+      signer.secretKey &&
+      signer.secretKey.length > 0 &&
+      !signer.publicKey.equals(userPublicKey)
+    ) {
+      uniqueByPubkey.set(signer.publicKey.toBase58(), signer);
+    }
+  }
+
+  return Array.from(uniqueByPubkey.values());
+}
+
+function mapFriendlyRaydiumError(error: unknown, network: SolanaCluster): Error {
+  const rawMessage = error instanceof Error ? error.message : String(error ?? "");
+  const lower = rawMessage.toLowerCase();
+
+  if (
+    lower.includes("not support mint") ||
+    lower.includes("notsupportmint") ||
+    lower.includes("6007")
+  ) {
+    return new Error(
+      "This Token-2022 mint uses an extension that Raydium CPMM does not support (NotSupportMint)."
+    );
+  }
+  if (lower.includes("initlpamounttooless") || lower.includes("lp amount too less")) {
+    return new Error(
+      "Initial liquidity is below Raydium CPMM's minimum threshold (sqrt(baseAmount * quoteAmount) must exceed 100 raw units)."
+    );
+  }
+  if (lower.includes("already in use") || lower.includes("pool already exists")) {
+    return new Error(
+      `A Raydium CPMM pool for this token pair and fee tier already exists on ${network}.`
+    );
+  }
+  if (
+    lower.includes("you don't has some token account") ||
+    lower.includes("token account")
+  ) {
+    return new Error(
+      `Required token account was not found in your wallet on ${network}. Verify your token and quote balances.`
+    );
+  }
+
+  return error instanceof Error
+    ? error
+    : new Error(rawMessage || "Raydium CPMM operation failed.");
 }
 
 export async function createLiquidityPoolTransaction(
   input: CreateLiquidityPoolInput
 ): Promise<CreateLiquidityPoolOutput> {
   const {
-    dex,
     baseMint,
     quoteToken,
     baseAmount,
     quoteAmount,
+    feeTierBps = 25,
+    startTime,
     revokeFreezeIfActive = true,
     wallet,
     programId,
@@ -171,6 +754,7 @@ export async function createLiquidityPoolTransaction(
     network = "mainnet-beta",
   } = input;
 
+  const isDevnet = network === "devnet";
   const connection = getSolanaConnection(network);
   const dexConfig = getClusterDexConfig(network);
   const userPublicKey = new PublicKey(wallet);
@@ -183,11 +767,18 @@ export async function createLiquidityPoolTransaction(
     throw new Error("Base token and quote token cannot be the same asset.");
   }
 
-  // 1. Detect Base Token Program ID on-chain
+  const cpmmProgramId = isDevnet
+    ? DEVNET_PROGRAM_ID.CREATE_CPMM_POOL_PROGRAM
+    : CREATE_CPMM_POOL_PROGRAM;
+  const cpmmPoolFeeAccount = isDevnet
+    ? DEVNET_PROGRAM_ID.CREATE_CPMM_POOL_FEE_ACC
+    : CREATE_CPMM_POOL_FEE_ACC;
+
+  // 1. Inspect Base Token Mint on-chain (supports both SPL Token and Token-2022)
   const baseMintAccountInfo = await connection.getAccountInfo(baseMintPublicKey, "confirmed");
   if (!baseMintAccountInfo) {
     throw new Error(
-      `Token Mint (${baseMint.slice(0, 8)}...) was not found on Solana ${network}. Make sure your wallet and top bar are set to the same network where the token was created.`
+      `Token Mint (${baseMint.slice(0, 8)}...) was not found on Solana ${network}. Make sure your wallet and network selector are set to the same cluster where the token was minted.`
     );
   }
 
@@ -197,6 +788,10 @@ export async function createLiquidityPoolTransaction(
     ? TOKEN_2022_PROGRAM_ID
     : TOKEN_PROGRAM_ID;
 
+  if (baseTokenProgramId.equals(TOKEN_2022_PROGRAM_ID)) {
+    assertRaydiumToken2022Compatibility(Buffer.from(baseMintAccountInfo.data));
+  }
+
   const baseMintInfo = await getMint(
     connection,
     baseMintPublicKey,
@@ -204,11 +799,18 @@ export async function createLiquidityPoolTransaction(
     baseTokenProgramId
   );
 
+  // 2. Convert amounts to raw BigInt & BN respecting real token decimals
   let rawBaseAmount = toRawTokenAmount(baseAmount, baseMintInfo.decimals);
   const rawQuoteAmount = toRawTokenAmount(quoteAmount, quoteDecimals);
-  const lpFeeLamports = getLpServiceFeeLamports(network);
 
-  // 2. Verify User Base Token ATA & Balance (and clamp float-rounded MAX amounts safely)
+  const initialLpSupplyRaw = bigIntSqrt(rawBaseAmount * rawQuoteAmount);
+  if (initialLpSupplyRaw <= BigInt(100)) {
+    throw new Error(
+      "Initial liquidity is too small for Raydium CPMM: sqrt(baseAmount * quoteAmount) in raw units must be greater than 100."
+    );
+  }
+
+  // 3. Verify User Base Token ATA & Balance (and USDC ATA if quoteToken === "USDC")
   const userBaseAta = await getAssociatedTokenAddress(
     baseMintPublicKey,
     userPublicKey,
@@ -216,115 +818,110 @@ export async function createLiquidityPoolTransaction(
     baseTokenProgramId
   );
 
-  const [userSolBalance, userBaseAccountParsed] = await Promise.all([
-    connection.getBalance(userPublicKey, "confirmed"),
-    connection.getParsedAccountInfo(userBaseAta, "confirmed"),
-  ]);
-
-  const parsedTokenInfo = extractParsedTokenInfo(userBaseAccountParsed.value?.data);
-  if (!parsedTokenInfo?.tokenAmount?.amount) {
+  const userBaseAccountParsed = await connection.getParsedAccountInfo(userBaseAta, "confirmed");
+  const parsedBaseInfo = extractParsedTokenInfo(userBaseAccountParsed.value?.data);
+  if (!parsedBaseInfo?.tokenAmount?.amount) {
     throw new Error(
       `Your wallet does not hold an active token account for ${baseMint.slice(0, 8)}... on Solana ${network}.`
     );
   }
 
-  const userRawTokenBalance = BigInt(parsedTokenInfo.tokenAmount.amount);
-  if (userRawTokenBalance <= BigInt(0)) {
+  const userRawBaseBalance = BigInt(parsedBaseInfo.tokenAmount.amount);
+  if (userRawBaseBalance <= BigInt(0)) {
     throw new Error("Your token balance is zero. Please select a token with a positive balance.");
   }
 
-  if (rawBaseAmount > userRawTokenBalance) {
-    const diff = rawBaseAmount - userRawTokenBalance;
-    if (diff * BigInt(1000) <= userRawTokenBalance) {
-      rawBaseAmount = userRawTokenBalance;
+  if (rawBaseAmount > userRawBaseBalance) {
+    const diff = rawBaseAmount - userRawBaseBalance;
+    if (diff * BigInt(1000) <= userRawBaseBalance) {
+      rawBaseAmount = userRawBaseBalance;
     } else {
       throw new Error(
-        `Insufficient token balance: you entered ${baseAmount}, but your wallet holds ${parsedTokenInfo.tokenAmount.uiAmountString}.`
+        `Insufficient token balance: you entered ${baseAmount}, but your wallet holds ${parsedBaseInfo.tokenAmount.uiAmountString}.`
       );
     }
   }
 
-  // 3. Verify user has enough SOL on-chain before building transaction
-  const requiredSolLamports =
-    lpFeeLamports +
-    (quoteToken === "SOL" ? Number(rawQuoteAmount) : 0) +
-    Math.round(0.012 * LAMPORTS_PER_SOL);
+  if (quoteToken === "USDC") {
+    const userUsdcAta = await getAssociatedTokenAddress(
+      quoteMintPublicKey,
+      userPublicKey,
+      false,
+      TOKEN_PROGRAM_ID
+    );
+    const userUsdcParsed = await connection.getParsedAccountInfo(userUsdcAta, "confirmed");
+    const parsedUsdcInfo = extractParsedTokenInfo(userUsdcParsed.value?.data);
+    const userRawUsdcBalance = BigInt(parsedUsdcInfo?.tokenAmount?.amount || "0");
+    if (userRawUsdcBalance < rawQuoteAmount) {
+      const uiUsdc = parsedUsdcInfo?.tokenAmount?.uiAmountString || "0";
+      throw new Error(
+        `Insufficient USDC balance on ${network}: you entered ${quoteAmount} USDC, but your wallet holds ${uiUsdc} USDC.`
+      );
+    }
+  }
 
-  if (userSolBalance < requiredSolLamports) {
-    const neededSol = (requiredSolLamports / LAMPORTS_PER_SOL).toFixed(4);
-    const currentSol = (userSolBalance / LAMPORTS_PER_SOL).toFixed(4);
+  // 4. Initialize Raydium SDK v2 (Server-Side, owner = userPublicKey) & resolve CPMM feeConfig strictly
+  const { raydium, userSolLamports } = await initRaydiumSdkServerSide({
+    userPublicKey,
+    connection,
+    network,
+  });
+
+  const { selectedConfig: feeConfig } = await resolveCpmmFeeConfig({
+    raydium,
+    connection,
+    cpmmProgramId,
+    feeTierBps,
+    network,
+  });
+
+  // 5. Check if the Raydium CPMM pool already exists for this token pair and fee tier
+  const { token0, token1 } = sortTokenMints(baseMintPublicKey, quoteMintPublicKey);
+  const expectedPoolPda = getCpmmPdaPoolId(
+    cpmmProgramId,
+    new PublicKey(feeConfig.id),
+    token0,
+    token1
+  ).publicKey;
+
+  const existingPoolAccount = await connection.getAccountInfo(expectedPoolPda, "confirmed");
+  if (existingPoolAccount && existingPoolAccount.data.length > 0) {
     throw new Error(
-      `Insufficient SOL balance on ${network}: you have ${currentSol} SOL, but initializing this pool requires ~${neededSol} SOL (including ${
-        quoteToken === "SOL" ? `${quoteAmount} SOL liquidity + ` : ""
-      }${(lpFeeLamports / LAMPORTS_PER_SOL).toFixed(2)} SOL service fee + account rent).`
+      `A Raydium CPMM pool (${expectedPoolPda.toBase58()}) already exists for this token pair and fee tier (${(
+        feeConfig.tradeFeeRate / 10000
+      ).toFixed(2)}%) on ${network}.`
     );
   }
 
-  // 4. Derive canonical Pool State / Authority PDA and generate LP Mint Keypair
-  const { token0, token1 } = sortTokenMints(baseMintPublicKey, quoteMintPublicKey);
-  const targetDexProgramId =
-    dex === "raydium-cpmm" ? dexConfig.raydiumProgramId : dexConfig.meteoraDammProgramId;
+  // 6. Verify sufficient SOL balance (liquidity + service fee + Raydium protocol createPoolFee ~0.15 SOL + account rent)
+  const lpFeeLamports = getLpServiceFeeLamports(network);
+  const raydiumProtocolFeeLamports = Number(feeConfig.createPoolFee || "150000000");
+  const estimatedRentLamports = Math.round(0.025 * LAMPORTS_PER_SOL);
+  const quoteSolLamports = quoteToken === "SOL" ? Number(rawQuoteAmount) : 0;
 
-  const [poolAuthorityPda] = PublicKey.findProgramAddressSync(
-    [
-      new Uint8Array(Buffer.from(dex === "raydium-cpmm" ? "raydium_cpmm_pool" : "meteora_damm_pool")),
-      new Uint8Array(token0.toBuffer()),
-      new Uint8Array(token1.toBuffer()),
-    ],
-    targetDexProgramId
-  );
+  const requiredSolLamports =
+    lpFeeLamports + quoteSolLamports + raydiumProtocolFeeLamports + estimatedRentLamports;
 
-  const lpMintKeypair = Keypair.generate();
-  const lpDecimals = 9;
-  const [mintRentLamports, tokenAccountRentLamports] = await Promise.all([
-    connection.getMinimumBalanceForRentExemption(MINT_SIZE),
-    connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE),
-  ]);
+  if (userSolLamports < requiredSolLamports) {
+    const neededSol = (requiredSolLamports / LAMPORTS_PER_SOL).toFixed(4);
+    const currentSol = (userSolLamports / LAMPORTS_PER_SOL).toFixed(4);
+    const raydiumFeeSol = (raydiumProtocolFeeLamports / LAMPORTS_PER_SOL).toFixed(2);
+    throw new Error(
+      `Insufficient SOL balance on ${network}: you have ${currentSol} SOL, but creating this Raydium CPMM pool requires ~${neededSol} SOL (${
+        quoteToken === "SOL" ? `${quoteAmount} SOL liquidity + ` : ""
+      }${(lpFeeLamports / LAMPORTS_PER_SOL).toFixed(2)} SOL service fee + ${raydiumFeeSol} SOL Raydium protocol fee + rent).`
+    );
+  }
 
-  // Pool Base Vault ATA
-  const poolBaseVaultAta = await getAssociatedTokenAddress(
-    baseMintPublicKey,
-    poolAuthorityPda,
-    true,
-    baseTokenProgramId
-  );
-
-  // Deterministic Creator-Withdrawable WSOL Quote Vault (so user can withdraw SOL liquidity at any time)
-  const { wsolVaultAddress, wsolVaultSeed } = await deriveCreatorPoolVaults(
-    userPublicKey,
-    baseMintPublicKey
-  );
-  const existingWsolVault = await connection.getAccountInfo(wsolVaultAddress, "confirmed");
-
-  const poolQuoteVaultAddress =
-    quoteToken === "SOL"
-      ? wsolVaultAddress
-      : await getAssociatedTokenAddress(
-          quoteMintPublicKey,
-          poolAuthorityPda,
-          true,
-          TOKEN_PROGRAM_ID
-        );
-
-  // User LP Token destination ATA
-  const creatorLpTokenAta = await getAssociatedTokenAddress(
-    lpMintKeypair.publicKey,
-    userPublicKey,
-    false,
-    TOKEN_PROGRAM_ID
-  );
-
-  const instructions: TransactionInstruction[] = [
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 450_000 }),
-    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
+  // 7. Build core instructions: Platform Service Fee (with affiliate split) + Freeze Authority Revocation + Raydium CPMM Pool
+  const coreInstructions: TransactionInstruction[] = [
     ...buildServiceFeeInstructions(userPublicKey, lpFeeLamports, affiliate),
   ];
 
-  // 5. Auto-revoke Freeze Authority if active
   let freezeAuthorityRevokedInTx = false;
   if (baseMintInfo.freezeAuthority) {
     if (baseMintInfo.freezeAuthority.equals(userPublicKey) && revokeFreezeIfActive) {
-      instructions.push(
+      coreInstructions.push(
         createSetAuthorityInstruction(
           baseMintPublicKey,
           userPublicKey,
@@ -337,149 +934,86 @@ export async function createLiquidityPoolTransaction(
       freezeAuthorityRevokedInTx = true;
     } else if (!baseMintInfo.freezeAuthority.equals(userPublicKey)) {
       throw new Error(
-        "This token has an active Freeze Authority controlled by another wallet. Liquidity pools require Freeze Authority to be revoked."
+        "This token has an active Freeze Authority controlled by another wallet. Raydium CPMM pools require Freeze Authority to be revoked."
       );
     } else {
       throw new Error(
-        "Token Freeze Authority is active. Enable Auto-Revoke Freeze Authority or revoke it in the Manage tab first."
+        "Token Freeze Authority is active. Enable Auto-Revoke Freeze Authority or revoke it in the Manage tab before creating a Raydium pool."
       );
     }
   }
 
-  // 6. Create & Initialize the LP Token Mint
-  instructions.push(
-    SystemProgram.createAccount({
-      fromPubkey: userPublicKey,
-      newAccountPubkey: lpMintKeypair.publicKey,
-      space: MINT_SIZE,
-      lamports: mintRentLamports,
-      programId: TOKEN_PROGRAM_ID,
+  // 8. Resolve token descriptors and invoke `raydium.cpmm.createPool`
+  const [mintAInfo, mintBInfo] = await Promise.all([
+    resolveRaydiumTokenInfo({
+      raydium,
+      mint: baseMintPublicKey,
+      programId: baseTokenProgramId,
+      decimals: baseMintInfo.decimals,
+      symbol: "BASE",
+      name: "Base Token",
     }),
-    createInitializeMintInstruction(
-      lpMintKeypair.publicKey,
-      lpDecimals,
-      userPublicKey,
-      null,
-      TOKEN_PROGRAM_ID
-    )
-  );
+    resolveRaydiumTokenInfo({
+      raydium,
+      mint: quoteMintPublicKey,
+      programId: TOKEN_PROGRAM_ID,
+      decimals: quoteDecimals,
+      symbol: quoteToken === "SOL" ? "WSOL" : "USDC",
+      name: quoteToken === "SOL" ? "Wrapped SOL" : "USD Coin",
+    }),
+  ]);
 
-  // 7. Create Pool Base Vault ATA and User LP Token ATA idempotently
-  instructions.push(
-    createAssociatedTokenAccountIdempotentInstruction(
-      userPublicKey,
-      poolBaseVaultAta,
-      poolAuthorityPda,
-      baseMintPublicKey,
-      baseTokenProgramId
-    ),
-    createAssociatedTokenAccountIdempotentInstruction(
-      userPublicKey,
-      creatorLpTokenAta,
-      userPublicKey,
-      lpMintKeypair.publicKey,
-      TOKEN_PROGRAM_ID
-    )
-  );
+  const baseAmountBn = new BN(rawBaseAmount.toString());
+  const quoteAmountBn = new BN(rawQuoteAmount.toString());
+  const startTimeBn =
+    typeof startTime === "number" && Number.isFinite(startTime) && startTime > 0
+      ? new BN(Math.floor(startTime))
+      : new BN(0);
 
-  // 8. Transfer Base Tokens from User to Pool Base Vault
-  instructions.push(
-    createTransferCheckedInstruction(
-      userBaseAta,
-      baseMintPublicKey,
-      poolBaseVaultAta,
-      userPublicKey,
-      rawBaseAmount,
-      baseMintInfo.decimals,
-      [],
-      baseTokenProgramId
-    )
-  );
-
-  // 9. Deposit Quote Liquidity (SOL wrapped into WSOL inside deterministic wsolVaultAddress, or USDC transfer)
-  if (quoteToken === "SOL") {
-    if (!existingWsolVault) {
-      instructions.push(
-        SystemProgram.createAccountWithSeed({
-          fromPubkey: userPublicKey,
-          newAccountPubkey: wsolVaultAddress,
-          basePubkey: userPublicKey,
-          seed: wsolVaultSeed,
-          lamports: tokenAccountRentLamports + Number(rawQuoteAmount),
-          space: ACCOUNT_SIZE,
-          programId: TOKEN_PROGRAM_ID,
-        }),
-        createInitializeAccountInstruction(
-          wsolVaultAddress,
-          WSOL_MINT,
-          userPublicKey,
-          TOKEN_PROGRAM_ID
-        )
-      );
-    } else {
-      instructions.push(
-        SystemProgram.transfer({
-          fromPubkey: userPublicKey,
-          toPubkey: wsolVaultAddress,
-          lamports: rawQuoteAmount,
-        }),
-        createSyncNativeInstruction(wsolVaultAddress, TOKEN_PROGRAM_ID)
-      );
-    }
-  } else {
-    instructions.push(
-      createAssociatedTokenAccountIdempotentInstruction(
-        userPublicKey,
-        poolQuoteVaultAddress,
-        poolAuthorityPda,
-        quoteMintPublicKey,
-        TOKEN_PROGRAM_ID
-      )
-    );
-    const userUsdcAta = await getAssociatedTokenAddress(
-      quoteMintPublicKey,
-      userPublicKey,
-      false,
-      TOKEN_PROGRAM_ID
-    );
-    instructions.push(
-      createTransferCheckedInstruction(
-        userUsdcAta,
-        quoteMintPublicKey,
-        poolQuoteVaultAddress,
-        userPublicKey,
-        rawQuoteAmount,
-        quoteDecimals,
-        [],
-        TOKEN_PROGRAM_ID
-      )
-    );
+  let createPoolBuilderResult: Awaited<ReturnType<typeof raydium.cpmm.createPool>>;
+  try {
+    createPoolBuilderResult = await raydium.cpmm.createPool({
+      programId: cpmmProgramId,
+      poolFeeAccount: cpmmPoolFeeAccount,
+      mintA: mintAInfo,
+      mintB: mintBInfo,
+      mintAAmount: baseAmountBn,
+      mintBAmount: quoteAmountBn,
+      startTime: startTimeBn,
+      feeConfig,
+      associatedOnly: false,
+      ownerInfo: {
+        useSOLBalance: quoteToken === "SOL",
+      },
+      txVersion: TxVersion.V0,
+    });
+  } catch (sdkErr) {
+    throw mapFriendlyRaydiumError(sdkErr, network);
   }
 
-  // 10. Mint Initial LP Tokens (sqrt(rawBase * rawQuote)) to Creator and lock LP Mint Authority to Pool PDA
-  const initialLpSupplyRaw = bigIntSqrt(rawBaseAmount * rawQuoteAmount);
-  const safeLpSupplyRaw =
-    initialLpSupplyRaw > BigInt(1000) ? initialLpSupplyRaw : BigInt(1_000_000_000);
+  const { builder, extInfo, signers } = createPoolBuilderResult;
 
-  instructions.push(
-    createMintToInstruction(
-      lpMintKeypair.publicKey,
-      creatorLpTokenAta,
-      userPublicKey,
-      safeLpSupplyRaw,
-      [],
-      TOKEN_PROGRAM_ID
-    ),
-    createSetAuthorityInstruction(
-      lpMintKeypair.publicKey,
-      userPublicKey,
-      AuthorityType.MintTokens,
-      poolAuthorityPda,
-      [],
-      TOKEN_PROGRAM_ID
-    )
+  const sdkInstructions = (builder.allInstructions || []).filter(
+    (ix) => !ix.programId.equals(ComputeBudgetProgram.programId)
   );
+  if (sdkInstructions.length === 0) {
+    throw new Error("Raydium SDK returned no instructions for CPMM pool creation.");
+  }
 
+  coreInstructions.push(...sdkInstructions);
+
+  // 9. Phase 2.10: Dynamic Compute Budget (simulate + priority fee)
+  const computeBudgetIxs = await buildDynamicComputeBudgetInstructions({
+    connection,
+    payerKey: userPublicKey,
+    instructions: coreInstructions,
+    defaultUnits: 600_000,
+    defaultMicroLamports: 50_000,
+  });
+
+  const instructions: TransactionInstruction[] = [...computeBudgetIxs, ...coreInstructions];
+
+  // 10. Compile VersionedTransaction V0 and partially sign with any ephemeral SDK signers
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
 
   const messageV0 = new TransactionMessage({
@@ -489,23 +1023,51 @@ export async function createLiquidityPoolTransaction(
   }).compileToV0Message();
 
   const transaction = new VersionedTransaction(messageV0);
-  transaction.sign([lpMintKeypair]);
+  const extraSigners = extractExtraSigners(
+    userPublicKey,
+    signers,
+    builder.AllTxData?.signers
+  );
+  if (extraSigners.length > 0) {
+    transaction.sign(extraSigners);
+  }
 
-  const serializedTransaction = transaction.serialize();
-  const base64Transaction = Buffer.from(serializedTransaction).toString("base64");
+  const base64Transaction = Buffer.from(transaction.serialize()).toString("base64");
 
-  const numericBase = Number(String(baseAmount).replace(/,/g, ""));
-  const numericQuote = Number(String(quoteAmount).replace(/,/g, ""));
-  const initialPrice = numericBase > 0 ? numericQuote / numericBase : 0;
-  const formattedLpMinted = (Number(safeLpSupplyRaw) / Math.pow(10, lpDecimals)).toFixed(4);
+  const addressInfo = extInfo.address as Record<string, unknown>;
+  const poolAddress = String(addressInfo.poolId ?? expectedPoolPda.toBase58());
+  const lpMintAddress = String(addressInfo.lpMint ?? "");
+  const vaultAStr = String(addressInfo.vaultA ?? "");
+  const vaultBStr = String(addressInfo.vaultB ?? "");
+
+  const rawMintA = addressInfo.mintA;
+  const extMintAAddress =
+    typeof rawMintA === "object" && rawMintA !== null && "address" in rawMintA
+      ? String((rawMintA as { address: string }).address)
+      : rawMintA
+      ? String(rawMintA)
+      : token0.toBase58();
+
+  const isMintABase = extMintAAddress === baseMintPublicKey.toBase58();
+  const baseVaultAddress = isMintABase ? vaultAStr : vaultBStr;
+  const quoteVaultAddress = isMintABase ? vaultBStr : vaultAStr;
+
+  const adjustedBaseUi = Number(rawBaseAmount) / Math.pow(10, baseMintInfo.decimals);
+  const adjustedQuoteUi = Number(rawQuoteAmount) / Math.pow(10, quoteDecimals);
+  const initialPrice = adjustedBaseUi > 0 ? adjustedQuoteUi / adjustedBaseUi : 0;
+
+  const lpDecimals = 9;
+  const netCreatorLpRaw =
+    initialLpSupplyRaw > BigInt(100) ? initialLpSupplyRaw - BigInt(100) : initialLpSupplyRaw;
+  const formattedLpMinted = (Number(netCreatorLpRaw) / Math.pow(10, lpDecimals)).toFixed(4);
 
   return {
     transaction: base64Transaction,
-    poolAddress: poolAuthorityPda.toBase58(),
-    lpMintAddress: lpMintKeypair.publicKey.toBase58(),
-    baseVaultAddress: poolBaseVaultAta.toBase58(),
-    quoteVaultAddress: poolQuoteVaultAddress.toBase58(),
-    dex,
+    poolAddress,
+    lpMintAddress,
+    baseVaultAddress,
+    quoteVaultAddress,
+    dex: "raydium-cpmm",
     initialPrice,
     lpTokensMinted: formattedLpMinted,
     serviceFeeSol: lpFeeLamports / LAMPORTS_PER_SOL,
@@ -516,18 +1078,157 @@ export async function createLiquidityPoolTransaction(
   };
 }
 
+async function resolveRaydiumCpmmPoolId(params: {
+  connection: Connection;
+  cpmmProgramId: PublicKey;
+  feeConfigs: ApiCpmmConfigInfo[];
+  userPublicKey: PublicKey;
+  baseMint: string;
+  poolId?: string;
+  lpMint?: string;
+  network: SolanaCluster;
+}): Promise<string> {
+  const {
+    connection,
+    cpmmProgramId,
+    feeConfigs,
+    userPublicKey,
+    baseMint,
+    poolId,
+    lpMint,
+    network,
+  } = params;
+
+  if (poolId && isValidPublicKey(poolId)) {
+    const directPoolAcc = await connection.getAccountInfo(new PublicKey(poolId), "confirmed");
+    if (directPoolAcc && directPoolAcc.owner.equals(cpmmProgramId)) {
+      return poolId;
+    }
+  }
+
+  const baseMintPubkey = new PublicKey(baseMint);
+  const baseMintAcc = await connection.getAccountInfo(baseMintPubkey, "confirmed");
+  if (baseMintAcc && baseMintAcc.owner.equals(cpmmProgramId)) {
+    return baseMintPubkey.toBase58();
+  }
+
+  const dexConfig = getClusterDexConfig(network);
+  const quoteCandidates = [dexConfig.wsolMint, dexConfig.usdcMint];
+  const candidatePoolPubkeys: PublicKey[] = [];
+
+  for (const quoteMint of quoteCandidates) {
+    if (baseMintPubkey.equals(quoteMint)) continue;
+    const { token0, token1 } = sortTokenMints(baseMintPubkey, quoteMint);
+    for (const cfg of feeConfigs) {
+      try {
+        const pda = getCpmmPdaPoolId(
+          cpmmProgramId,
+          new PublicKey(cfg.id),
+          token0,
+          token1
+        ).publicKey;
+        if (!candidatePoolPubkeys.some((pk) => pk.equals(pda))) {
+          candidatePoolPubkeys.push(pda);
+        }
+      } catch {
+        // Ignore malformed config ID
+      }
+    }
+  }
+
+  if (candidatePoolPubkeys.length > 0) {
+    const accounts = await connection.getMultipleAccountsInfo(candidatePoolPubkeys, "confirmed");
+    const validPools: Array<{ poolId: string; lpMint: string }> = [];
+
+    accounts.forEach((acc, idx) => {
+      if (acc && acc.owner.equals(cpmmProgramId) && acc.data.length >= CpmmPoolInfoLayout.span) {
+        try {
+          const decoded = CpmmPoolInfoLayout.decode(acc.data);
+          validPools.push({
+            poolId: candidatePoolPubkeys[idx].toBase58(),
+            lpMint: decoded.lpMint.toBase58(),
+          });
+        } catch {
+          // Ignore decode failure
+        }
+      }
+    });
+
+    if (validPools.length > 0) {
+      if (lpMint && isValidPublicKey(lpMint)) {
+        const matchedByLp = validPools.find((p) => p.lpMint === lpMint);
+        if (matchedByLp) return matchedByLp.poolId;
+      }
+
+      for (const candidate of validPools) {
+        try {
+          const userLpAta = await getAssociatedTokenAddress(
+            new PublicKey(candidate.lpMint),
+            userPublicKey,
+            false,
+            TOKEN_PROGRAM_ID
+          );
+          const lpBal = await connection.getTokenAccountBalance(userLpAta, "confirmed");
+          if (BigInt(lpBal.value.amount || "0") > BigInt(0)) {
+            return candidate.poolId;
+          }
+        } catch {
+          // Check next pool
+        }
+      }
+
+      return validPools[0].poolId;
+    }
+  }
+
+  const lpMintTargets = [lpMint, baseMint].filter(
+    (m): m is string => Boolean(m && isValidPublicKey(m))
+  );
+  const lpMintOffset =
+    typeof CpmmPoolInfoLayout.offsetOf === "function"
+      ? (CpmmPoolInfoLayout.offsetOf("lpMint") ?? 136)
+      : 136;
+
+  for (const targetLpMint of lpMintTargets) {
+    try {
+      const matchedAccounts = await connection.getProgramAccounts(cpmmProgramId, {
+        commitment: "confirmed",
+        filters: [
+          {
+            memcmp: {
+              offset: lpMintOffset,
+              bytes: targetLpMint,
+            },
+          },
+        ],
+      });
+      if (matchedAccounts.length > 0) {
+        return matchedAccounts[0].pubkey.toBase58();
+      }
+    } catch {
+      // Continue
+    }
+  }
+
+  throw new Error(
+    `No active Raydium CPMM pool was found on ${network} for token ${baseMint.slice(
+      0,
+      8
+    )}... Please provide a valid Pool ID or select a token with an active Raydium CPMM pool.`
+  );
+}
+
 /**
- * Withdraws SOL Liquidity on-chain and charges the mandatory 0.05 SOL fee to DEV_WALLET_ADDRESS:
- * 1. Charges 0.05 SOL (50,000,000 lamports) atomically to DEV_WALLET_ADDRESS (with 10% affiliate split if present).
- * 2. Inspects the deterministic WSOL Pool Quote Vault (`wsolVaultAddress`) and/or user's WSOL ATA (`userWsolAta`).
- * 3. Unwraps WSOL back into native SOL directly into the user's wallet (100% full close or partial withdrawal).
- * 4. Burns proportional LP tokens if `lpMint` is provided and held by the user.
+ * Phase 2.9: Withdraws liquidity from a Raydium CPMM pool, properly distinguishing SOL (WSOL)
+ * vs USDC quote pools and returning `quoteToken`, `lpPairLabel` ("LP-SOL" | "LP-USDC"),
+ * `quoteVaultAddress`, `withdrawnQuote`, and `estimatedQuoteReturned`.
  */
 export async function removeLiquidityTransaction(
   input: RemoveLiquidityInput
 ): Promise<RemoveLiquidityOutput> {
   const {
     baseMint,
+    poolId,
     lpMint,
     withdrawPercentage = 100,
     wallet,
@@ -535,137 +1236,169 @@ export async function removeLiquidityTransaction(
     network = "mainnet-beta",
   } = input;
 
+  const isDevnet = network === "devnet";
   const connection = getSolanaConnection(network);
   const userPublicKey = new PublicKey(wallet);
-  const baseMintPublicKey = new PublicKey(baseMint);
-  const pct = Math.min(Math.max(Number(withdrawPercentage) || 100, 1), 100);
+  const pct = Math.min(Math.max(Math.round(Number(withdrawPercentage) || 100), 1), 100);
 
-  const userSolBalance = await connection.getBalance(userPublicKey, "confirmed");
-  if (userSolBalance < SERVICE_FEE_REMOVE_LP_LAMPORTS + 10_000) {
+  const cpmmProgramId = isDevnet
+    ? DEVNET_PROGRAM_ID.CREATE_CPMM_POOL_PROGRAM
+    : CREATE_CPMM_POOL_PROGRAM;
+
+  // 1. Initialize Raydium SDK v2 and verify user SOL balance for service fee + network fee
+  const { raydium, userSolLamports } = await initRaydiumSdkServerSide({
+    userPublicKey,
+    connection,
+    network,
+  });
+
+  if (userSolLamports < SERVICE_FEE_REMOVE_LP_LAMPORTS + 15_000) {
     throw new Error(
       `Insufficient SOL to pay the ${SERVICE_FEE_REMOVE_LP_SOL.toFixed(
         2
       )} SOL withdrawal service fee (current balance: ${(
-        userSolBalance / LAMPORTS_PER_SOL
+        userSolLamports / LAMPORTS_PER_SOL
       ).toFixed(4)} SOL).`
     );
   }
 
-  const instructions: TransactionInstruction[] = [
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 350_000 }),
-    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 25_000 }),
-    // Mandatory 0.05 SOL Withdrawal Fee routed to DEV_WALLET_ADDRESS
-    ...buildServiceFeeInstructions(userPublicKey, SERVICE_FEE_REMOVE_LP_LAMPORTS, affiliate),
-  ];
+  // 2. Resolve `poolId`
+  const { allConfigs } = await resolveCpmmFeeConfig({
+    raydium,
+    connection,
+    cpmmProgramId,
+    feeTierBps: 25,
+    network,
+  });
 
-  const { wsolVaultAddress } = await deriveCreatorPoolVaults(userPublicKey, baseMintPublicKey);
-  const userWsolAta = await getAssociatedTokenAddress(
-    WSOL_MINT,
+  const resolvedPoolId = await resolveRaydiumCpmmPoolId({
+    connection,
+    cpmmProgramId,
+    feeConfigs: allConfigs,
+    userPublicKey,
+    baseMint,
+    poolId,
+    lpMint,
+    network,
+  });
+
+  // 3. Fetch live Pool Info, Keys, and Reserves directly from RPC
+  let poolRpcData: Awaited<ReturnType<typeof raydium.cpmm.getPoolInfoFromRpc>>;
+  try {
+    poolRpcData = await raydium.cpmm.getPoolInfoFromRpc(resolvedPoolId);
+  } catch (rpcErr) {
+    throw mapFriendlyRaydiumError(rpcErr, network);
+  }
+
+  const { poolInfo, poolKeys, rpcData } = poolRpcData;
+  const poolLpMintPubkey = new PublicKey(poolInfo.lpMint.address);
+
+  // 4. Inspect user's LP Token balance on-chain and calculate `lpAmount` to withdraw
+  const userLpAta = await getAssociatedTokenAddress(
+    poolLpMintPubkey,
     userPublicKey,
     false,
     TOKEN_PROGRAM_ID
   );
+  const userLpParsed = await connection.getParsedAccountInfo(userLpAta, "confirmed");
+  const parsedLpInfo = extractParsedTokenInfo(userLpParsed.value?.data);
+  const rawLpBalanceStr = parsedLpInfo?.tokenAmount?.amount || "0";
+  const userLpBalanceBn = new BN(rawLpBalanceStr);
 
-  const [vaultInfo, userWsolInfo] = await Promise.all([
-    connection.getParsedAccountInfo(wsolVaultAddress, "confirmed"),
-    connection.getParsedAccountInfo(userWsolAta, "confirmed"),
-  ]);
-
-  let estimatedSolReturnedLamports = 0;
-
-  // Case A: Active Creator WSOL Pool Vault exists on-chain
-  const vaultParsed = extractParsedTokenInfo(vaultInfo.value?.data);
-  if (vaultInfo.value && vaultParsed?.owner === userPublicKey.toBase58()) {
-    const rawWsolAmount = BigInt(vaultParsed?.tokenAmount?.amount || "0");
-    if (pct === 100 || rawWsolAmount <= BigInt(0)) {
-      estimatedSolReturnedLamports += vaultInfo.value.lamports;
-      instructions.push(
-        createCloseAccountInstruction(
-          wsolVaultAddress,
-          userPublicKey,
-          userPublicKey,
-          [],
-          TOKEN_PROGRAM_ID
-        )
-      );
-    } else {
-      const withdrawLamports = (rawWsolAmount * BigInt(pct)) / BigInt(100);
-      estimatedSolReturnedLamports += Number(withdrawLamports);
-      instructions.push(
-        createAssociatedTokenAccountIdempotentInstruction(
-          userPublicKey,
-          userWsolAta,
-          userPublicKey,
-          WSOL_MINT,
-          TOKEN_PROGRAM_ID
-        ),
-        createTransferCheckedInstruction(
-          wsolVaultAddress,
-          WSOL_MINT,
-          userWsolAta,
-          userPublicKey,
-          withdrawLamports,
-          9,
-          [],
-          TOKEN_PROGRAM_ID
-        ),
-        createCloseAccountInstruction(
-          userWsolAta,
-          userPublicKey,
-          userPublicKey,
-          [],
-          TOKEN_PROGRAM_ID
-        )
-      );
-    }
-  } else if (userWsolInfo.value) {
-    // Case B: User holds wrapped SOL (WSOL ATA) in their wallet — unwrap it back to native SOL
-    estimatedSolReturnedLamports += userWsolInfo.value.lamports;
-    instructions.push(
-      createCloseAccountInstruction(
-        userWsolAta,
-        userPublicKey,
-        userPublicKey,
-        [],
-        TOKEN_PROGRAM_ID
-      )
+  if (userLpBalanceBn.lte(new BN(0))) {
+    throw new Error(
+      `Your wallet holds 0 LP tokens (${poolInfo.lpMint.address.slice(
+        0,
+        8
+      )}...) for Raydium CPMM pool ${resolvedPoolId.slice(0, 8)}... on ${network}.`
     );
   }
 
-  // Optional: If lpMint (or baseMint if user selected an LP token directly) is held by user, burn proportional LP tokens
-  const candidateLpMint = lpMint ? new PublicKey(lpMint) : null;
-  if (candidateLpMint) {
-    try {
-      const userLpAta = await getAssociatedTokenAddress(
-        candidateLpMint,
-        userPublicKey,
-        false,
-        TOKEN_PROGRAM_ID
-      );
-      const lpAcc = await connection.getParsedAccountInfo(userLpAta, "confirmed");
-      const lpParsed = extractParsedTokenInfo(lpAcc.value?.data);
-      if (lpParsed?.tokenAmount?.amount) {
-        const rawLpBal = BigInt(lpParsed.tokenAmount.amount);
-        const burnLpRaw = (rawLpBal * BigInt(pct)) / BigInt(100);
-        if (burnLpRaw > BigInt(0)) {
-          instructions.push(
-            createBurnCheckedInstruction(
-              userLpAta,
-              candidateLpMint,
-              userPublicKey,
-              burnLpRaw,
-              Number(lpParsed.tokenAmount.decimals ?? 9),
-              [],
-              TOKEN_PROGRAM_ID
-            )
-          );
-        }
-      }
-    } catch {
-      // Ignore if LP token account is already closed/burned
-    }
+  const lpAmountBn =
+    pct === 100
+      ? userLpBalanceBn
+      : userLpBalanceBn.mul(new BN(pct)).div(new BN(100));
+
+  if (lpAmountBn.lte(new BN(0))) {
+    throw new Error("Calculated LP token withdrawal amount is zero. Increase withdrawal percentage.");
   }
 
+  // 5. Compute expected token outputs pro-rata from live RPC reserves and identify SOL vs USDC quote
+  const totalLpSupply = rpcData.lpAmount.gt(new BN(0)) ? rpcData.lpAmount : new BN(1);
+  const rawOutA = lpAmountBn.mul(rpcData.baseReserve).div(totalLpSupply);
+  const rawOutB = lpAmountBn.mul(rpcData.quoteReserve).div(totalLpSupply);
+
+  const mintAAddr = poolInfo.mintA.address;
+  const mintBAddr = poolInfo.mintB.address;
+  const wsolAddr = WSOL_MINT.toBase58();
+  const usdcAddresses = new Set<string>([
+    USDC_MINT_MAINNET.toBase58(),
+    USDC_MINT_DEVNET.toBase58(),
+  ]);
+
+  const hasWsol = mintAAddr === wsolAddr || mintBAddr === wsolAddr;
+  const hasUsdc = usdcAddresses.has(mintAAddr) || usdcAddresses.has(mintBAddr);
+
+  const isMintAQuote =
+    mintAAddr === wsolAddr ||
+    (!hasWsol && usdcAddresses.has(mintAAddr)) ||
+    (!hasWsol && !hasUsdc && mintAAddr !== baseMint);
+
+  const quoteMintAddr = isMintAQuote ? mintAAddr : mintBAddr;
+  const quoteToken: "SOL" | "USDC" =
+    quoteMintAddr === wsolAddr ? "SOL" : "USDC";
+  const lpPairLabel: "LP-SOL" | "LP-USDC" = `LP-${quoteToken}`;
+
+  const rawQuoteOut = isMintAQuote ? rawOutA : rawOutB;
+  const rawBaseOut = isMintAQuote ? rawOutB : rawOutA;
+  const quoteDecimals = isMintAQuote ? poolInfo.mintA.decimals : poolInfo.mintB.decimals;
+  const baseDecimals = isMintAQuote ? poolInfo.mintB.decimals : poolInfo.mintA.decimals;
+  const resolvedBaseMint = isMintAQuote ? mintBAddr : mintAAddr;
+  const quoteVaultAddress = isMintAQuote ? poolKeys.vault.A : poolKeys.vault.B;
+
+  const estimatedQuoteUi = Number(rawQuoteOut.toString()) / Math.pow(10, quoteDecimals);
+  const estimatedBaseUi = Number(rawBaseOut.toString()) / Math.pow(10, baseDecimals);
+
+  // 6. Build withdrawal instructions via `raydium.cpmm.withdrawLiquidity`
+  let withdrawBuilderResult: Awaited<ReturnType<typeof raydium.cpmm.withdrawLiquidity>>;
+  try {
+    withdrawBuilderResult = await raydium.cpmm.withdrawLiquidity({
+      poolInfo,
+      poolKeys,
+      lpAmount: lpAmountBn,
+      txVersion: TxVersion.V0,
+      slippage: new Percent(1, 100), // 1% slippage tolerance
+      closeWsol: quoteToken === "SOL" && hasWsol,
+    });
+  } catch (sdkErr) {
+    throw mapFriendlyRaydiumError(sdkErr, network);
+  }
+
+  const { builder, signers } = withdrawBuilderResult;
+  const sdkInstructions = (builder.allInstructions || []).filter(
+    (ix) => !ix.programId.equals(ComputeBudgetProgram.programId)
+  );
+  if (sdkInstructions.length === 0) {
+    throw new Error("Raydium SDK returned no instructions for CPMM liquidity withdrawal.");
+  }
+
+  const coreInstructions: TransactionInstruction[] = [
+    ...buildServiceFeeInstructions(userPublicKey, SERVICE_FEE_REMOVE_LP_LAMPORTS, affiliate),
+    ...sdkInstructions,
+  ];
+
+  // 7. Phase 2.10: Dynamic Compute Budget (simulate + priority fee)
+  const computeBudgetIxs = await buildDynamicComputeBudgetInstructions({
+    connection,
+    payerKey: userPublicKey,
+    instructions: coreInstructions,
+    defaultUnits: 450_000,
+    defaultMicroLamports: 50_000,
+  });
+
+  const instructions: TransactionInstruction[] = [...computeBudgetIxs, ...coreInstructions];
+
+  // 8. Compile VersionedTransaction V0 and partially sign with any ephemeral SDK signers
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
 
   const messageV0 = new TransactionMessage({
@@ -675,20 +1408,203 @@ export async function removeLiquidityTransaction(
   }).compileToV0Message();
 
   const transaction = new VersionedTransaction(messageV0);
-  const serializedTransaction = transaction.serialize();
-  const base64Transaction = Buffer.from(serializedTransaction).toString("base64");
+  const extraSigners = extractExtraSigners(
+    userPublicKey,
+    signers,
+    builder.AllTxData?.signers
+  );
+  if (extraSigners.length > 0) {
+    transaction.sign(extraSigners);
+  }
+
+  const base64Transaction = Buffer.from(transaction.serialize()).toString("base64");
+  const quoteDecimalsDisplay = quoteToken === "USDC" ? 2 : 6;
 
   return {
     transaction: base64Transaction,
-    baseMint,
-    wsolVaultAddress: wsolVaultAddress.toBase58(),
-    withdrawnSol: Number((estimatedSolReturnedLamports / LAMPORTS_PER_SOL).toFixed(6)),
+    poolId: resolvedPoolId,
+    lpMint: poolInfo.lpMint.address,
+    baseMint: resolvedBaseMint,
+    quoteToken,
+    lpPairLabel,
+    quoteVaultAddress,
+    withdrawnQuote: Number(estimatedQuoteUi.toFixed(6)),
     withdrawPercentage: pct,
-    estimatedSolReturned: (estimatedSolReturnedLamports / LAMPORTS_PER_SOL).toFixed(4),
-    estimatedBaseReturned: `${pct}% of Pool Position`,
+    estimatedQuoteReturned: estimatedQuoteUi.toFixed(quoteDecimalsDisplay),
+    estimatedBaseReturned: estimatedBaseUi.toFixed(4),
     serviceFeeSol: SERVICE_FEE_REMOVE_LP_SOL,
     blockhash,
     lastValidBlockHeight,
     network,
   };
+}
+
+
+export interface DiscoveredLiquidityPosition {
+  id: string;
+  poolId: string;
+  baseMint: string;
+  quoteToken: "SOL" | "USDC";
+  lpPairLabel: "LP-SOL" | "LP-USDC";
+  lpMintAddress: string;
+  quoteVaultAddress: string;
+  wsolVaultAddress: string;
+  baseVaultAddress: string;
+  lpTokenBalanceUi: number;
+  lpTokenAmountRaw: string;
+  programId: string;
+  network: SolanaCluster;
+}
+
+/**
+ * Discovers active Raydium CPMM liquidity pool positions held by `walletAddress` on `network`.
+ */
+export async function discoverUserLiquidityPositions(
+  walletAddress: string,
+  network: SolanaCluster = "mainnet-beta",
+  hintMints: string[] = []
+): Promise<DiscoveredLiquidityPosition[]> {
+  if (!walletAddress || !isValidPublicKey(walletAddress)) {
+    return [];
+  }
+
+  const isDevnet = network === "devnet";
+  const connection = getSolanaConnection(network);
+  const userPublicKey = new PublicKey(walletAddress);
+  const dexConfig = getClusterDexConfig(network);
+  const cpmmProgramId = isDevnet
+    ? DEVNET_PROGRAM_ID.CREATE_CPMM_POOL_PROGRAM
+    : CREATE_CPMM_POOL_PROGRAM;
+
+  const [splAccounts, token2022Accounts] = await Promise.all([
+    connection.getParsedTokenAccountsByOwner(
+      userPublicKey,
+      { programId: TOKEN_PROGRAM_ID },
+      "confirmed"
+    ),
+    connection.getParsedTokenAccountsByOwner(
+      userPublicKey,
+      { programId: TOKEN_2022_PROGRAM_ID },
+      "confirmed"
+    ),
+  ]);
+
+  const userTokenBalances = new Map<string, { raw: string; ui: number; programId: string }>();
+  const candidateMints = new Set<string>();
+
+  for (const acc of [...splAccounts.value, ...token2022Accounts.value]) {
+    const info = extractParsedTokenInfo(acc.account.data);
+    const mintStr = info?.mint;
+    const rawStr = String(info?.tokenAmount?.amount || "0");
+    if (!mintStr || BigInt(rawStr) <= BigInt(0)) continue;
+    const uiVal = Number(info?.tokenAmount?.uiAmountString || "0");
+    userTokenBalances.set(mintStr, {
+      raw: rawStr,
+      ui: uiVal,
+      programId: acc.account.owner.toBase58(),
+    });
+    if (
+      mintStr !== WSOL_MINT.toBase58() &&
+      mintStr !== dexConfig.usdcMint.toBase58()
+    ) {
+      candidateMints.add(mintStr);
+    }
+  }
+
+  for (const h of hintMints) {
+    if (h && isValidPublicKey(h) && h !== WSOL_MINT.toBase58()) {
+      candidateMints.add(h);
+    }
+  }
+
+  if (candidateMints.size === 0) return [];
+
+  const configs = getFallbackCpmmConfigs(cpmmProgramId);
+  const quoteMints: Array<{ mint: PublicKey; quoteToken: "SOL" | "USDC" }> = [
+    { mint: dexConfig.wsolMint, quoteToken: "SOL" },
+    { mint: dexConfig.usdcMint, quoteToken: "USDC" },
+  ];
+
+  const poolCandidates: Array<{
+    poolPda: PublicKey;
+    baseMint: string;
+    quoteToken: "SOL" | "USDC";
+  }> = [];
+
+  for (const baseMintStr of Array.from(candidateMints).slice(0, 15)) {
+    const basePk = new PublicKey(baseMintStr);
+    for (const q of quoteMints) {
+      if (basePk.equals(q.mint)) continue;
+      const { token0, token1 } = sortTokenMints(basePk, q.mint);
+      for (const cfg of configs) {
+        const poolPda = getCpmmPdaPoolId(
+          cpmmProgramId,
+          new PublicKey(cfg.id),
+          token0,
+          token1
+        ).publicKey;
+        poolCandidates.push({
+          poolPda,
+          baseMint: baseMintStr,
+          quoteToken: q.quoteToken,
+        });
+      }
+    }
+  }
+
+  const positions: DiscoveredLiquidityPosition[] = [];
+  const seenPools = new Set<string>();
+
+  for (let i = 0; i < poolCandidates.length; i += 50) {
+    const batch = poolCandidates.slice(i, i + 50);
+    const infos = await connection.getMultipleAccountsInfo(
+      batch.map((b) => b.poolPda),
+      "confirmed"
+    );
+
+    infos.forEach((acc, idx) => {
+      const item = batch[idx];
+      const poolIdStr = item.poolPda.toBase58();
+      if (
+        !acc ||
+        seenPools.has(poolIdStr) ||
+        !acc.owner.equals(cpmmProgramId) ||
+        acc.data.length < CpmmPoolInfoLayout.span
+      ) {
+        return;
+      }
+
+      try {
+        const decoded = CpmmPoolInfoLayout.decode(acc.data);
+        const lpMintStr = decoded.lpMint.toBase58();
+        const lpBalance = userTokenBalances.get(lpMintStr);
+        if (!lpBalance || BigInt(lpBalance.raw) <= BigInt(0)) return;
+
+        seenPools.add(poolIdStr);
+        const isToken0Base = decoded.mintA.toBase58() === item.baseMint;
+        const baseVaultStr = (isToken0Base ? decoded.vaultA : decoded.vaultB).toBase58();
+        const quoteVaultStr = (isToken0Base ? decoded.vaultB : decoded.vaultA).toBase58();
+
+        positions.push({
+          id: poolIdStr,
+          poolId: poolIdStr,
+          baseMint: item.baseMint,
+          quoteToken: item.quoteToken,
+          lpPairLabel: `LP-${item.quoteToken}`,
+          lpMintAddress: lpMintStr,
+          quoteVaultAddress: quoteVaultStr,
+          wsolVaultAddress: quoteVaultStr,
+          baseVaultAddress: baseVaultStr,
+          lpTokenBalanceUi: lpBalance.ui,
+          lpTokenAmountRaw: lpBalance.raw,
+          programId: TOKEN_PROGRAM_ID.toBase58(),
+          network,
+        });
+      } catch {
+        // Ignore malformed pool state
+      }
+    });
+  }
+
+  return positions;
 }

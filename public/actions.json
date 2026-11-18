@@ -1,0 +1,6 @@
+{
+  "rules": [
+    { "pathPattern": "/token/*", "apiPath": "/api/actions/token/*" },
+    { "pathPattern": "/reclaim", "apiPath": "/api/actions/reclaim" }
+  ]
+}

@@ -20,12 +20,17 @@ import {
   MODULAR_FEE_PERMANENT_DELEGATE_EXT_SOL,
   MODULAR_FEE_VANITY_MINT_SOL,
   MODULAR_FEE_JITO_BUNDLE_SOL,
+  MODULAR_FEE_JITO_MULTI_WALLET_SOL,
   calculateModularTokenCreationFee,
 } from "@/lib/constants";
 import {
   startVanityMintGenerator,
   validateBase58Input,
 } from "@/workers/vanityMint.worker";
+import {
+  generateAntiBubblemapsBuyerWallets,
+  GeneratedBuyerWallet,
+} from "@/lib/solana/jitoBundler";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -94,6 +99,7 @@ const tokenSchema = z.object({
       poolSupplyPercent: z.number().min(1).max(100),
       firstBuySol: z.number().min(0),
       jitoTipSol: z.number().min(0.001).max(0.05),
+      isMultiWalletBundle: z.boolean().optional(),
     })
     .optional(),
 });
@@ -122,8 +128,9 @@ export default function TokenForm() {
   const [clientValidationAlert, setClientValidationAlert] = useState<string | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const { cluster, setCluster } = useCluster();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const isDevnet = cluster === "devnet";
+  const isPt = locale === "pt" || locale === "pt-BR";
 
   // Phase 2: Vanity Mint Address Generator state
   const [vanityEnabled, setVanityEnabled] = useState(false);
@@ -142,6 +149,11 @@ export default function TokenForm() {
     charLength: number;
   } | null>(null);
   const vanityControllerRef = useRef<{ stop: () => void } | null>(null);
+
+  // Phase 2: Jito Multi-Wallet Anti-Bubblemaps (4–8 Wallets) state
+  const [multiWalletCount, setMultiWalletCount] = useState<number>(4);
+  const [buyerWallets, setBuyerWallets] = useState<GeneratedBuyerWallet[]>([]);
+  const [buyerKeysDownloaded, setBuyerKeysDownloaded] = useState<boolean>(false);
 
   useEffect(() => {
     return () => {
@@ -255,8 +267,9 @@ export default function TokenForm() {
         enabled: false,
         liquiditySol: 1.0,
         poolSupplyPercent: 80,
-        firstBuySol: 0.1,
+        firstBuySol: 0.2,
         jitoTipSol: 0.002,
+        isMultiWalletBundle: false,
       },
     },
     mode: "onChange",
@@ -264,8 +277,52 @@ export default function TokenForm() {
 
   const watchedFields = watch();
 
+  // Auto-generate buyer sub-wallets when Multi-Wallet Anti-Bubblemaps is enabled
+  useEffect(() => {
+    if (watchedFields.jitoBundle?.enabled && watchedFields.jitoBundle?.isMultiWalletBundle) {
+      const generated = generateAntiBubblemapsBuyerWallets(
+        multiWalletCount,
+        watchedFields.jitoBundle.firstBuySol || 0.2
+      );
+      setBuyerWallets(generated);
+      setBuyerKeysDownloaded(false);
+    }
+  }, [
+    watchedFields.jitoBundle?.enabled,
+    watchedFields.jitoBundle?.isMultiWalletBundle,
+    multiWalletCount,
+    watchedFields.jitoBundle?.firstBuySol,
+  ]);
+
+  const handleDownloadBuyerWalletsJson = () => {
+    if (buyerWallets.length === 0) return;
+    const payload = {
+      platform: "CreateTokenSolana (https://www.createtokensol.store)",
+      module: "Jito Multi-Wallet Anti-Bubblemaps Bundle",
+      network: cluster,
+      tokenSymbol: watchedFields.symbol || "TOKEN",
+      generatedAt: new Date().toISOString(),
+      walletCount: buyerWallets.length,
+      wallets: buyerWallets,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `createtokensol-jito-buyer-wallets-${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setBuyerKeysDownloaded(true);
+  };
+
   const activeVanityCharLen =
-    vanityEnabled && vanityFound ? vanityFound.charLength : vanityEnabled ? vanityPattern.trim().length : 0;
+    vanityEnabled && vanityFound
+      ? vanityFound.charLength
+      : vanityEnabled
+      ? vanityPattern.trim().length
+      : 0;
 
   const modularOptions = useMemo(
     () => ({
@@ -282,6 +339,9 @@ export default function TokenForm() {
         watchedFields.tokenStandard === "token-2022" && Boolean(watchedFields.permanentDelegate),
       vanityCharLength: activeVanityCharLen,
       hasJitoBundle: Boolean(watchedFields.jitoBundle?.enabled),
+      isMultiWalletBundle: Boolean(
+        watchedFields.jitoBundle?.enabled && watchedFields.jitoBundle?.isMultiWalletBundle
+      ),
     }),
     [
       watchedFields.freezeAuthority,
@@ -294,6 +354,7 @@ export default function TokenForm() {
       watchedFields.permanentDelegate,
       activeVanityCharLen,
       watchedFields.jitoBundle?.enabled,
+      watchedFields.jitoBundle?.isMultiWalletBundle,
     ]
   );
 
@@ -429,6 +490,10 @@ export default function TokenForm() {
     setValue("imageUrl", "", { shouldValidate: true });
   };
 
+  const isMultiWalletActive = Boolean(
+    watchedFields.jitoBundle?.enabled && watchedFields.jitoBundle?.isMultiWalletBundle
+  );
+
   const handleStrictFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setClientValidationAlert(null);
@@ -472,6 +537,13 @@ export default function TokenForm() {
       return;
     }
 
+    if (isMultiWalletActive && !buyerKeysDownloaded) {
+      setClientValidationAlert(
+        "Baixe o arquivo .JSON com as chaves das carteiras compradoras antes de disparar o Jito Bundle Multi-Carteira."
+      );
+      return;
+    }
+
     await handleSubmit(async (data: TokenFormData) => {
       const tokenDataForApi = {
         ...data,
@@ -487,6 +559,8 @@ export default function TokenForm() {
         },
         soulbound: Boolean(data.soulbound),
         permanentDelegate: Boolean(data.permanentDelegate),
+        vanityPublicKey:
+          vanityEnabled && vanityFound ? vanityFound.publicKey : undefined,
         vanitySecretKey:
           vanityEnabled && vanityFound ? vanityFound.secretKey : undefined,
         vanityCharLength:
@@ -496,8 +570,15 @@ export default function TokenForm() {
               enabled: true,
               liquiditySol: Number(data.jitoBundle.liquiditySol) || 1.0,
               poolSupplyPercent: Number(data.jitoBundle.poolSupplyPercent) || 80,
-              firstBuySol: Number(data.jitoBundle.firstBuySol) || 0.1,
+              firstBuySol: Number(data.jitoBundle.firstBuySol) || 0.2,
               jitoTipSol: Number(data.jitoBundle.jitoTipSol) || 0.002,
+              isMultiWalletBundle: Boolean(data.jitoBundle.isMultiWalletBundle),
+              multiWalletBuys: data.jitoBundle.isMultiWalletBundle
+                ? buyerWallets.map((w) => ({
+                    secretKey: Uint8Array.from(w.secretKeyArray),
+                    buyAmountSol: w.buyAmountSol,
+                  }))
+                : undefined,
             }
           : undefined,
       };
@@ -548,6 +629,7 @@ export default function TokenForm() {
             <strong>{liveModularTotalSol.toFixed(2)} SOL</strong>
           </div>
         </div>
+
 
         <div className={styles.stepIndicatorContainer}>
           {STEPS.map((step, index) => (
@@ -803,7 +885,15 @@ export default function TokenForm() {
                       marginTop: "0.75rem",
                     }}
                   >
-                    <label style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", fontSize: "0.82rem", cursor: "pointer" }}>
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.45rem",
+                        fontSize: "0.82rem",
+                        cursor: "pointer",
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={vanityCaseSensitive}
@@ -1142,7 +1232,6 @@ export default function TokenForm() {
                     <p className={styles.fieldDescription}>Cap per transfer in whole tokens.</p>
                   </div>
 
-                  {/* Phase 5: New Token-2022 Extensions (+0.10 SOL each) */}
                   <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
                     <div className={styles.authorityOption}>
                       <div className={styles.authorityText}>
@@ -1200,6 +1289,32 @@ export default function TokenForm() {
                       />
                     </div>
                   </div>
+
+                  {(watchedFields.soulbound || watchedFields.permanentDelegate) && (
+                    <div
+                      role="alert"
+                      style={{
+                        gridColumn: "1 / -1",
+                        padding: "0.85rem 1rem",
+                        borderRadius: "0.75rem",
+                        border: "1px solid rgba(245, 158, 11, 0.55)",
+                        background: "rgba(245, 158, 11, 0.12)",
+                        color: "#fde68a",
+                        fontSize: "0.82rem",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      ⚠️{" "}
+                      <strong>
+                        {isPt
+                          ? "Aviso de Incompatibilidade com Pools Raydium CPMM:"
+                          : "Raydium CPMM Pool Incompatibility Warning:"}
+                      </strong>{" "}
+                      {isPt
+                        ? "As extensões Soulbound (NonTransferable) e Permanent Delegate são rejeitadas pelo protocolo Raydium CPMM (erro NotSupportMint). Desative essas opções se você pretende criar uma Pool de Liquidez para este token."
+                        : "Soulbound (NonTransferable) and Permanent Delegate extensions are rejected by the Raydium CPMM protocol (NotSupportMint error). Disable both options if you plan to create a Raydium liquidity pool."}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1278,15 +1393,18 @@ export default function TokenForm() {
                     />
                   </div>
 
-                  {/* Phase 3: Jito Atomic Bundle (Mint + Liquidity Pool + First Dev Buy) */}
+                  {/* Phase 2 & 3: Jito Atomic Bundle (Single or Multi-Wallet Anti-Bubblemaps) */}
                   <div className={styles.authorityOption}>
                     <div className={styles.authorityText}>
                       <Label htmlFor="jitoBundleToggle">
                         ⚡ Lançamento Blindado Anti-Sniper (Jito Atomic Bundle: Mint + Pool + 1ª Compra) (+
-                        {MODULAR_FEE_JITO_BUNDLE_SOL.toFixed(2)} SOL)
+                        {watchedFields.jitoBundle?.isMultiWalletBundle
+                          ? MODULAR_FEE_JITO_MULTI_WALLET_SOL.toFixed(2)
+                          : MODULAR_FEE_JITO_BUNDLE_SOL.toFixed(2)}{" "}
+                        SOL)
                       </Label>
                       <p>
-                        Executa Mint + Pool de Liquidez Raydium + 1ª Compra do Criador no Bloco Zero via Jito Block Engine para impedir front-running de bots MEV.
+                        Executa Mint + Pool de Liquidez Raydium CPMM + Compra no Bloco Zero via Jito Block Engine para impedir front-running de bots MEV.
                       </p>
                     </div>
                     <Controller
@@ -1356,7 +1474,7 @@ export default function TokenForm() {
                       </div>
 
                       <div className={styles.field}>
-                        <Label htmlFor="jitoFirstBuySol">1ª Compra Anti-Sniper (SOL)</Label>
+                        <Label htmlFor="jitoFirstBuySol">Compra Total no Bloco Zero (SOL)</Label>
                         <Controller
                           name="jitoBundle.firstBuySol"
                           control={control}
@@ -1376,21 +1494,167 @@ export default function TokenForm() {
                       <div className={styles.field}>
                         <Label htmlFor="jitoTipSol">Gorjeta Validador Jito (0.001–0.01 SOL)</Label>
                         <Controller
-                          name="jitoBundle.jitoTipSol"
+                          name="jitoTipSol"
                           control={control}
-                          render={({ field }) => (
-                            <Input
-                              id="jitoTipSol"
-                              type="number"
-                              step="0.001"
-                              min={0.001}
-                              max={0.01}
-                              {...field}
-                              onChange={(e) => field.onChange(Number(e.target.value) || 0.002)}
+                          render={() => (
+                            <Controller
+                              name="jitoBundle.jitoTipSol"
+                              control={control}
+                              render={({ field }) => (
+                                <Input
+                                  id="jitoTipSol"
+                                  type="number"
+                                  step="0.001"
+                                  min={0.001}
+                                  max={0.01}
+                                  {...field}
+                                  onChange={(e) => field.onChange(Number(e.target.value) || 0.002)}
+                                />
+                              )}
                             />
                           )}
                         />
                       </div>
+                    </div>
+
+                    {/* Phase 2: Multi-Wallet Anti-Bubblemaps Buy Toggle (4-8 Wallets) */}
+                    <div
+                      style={{
+                        marginTop: "0.9rem",
+                        padding: "0.85rem",
+                        borderRadius: "0.65rem",
+                        background: "rgba(9, 9, 11, 0.72)",
+                        border: "1px solid rgba(20, 241, 149, 0.4)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: "0.75rem",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div>
+                          <strong style={{ fontSize: "0.86rem", color: "#14f195" }}>
+                            🛡️ Multi-Wallet Anti-Bubblemaps Buy (4–8 Wallets) (+
+                            {MODULAR_FEE_JITO_MULTI_WALLET_SOL.toFixed(2)} SOL)
+                          </strong>
+                          <p
+                            style={{
+                              fontSize: "0.76rem",
+                              color: "hsl(var(--muted-foreground))",
+                              marginTop: "0.15rem",
+                            }}
+                          >
+                            Distribui a compra do Bloco Zero em 4 a 8 sub-carteiras independentes via{" "}
+                            <code>swapBaseInput</code> oficial do Raydium CPMM.
+                          </p>
+                        </div>
+                        <Controller
+                          name="jitoBundle.isMultiWalletBundle"
+                          control={control}
+                          render={({ field }) => (
+                            <label className={styles.switch}>
+                              <input
+                                type="checkbox"
+                                checked={Boolean(field.value)}
+                                onChange={(e) => field.onChange(e.target.checked)}
+                              />
+                              <span className={styles.slider}></span>
+                            </label>
+                          )}
+                        />
+                      </div>
+
+                      {watchedFields.jitoBundle?.isMultiWalletBundle && (
+                        <div style={{ marginTop: "0.75rem" }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              flexWrap: "wrap",
+                              gap: "0.75rem",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                              <span style={{ fontSize: "0.78rem" }}>Sub-Carteiras:</span>
+                              {[4, 6, 8].map((cnt) => (
+                                <button
+                                  key={cnt}
+                                  type="button"
+                                  onClick={() => setMultiWalletCount(cnt)}
+                                  style={{
+                                    padding: "0.28rem 0.65rem",
+                                    borderRadius: "0.45rem",
+                                    fontSize: "0.76rem",
+                                    fontWeight: 700,
+                                    border:
+                                      multiWalletCount === cnt
+                                        ? "1px solid #14f195"
+                                        : "1px solid rgba(255,255,255,0.2)",
+                                    background:
+                                      multiWalletCount === cnt
+                                        ? "rgba(20, 241, 149, 0.18)"
+                                        : "transparent",
+                                    color: multiWalletCount === cnt ? "#14f195" : "#e2e8f0",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  {cnt} Wallets
+                                </button>
+                              ))}
+                            </div>
+
+                            <Button
+                              type="button"
+                              onClick={handleDownloadBuyerWalletsJson}
+                              style={{
+                                background: buyerKeysDownloaded
+                                  ? "rgba(20, 241, 149, 0.2)"
+                                  : "linear-gradient(135deg, #14f195 0%, #00d1ff 100%)",
+                                color: buyerKeysDownloaded ? "#14f195" : "#09090b",
+                                fontWeight: 800,
+                                fontSize: "0.78rem",
+                              }}
+                            >
+                              {buyerKeysDownloaded
+                                ? "✓ Chaves Compradoras Baixadas (.JSON)"
+                                : "⬇️ Baixar Chaves das Carteiras Compradoras (.JSON)"}
+                            </Button>
+                          </div>
+
+                          <div
+                            style={{
+                              marginTop: "0.6rem",
+                              display: "grid",
+                              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                              gap: "0.4rem",
+                              fontSize: "0.74rem",
+                              fontFamily: "monospace",
+                            }}
+                          >
+                            {buyerWallets.map((w) => (
+                              <div
+                                key={w.publicKey}
+                                style={{
+                                  padding: "0.35rem 0.55rem",
+                                  borderRadius: "0.4rem",
+                                  background: "rgba(255,255,255,0.04)",
+                                  border: "1px solid rgba(255,255,255,0.1)",
+                                }}
+                              >
+                                #{w.index}: {w.publicKey.slice(0, 5)}...{w.publicKey.slice(-4)} →{" "}
+                                <strong style={{ color: "#14f195" }}>
+                                  {w.buyAmountSol.toFixed(3)} SOL
+                                </strong>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1417,7 +1681,11 @@ export default function TokenForm() {
             {currentStep === STEPS.length && (
               <Button
                 type="submit"
-                disabled={isCreatingToken || isUploading}
+                disabled={
+                  isCreatingToken ||
+                  isUploading ||
+                  (isMultiWalletActive && !buyerKeysDownloaded)
+                }
                 style={
                   isDevnet
                     ? {
@@ -1435,6 +1703,8 @@ export default function TokenForm() {
                   </div>
                 ) : isUploading ? (
                   t.form.uploadingImg
+                ) : isMultiWalletActive && !buyerKeysDownloaded ? (
+                  "⬇️ Baixe o .JSON das Carteiras Compradoras Antes de Lançar"
                 ) : (
                   `${isDevnet ? t.form.submitDevnet : t.form.submitMainnet} (${liveModularTotalSol.toFixed(2)} SOL)`
                 )}

@@ -4,9 +4,10 @@ import { createSplTokenTransaction } from "@/lib/services/splTokenService";
 import { createToken2022Transaction } from "@/lib/services/token2022Service";
 import { uploadMetadataJsonToArweave } from "@/lib/services/arweaveService";
 import {
-  checkRateLimit,
+  checkRateLimitAsync,
   createTokenRequestSchema,
   getClientIp,
+  sanitizeErrorMessage,
   sanitizeHttpsUrl,
 } from "@/lib/security";
 
@@ -22,7 +23,7 @@ cloudinary.config({
 export async function POST(request: NextRequest) {
   try {
     const clientIp = getClientIp(request);
-    const rateLimit = checkRateLimit(`create-token:${clientIp}`, 12, 60_000);
+    const rateLimit = await checkRateLimitAsync(`create-token:${clientIp}`, 12, 60_000);
 
     if (!rateLimit.allowed) {
       return NextResponse.json(
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       transferFee,
       soulbound = false,
       permanentDelegate = false,
-      vanitySecretKey,
+      vanityPublicKey,
       vanityCharLength = 0,
       jitoBundle,
       affiliate,
@@ -169,6 +170,7 @@ export async function POST(request: NextRequest) {
 
     const cleanSupplyStr = String(supply).replace(/,/g, "").trim();
     const hasJitoBundle = Boolean(jitoBundle?.enabled);
+    const isMultiWalletBundle = Boolean(jitoBundle?.isMultiWalletBundle);
 
     const result =
       tokenStandard === "token-2022"
@@ -188,9 +190,10 @@ export async function POST(request: NextRequest) {
             transferFee,
             soulbound,
             permanentDelegate,
-            vanitySecretKey,
+            vanityPublicKey,
             vanityCharLength,
             hasJitoBundle,
+            isMultiWalletBundle,
             affiliate,
             network,
           })
@@ -205,9 +208,10 @@ export async function POST(request: NextRequest) {
             freezeAuthority,
             isMetadataMutable,
             customCreatorInfo: isCustomCreatorEnabled,
-            vanitySecretKey,
+            vanityPublicKey,
             vanityCharLength,
             hasJitoBundle,
+            isMultiWalletBundle,
             affiliate,
             network,
           });
@@ -219,10 +223,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Detailed error while creating token transaction:", error);
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "Internal server error while creating the token transaction.";
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: sanitizeErrorMessage(
+          error,
+          "Internal server error while creating the token transaction."
+        ),
+      },
+      { status: 500 }
+    );
   }
 }

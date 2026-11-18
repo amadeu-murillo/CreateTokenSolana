@@ -66,6 +66,13 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, []);
 
   const endpoint = useMemo(() => getRpcEndpoint(cluster), [cluster]);
+  const wsEndpoint = useMemo(
+    () =>
+      cluster === "devnet"
+        ? "wss://api.devnet.solana.com"
+        : "wss://api.mainnet-beta.solana.com",
+    [cluster]
+  );
 
   const getExplorerUrl = useCallback(
     (type: "tx" | "token" | "account", id: string) =>
@@ -90,7 +97,15 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   return (
     <ClusterContext.Provider value={contextValue}>
-      <ConnectionProvider endpoint={endpoint} config={{ commitment: "confirmed", disableRetryOnRateLimit: true, confirmTransactionInitialTimeout: 45000 }}>
+      <ConnectionProvider
+        endpoint={endpoint}
+        config={{
+          commitment: "confirmed",
+          wsEndpoint,
+          disableRetryOnRateLimit: true,
+          confirmTransactionInitialTimeout: 60000,
+        }}
+      >
         <SolanaWalletProvider wallets={wallets} autoConnect>
           <WalletModalProvider>{children}</WalletModalProvider>
         </SolanaWalletProvider>

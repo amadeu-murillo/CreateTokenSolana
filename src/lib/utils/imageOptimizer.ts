@@ -60,11 +60,12 @@ export async function optimizeTokenLogo(
 
   try {
     const img = await loadImageElement(file);
-    const srcWidth = img.naturalWidth || img.width;
-    const srcHeight = img.naturalHeight || img.height;
+    const srcWidth = img.naturalWidth || img.width || MAX_LOGO_DIMENSION;
+    const srcHeight = img.naturalHeight || img.height || MAX_LOGO_DIMENSION;
 
-    // If already small enough (< 95 KiB) and within 512x512, skip re-encoding
+    // If already small enough (< 95 KiB), WebP/PNG/JPG, and within 512x512, skip re-encoding
     if (
+      file.type !== "image/svg+xml" &&
       file.size <= targetMaxBytes &&
       srcWidth <= MAX_LOGO_DIMENSION &&
       srcHeight <= MAX_LOGO_DIMENSION
@@ -127,7 +128,7 @@ export async function optimizeTokenLogo(
       }
     }
 
-    if (!bestBlob || bestBlob.size >= file.size) {
+    if (!bestBlob || (file.type !== "image/svg+xml" && bestBlob.size >= file.size)) {
       return {
         file,
         originalSize: file.size,
@@ -163,4 +164,25 @@ export async function optimizeTokenLogo(
       height: 0,
     };
   }
+}
+
+/**
+ * Alias for optimizeTokenLogo returning OptimizedImageResult (used by AI Branding Studio & Arweave uploader).
+ */
+export const optimizeTokenImageFile = optimizeTokenLogo;
+
+/**
+ * Converts a raw SVG string (512x512) into an optimized WebP File (< 95 KiB) in the browser.
+ */
+export async function convertSvgStringToWebpFile(
+  svgString: string,
+  baseName = "ai-token-logo"
+): Promise<File> {
+  const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+  const rawFile = new File([svgBlob], `${baseName}.svg`, {
+    type: "image/svg+xml",
+    lastModified: Date.now(),
+  });
+  const optimized = await optimizeTokenImageFile(rawFile, IRYS_FREE_TIER_TARGET_BYTES);
+  return optimized.file;
 }
