@@ -131,6 +131,7 @@ export const useCreateLiquidityPool = () => {
             jitoTipSol: params.jitoBundle.jitoTipSol || 0.002,
             firstBuySol: params.jitoBundle.firstBuySol || 0,
             poolVaultAddress: data.quoteVaultAddress,
+            ammConfigAddress: data.ammConfigAddress,
             isMultiWalletBundle: Boolean(params.jitoBundle.isMultiWalletBundle),
             multiWalletBuys: params.jitoBundle.multiWalletBuys,
             onStatusUpdate: (msg, stepIdx) => {

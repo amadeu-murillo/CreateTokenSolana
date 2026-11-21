@@ -14,6 +14,8 @@ export interface CreateLiquidityPoolParams {
   revokeFreezeIfActive?: boolean;
   programId?: string;
   network?: SolanaCluster;
+  isAtomicBundlePreMint?: boolean;
+  baseDecimals?: number;
   jitoBundle?: {
     enabled: boolean;
     firstBuySol?: number;
@@ -26,6 +28,7 @@ export interface CreateLiquidityPoolParams {
 export interface CreateLiquidityPoolResponse {
   transaction: string;
   poolAddress: string;
+  ammConfigAddress?: string;
   lpMintAddress: string;
   baseVaultAddress: string;
   quoteVaultAddress: string;

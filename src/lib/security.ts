@@ -950,6 +950,8 @@ export const createLiquidityPoolRequestSchema = z.object({
   programId: tokenProgramIdSchema.optional(),
   affiliate: z.string().trim().nullable().optional(),
   network: solanaClusterSchema.optional(),
+  isAtomicBundlePreMint: z.boolean().optional().default(false),
+  baseDecimals: z.number().int().min(0).max(9).optional(),
 });
 
 export const removeLiquidityRequestSchema = z.object({

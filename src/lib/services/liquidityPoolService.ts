@@ -17,7 +17,10 @@ import {
   MINT_SIZE,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountIdempotentInstruction,
+  createCloseAccountInstruction,
   createSetAuthorityInstruction,
+  createSyncNativeInstruction,
   getAssociatedTokenAddress,
   getExtensionTypes,
   getMint,
@@ -84,11 +87,14 @@ export interface CreateLiquidityPoolInput {
   programId?: string;
   affiliate?: string | null;
   network?: SolanaCluster;
+  isAtomicBundlePreMint?: boolean;
+  baseDecimals?: number;
 }
 
 export interface CreateLiquidityPoolOutput {
   transaction: string;
   poolAddress: string;
+  ammConfigAddress: string;
   lpMintAddress: string;
   baseVaultAddress: string;
   quoteVaultAddress: string;
@@ -166,11 +172,12 @@ export interface RaydiumCpmmAccountsPda {
 export function deriveRaydiumCpmmPdas(
   baseMint: PublicKey,
   quoteMint: PublicKey,
-  network: SolanaCluster = "mainnet-beta"
+  network: SolanaCluster = "mainnet-beta",
+  ammConfigOverride?: PublicKey
 ): RaydiumCpmmAccountsPda {
   const dexConfig = getClusterDexConfig(network);
   const raydiumProgramId = dexConfig.raydiumProgramId;
-  const ammConfigPubkey = dexConfig.raydiumAmmConfig;
+  const ammConfigPubkey = ammConfigOverride || dexConfig.raydiumAmmConfig;
   const createPoolFeeReceiver = dexConfig.raydiumFeeReceiver;
 
   const { token0Mint, token1Mint, isBaseToken0 } = sortTokenMintsLexicographically(
@@ -752,6 +759,8 @@ export async function createLiquidityPoolTransaction(
     programId,
     affiliate,
     network = "mainnet-beta",
+    isAtomicBundlePreMint = false,
+    baseDecimals: providedBaseDecimals,
   } = input;
 
   const isDevnet = network === "devnet";
@@ -774,33 +783,40 @@ export async function createLiquidityPoolTransaction(
     ? DEVNET_PROGRAM_ID.CREATE_CPMM_POOL_FEE_ACC
     : CREATE_CPMM_POOL_FEE_ACC;
 
-  // 1. Inspect Base Token Mint on-chain (supports both SPL Token and Token-2022)
+  // 1. Inspect Base Token Mint on-chain (supports both SPL Token and Token-2022, plus Block-Zero pre-mint atomic bundles)
   const baseMintAccountInfo = await connection.getAccountInfo(baseMintPublicKey, "confirmed");
-  if (!baseMintAccountInfo) {
+  const isPreMintBundleMode = !baseMintAccountInfo && Boolean(isAtomicBundlePreMint);
+
+  if (!baseMintAccountInfo && !isPreMintBundleMode) {
     throw new Error(
       `Token Mint (${baseMint.slice(0, 8)}...) was not found on Solana ${network}. Make sure your wallet and network selector are set to the same cluster where the token was minted.`
     );
   }
 
-  const baseTokenProgramId = baseMintAccountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
-    ? TOKEN_2022_PROGRAM_ID
+  const baseTokenProgramId = baseMintAccountInfo
+    ? baseMintAccountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
+      ? TOKEN_2022_PROGRAM_ID
+      : programId && programId === TOKEN_2022_PROGRAM_ID.toBase58()
+      ? TOKEN_2022_PROGRAM_ID
+      : TOKEN_PROGRAM_ID
     : programId && programId === TOKEN_2022_PROGRAM_ID.toBase58()
     ? TOKEN_2022_PROGRAM_ID
     : TOKEN_PROGRAM_ID;
 
-  if (baseTokenProgramId.equals(TOKEN_2022_PROGRAM_ID)) {
+  if (baseMintAccountInfo && baseTokenProgramId.equals(TOKEN_2022_PROGRAM_ID)) {
     assertRaydiumToken2022Compatibility(Buffer.from(baseMintAccountInfo.data));
   }
 
-  const baseMintInfo = await getMint(
-    connection,
-    baseMintPublicKey,
-    "confirmed",
-    baseTokenProgramId
-  );
+  const baseMintInfo = baseMintAccountInfo
+    ? await getMint(connection, baseMintPublicKey, "confirmed", baseTokenProgramId)
+    : null;
+
+  const resolvedBaseDecimals =
+    baseMintInfo?.decimals ??
+    (typeof providedBaseDecimals === "number" ? providedBaseDecimals : 9);
 
   // 2. Convert amounts to raw BigInt & BN respecting real token decimals
-  let rawBaseAmount = toRawTokenAmount(baseAmount, baseMintInfo.decimals);
+  let rawBaseAmount = toRawTokenAmount(baseAmount, resolvedBaseDecimals);
   const rawQuoteAmount = toRawTokenAmount(quoteAmount, quoteDecimals);
 
   const initialLpSupplyRaw = bigIntSqrt(rawBaseAmount * rawQuoteAmount);
@@ -810,7 +826,7 @@ export async function createLiquidityPoolTransaction(
     );
   }
 
-  // 3. Verify User Base Token ATA & Balance (and USDC ATA if quoteToken === "USDC")
+  // 3. Verify User Base Token ATA & Balance (skipped only in Block-Zero pre-mint mode where Tx 1 creates & funds the ATA)
   const userBaseAta = await getAssociatedTokenAddress(
     baseMintPublicKey,
     userPublicKey,
@@ -818,27 +834,29 @@ export async function createLiquidityPoolTransaction(
     baseTokenProgramId
   );
 
-  const userBaseAccountParsed = await connection.getParsedAccountInfo(userBaseAta, "confirmed");
-  const parsedBaseInfo = extractParsedTokenInfo(userBaseAccountParsed.value?.data);
-  if (!parsedBaseInfo?.tokenAmount?.amount) {
-    throw new Error(
-      `Your wallet does not hold an active token account for ${baseMint.slice(0, 8)}... on Solana ${network}.`
-    );
-  }
-
-  const userRawBaseBalance = BigInt(parsedBaseInfo.tokenAmount.amount);
-  if (userRawBaseBalance <= BigInt(0)) {
-    throw new Error("Your token balance is zero. Please select a token with a positive balance.");
-  }
-
-  if (rawBaseAmount > userRawBaseBalance) {
-    const diff = rawBaseAmount - userRawBaseBalance;
-    if (diff * BigInt(1000) <= userRawBaseBalance) {
-      rawBaseAmount = userRawBaseBalance;
-    } else {
+  if (!isPreMintBundleMode) {
+    const userBaseAccountParsed = await connection.getParsedAccountInfo(userBaseAta, "confirmed");
+    const parsedBaseInfo = extractParsedTokenInfo(userBaseAccountParsed.value?.data);
+    if (!parsedBaseInfo?.tokenAmount?.amount) {
       throw new Error(
-        `Insufficient token balance: you entered ${baseAmount}, but your wallet holds ${parsedBaseInfo.tokenAmount.uiAmountString}.`
+        `Your wallet does not hold an active token account for ${baseMint.slice(0, 8)}... on Solana ${network}.`
       );
+    }
+
+    const userRawBaseBalance = BigInt(parsedBaseInfo.tokenAmount.amount);
+    if (userRawBaseBalance <= BigInt(0)) {
+      throw new Error("Your token balance is zero. Please select a token with a positive balance.");
+    }
+
+    if (rawBaseAmount > userRawBaseBalance) {
+      const diff = rawBaseAmount - userRawBaseBalance;
+      if (diff * BigInt(1000) <= userRawBaseBalance) {
+        rawBaseAmount = userRawBaseBalance;
+      } else {
+        throw new Error(
+          `Insufficient token balance: you entered ${baseAmount}, but your wallet holds ${parsedBaseInfo.tokenAmount.uiAmountString}.`
+        );
+      }
     }
   }
 
@@ -919,7 +937,7 @@ export async function createLiquidityPoolTransaction(
   ];
 
   let freezeAuthorityRevokedInTx = false;
-  if (baseMintInfo.freezeAuthority) {
+  if (baseMintInfo?.freezeAuthority) {
     if (baseMintInfo.freezeAuthority.equals(userPublicKey) && revokeFreezeIfActive) {
       coreInstructions.push(
         createSetAuthorityInstruction(
@@ -943,64 +961,189 @@ export async function createLiquidityPoolTransaction(
     }
   }
 
-  // 8. Resolve token descriptors and invoke `raydium.cpmm.createPool`
-  const [mintAInfo, mintBInfo] = await Promise.all([
-    resolveRaydiumTokenInfo({
-      raydium,
-      mint: baseMintPublicKey,
-      programId: baseTokenProgramId,
-      decimals: baseMintInfo.decimals,
-      symbol: "BASE",
-      name: "Base Token",
-    }),
-    resolveRaydiumTokenInfo({
-      raydium,
-      mint: quoteMintPublicKey,
-      programId: TOKEN_PROGRAM_ID,
-      decimals: quoteDecimals,
-      symbol: quoteToken === "SOL" ? "WSOL" : "USDC",
-      name: quoteToken === "SOL" ? "Wrapped SOL" : "USD Coin",
-    }),
-  ]);
-
-  const baseAmountBn = new BN(rawBaseAmount.toString());
-  const quoteAmountBn = new BN(rawQuoteAmount.toString());
   const startTimeBn =
     typeof startTime === "number" && Number.isFinite(startTime) && startTime > 0
       ? new BN(Math.floor(startTime))
       : new BN(0);
 
-  let createPoolBuilderResult: Awaited<ReturnType<typeof raydium.cpmm.createPool>>;
-  try {
-    createPoolBuilderResult = await raydium.cpmm.createPool({
-      programId: cpmmProgramId,
-      poolFeeAccount: cpmmPoolFeeAccount,
-      mintA: mintAInfo,
-      mintB: mintBInfo,
-      mintAAmount: baseAmountBn,
-      mintBAmount: quoteAmountBn,
-      startTime: startTimeBn,
-      feeConfig,
-      associatedOnly: false,
-      ownerInfo: {
-        useSOLBalance: quoteToken === "SOL",
-      },
-      txVersion: TxVersion.V0,
-    });
-  } catch (sdkErr) {
-    throw mapFriendlyRaydiumError(sdkErr, network);
+  let poolAddress = expectedPoolPda.toBase58();
+  let lpMintAddress = "";
+  let baseVaultAddress = "";
+  let quoteVaultAddress = "";
+  let extraSigners: Signer[] = [];
+
+  if (isPreMintBundleMode) {
+    // 8A. Direct Raydium CPMM Initialize instruction for Block-Zero Atomic Bundles
+    // (where Tx 1 creates the mint & ATA in the same block, so SDK on-chain ATA lookup would fail).
+    const pdas = deriveRaydiumCpmmPdas(
+      baseMintPublicKey,
+      quoteMintPublicKey,
+      network,
+      new PublicKey(feeConfig.id)
+    );
+
+    const creatorQuoteAta = await getAssociatedTokenAddress(
+      quoteMintPublicKey,
+      userPublicKey,
+      false,
+      TOKEN_PROGRAM_ID
+    );
+    const creatorLpToken = await getAssociatedTokenAddress(
+      pdas.lpMintPda,
+      userPublicKey,
+      false,
+      TOKEN_PROGRAM_ID
+    );
+
+    if (quoteToken === "SOL") {
+      coreInstructions.push(
+        createAssociatedTokenAccountIdempotentInstruction(
+          userPublicKey,
+          creatorQuoteAta,
+          userPublicKey,
+          quoteMintPublicKey,
+          TOKEN_PROGRAM_ID
+        ),
+        SystemProgram.transfer({
+          fromPubkey: userPublicKey,
+          toPubkey: creatorQuoteAta,
+          lamports: Number(rawQuoteAmount),
+        }),
+        createSyncNativeInstruction(creatorQuoteAta, TOKEN_PROGRAM_ID)
+      );
+    }
+
+    const creatorToken0 = pdas.isBaseToken0 ? userBaseAta : creatorQuoteAta;
+    const creatorToken1 = pdas.isBaseToken0 ? creatorQuoteAta : userBaseAta;
+    const token0Program = pdas.isBaseToken0 ? baseTokenProgramId : TOKEN_PROGRAM_ID;
+    const token1Program = pdas.isBaseToken0 ? TOKEN_PROGRAM_ID : baseTokenProgramId;
+    const initAmount0 = pdas.isBaseToken0 ? rawBaseAmount : rawQuoteAmount;
+    const initAmount1 = pdas.isBaseToken0 ? rawQuoteAmount : rawBaseAmount;
+
+    coreInstructions.push(
+      buildRaydiumCpmmInitializeInstruction({
+        creator: userPublicKey,
+        ammConfig: pdas.ammConfigPubkey,
+        authority: pdas.authPda,
+        poolState: pdas.poolStatePda,
+        token0Mint: pdas.token0Mint,
+        token1Mint: pdas.token1Mint,
+        lpMint: pdas.lpMintPda,
+        creatorToken0,
+        creatorToken1,
+        creatorLpToken,
+        token0Vault: pdas.token0VaultPda,
+        token1Vault: pdas.token1VaultPda,
+        createPoolFee: cpmmPoolFeeAccount,
+        observationState: pdas.observationStatePda,
+        token0Program,
+        token1Program,
+        raydiumProgramId: cpmmProgramId,
+        initAmount0,
+        initAmount1,
+        openTime: BigInt(startTimeBn.toString()),
+      })
+    );
+
+    if (quoteToken === "SOL") {
+      coreInstructions.push(
+        createCloseAccountInstruction(
+          creatorQuoteAta,
+          userPublicKey,
+          userPublicKey,
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      );
+    }
+
+    poolAddress = pdas.poolStatePda.toBase58();
+    lpMintAddress = pdas.lpMintPda.toBase58();
+    baseVaultAddress = (
+      pdas.isBaseToken0 ? pdas.token0VaultPda : pdas.token1VaultPda
+    ).toBase58();
+    quoteVaultAddress = (
+      pdas.isBaseToken0 ? pdas.token1VaultPda : pdas.token0VaultPda
+    ).toBase58();
+  } else {
+    // 8B. Standard flow: Resolve token descriptors and invoke `raydium.cpmm.createPool`
+    const [mintAInfo, mintBInfo] = await Promise.all([
+      resolveRaydiumTokenInfo({
+        raydium,
+        mint: baseMintPublicKey,
+        programId: baseTokenProgramId,
+        decimals: resolvedBaseDecimals,
+        symbol: "BASE",
+        name: "Base Token",
+      }),
+      resolveRaydiumTokenInfo({
+        raydium,
+        mint: quoteMintPublicKey,
+        programId: TOKEN_PROGRAM_ID,
+        decimals: quoteDecimals,
+        symbol: quoteToken === "SOL" ? "WSOL" : "USDC",
+        name: quoteToken === "SOL" ? "Wrapped SOL" : "USD Coin",
+      }),
+    ]);
+
+    const baseAmountBn = new BN(rawBaseAmount.toString());
+    const quoteAmountBn = new BN(rawQuoteAmount.toString());
+
+    let createPoolBuilderResult: Awaited<ReturnType<typeof raydium.cpmm.createPool>>;
+    try {
+      createPoolBuilderResult = await raydium.cpmm.createPool({
+        programId: cpmmProgramId,
+        poolFeeAccount: cpmmPoolFeeAccount,
+        mintA: mintAInfo,
+        mintB: mintBInfo,
+        mintAAmount: baseAmountBn,
+        mintBAmount: quoteAmountBn,
+        startTime: startTimeBn,
+        feeConfig,
+        associatedOnly: false,
+        ownerInfo: {
+          useSOLBalance: quoteToken === "SOL",
+        },
+        txVersion: TxVersion.V0,
+      });
+    } catch (sdkErr) {
+      throw mapFriendlyRaydiumError(sdkErr, network);
+    }
+
+    const { builder, extInfo, signers } = createPoolBuilderResult;
+
+    const sdkInstructions = (builder.allInstructions || []).filter(
+      (ix) => !ix.programId.equals(ComputeBudgetProgram.programId)
+    );
+    if (sdkInstructions.length === 0) {
+      throw new Error("Raydium SDK returned no instructions for CPMM pool creation.");
+    }
+
+    coreInstructions.push(...sdkInstructions);
+    extraSigners = extractExtraSigners(
+      userPublicKey,
+      signers,
+      builder.AllTxData?.signers
+    );
+
+    const addressInfo = extInfo.address as Record<string, unknown>;
+    poolAddress = String(addressInfo.poolId ?? expectedPoolPda.toBase58());
+    lpMintAddress = String(addressInfo.lpMint ?? "");
+    const vaultAStr = String(addressInfo.vaultA ?? "");
+    const vaultBStr = String(addressInfo.vaultB ?? "");
+
+    const rawMintA = addressInfo.mintA;
+    const extMintAAddress =
+      typeof rawMintA === "object" && rawMintA !== null && "address" in rawMintA
+        ? String((rawMintA as { address: string }).address)
+        : rawMintA
+        ? String(rawMintA)
+        : token0.toBase58();
+
+    const isMintABase = extMintAAddress === baseMintPublicKey.toBase58();
+    baseVaultAddress = isMintABase ? vaultAStr : vaultBStr;
+    quoteVaultAddress = isMintABase ? vaultBStr : vaultAStr;
   }
-
-  const { builder, extInfo, signers } = createPoolBuilderResult;
-
-  const sdkInstructions = (builder.allInstructions || []).filter(
-    (ix) => !ix.programId.equals(ComputeBudgetProgram.programId)
-  );
-  if (sdkInstructions.length === 0) {
-    throw new Error("Raydium SDK returned no instructions for CPMM pool creation.");
-  }
-
-  coreInstructions.push(...sdkInstructions);
 
   // 9. Phase 2.10: Dynamic Compute Budget (simulate + priority fee)
   const computeBudgetIxs = await buildDynamicComputeBudgetInstructions({
@@ -1023,36 +1166,13 @@ export async function createLiquidityPoolTransaction(
   }).compileToV0Message();
 
   const transaction = new VersionedTransaction(messageV0);
-  const extraSigners = extractExtraSigners(
-    userPublicKey,
-    signers,
-    builder.AllTxData?.signers
-  );
   if (extraSigners.length > 0) {
     transaction.sign(extraSigners);
   }
 
   const base64Transaction = Buffer.from(transaction.serialize()).toString("base64");
 
-  const addressInfo = extInfo.address as Record<string, unknown>;
-  const poolAddress = String(addressInfo.poolId ?? expectedPoolPda.toBase58());
-  const lpMintAddress = String(addressInfo.lpMint ?? "");
-  const vaultAStr = String(addressInfo.vaultA ?? "");
-  const vaultBStr = String(addressInfo.vaultB ?? "");
-
-  const rawMintA = addressInfo.mintA;
-  const extMintAAddress =
-    typeof rawMintA === "object" && rawMintA !== null && "address" in rawMintA
-      ? String((rawMintA as { address: string }).address)
-      : rawMintA
-      ? String(rawMintA)
-      : token0.toBase58();
-
-  const isMintABase = extMintAAddress === baseMintPublicKey.toBase58();
-  const baseVaultAddress = isMintABase ? vaultAStr : vaultBStr;
-  const quoteVaultAddress = isMintABase ? vaultBStr : vaultAStr;
-
-  const adjustedBaseUi = Number(rawBaseAmount) / Math.pow(10, baseMintInfo.decimals);
+  const adjustedBaseUi = Number(rawBaseAmount) / Math.pow(10, resolvedBaseDecimals);
   const adjustedQuoteUi = Number(rawQuoteAmount) / Math.pow(10, quoteDecimals);
   const initialPrice = adjustedBaseUi > 0 ? adjustedQuoteUi / adjustedBaseUi : 0;
 
@@ -1064,6 +1184,7 @@ export async function createLiquidityPoolTransaction(
   return {
     transaction: base64Transaction,
     poolAddress,
+    ammConfigAddress: feeConfig.id,
     lpMintAddress,
     baseVaultAddress,
     quoteVaultAddress,
@@ -1186,7 +1307,7 @@ async function resolveRaydiumCpmmPoolId(params: {
   );
   const lpMintOffset =
     typeof CpmmPoolInfoLayout.offsetOf === "function"
-      ? (CpmmPoolInfoLayout.offsetOf("lpMint") ?? 136)
+      ? (CpmmPoolInfoLayout.offsetOf("mintLp") ?? 136)
       : 136;
 
   for (const targetLpMint of lpMintTargets) {

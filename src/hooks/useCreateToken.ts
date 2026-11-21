@@ -199,6 +199,7 @@ export const useCreateToken = () => {
         if (isJitoEnabled && signAllTransactions && tokenData.jitoBundle) {
           const unsignedTxs: VersionedTransaction[] = [transaction];
           let poolVaultAddress: string | undefined;
+          let ammConfigAddress: string | undefined;
 
           const poolTokenAmount = Math.max(
             1,
@@ -210,35 +211,54 @@ export const useCreateToken = () => {
               ? TOKEN_2022_PROGRAM_ID.toBase58()
               : TOKEN_PROGRAM_ID.toBase58();
 
-          try {
-            const lpResponse = await fetch("/api/create-liquidity-pool", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                dex: "raydium-cpmm",
-                baseMint: result.mintAddress,
-                quoteToken: "SOL",
-                baseAmount: poolTokenAmount,
-                quoteAmount: poolLiquiditySol,
-                feeTierBps: 25,
-                revokeFreezeIfActive: true,
-                wallet: publicKey.toBase58(),
-                programId: baseProgramIdStr,
-                affiliate: affiliateRef,
-                network: cluster,
-              }),
-            });
-            if (lpResponse.ok) {
-              const lpData = await lpResponse.json();
-              if (lpData.transaction) {
-                const lpTxBuf = Buffer.from(lpData.transaction, "base64");
-                unsignedTxs.push(VersionedTransaction.deserialize(new Uint8Array(lpTxBuf)));
-                poolVaultAddress = lpData.quoteVaultAddress;
-              }
-            }
-          } catch (lpErr) {
-            console.warn("Could not pre-build LP transaction in Jito bundle:", lpErr);
+          const lpResponse = await fetch("/api/create-liquidity-pool", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              dex: "raydium-cpmm",
+              baseMint: result.mintAddress,
+              quoteToken: "SOL",
+              baseAmount: poolTokenAmount,
+              quoteAmount: poolLiquiditySol,
+              feeTierBps: 25,
+              revokeFreezeIfActive: true,
+              wallet: publicKey.toBase58(),
+              programId: baseProgramIdStr,
+              affiliate: affiliateRef,
+              network: cluster,
+              isAtomicBundlePreMint: true,
+              baseDecimals: tokenData.decimals,
+            }),
+          });
+
+          const lpData = await lpResponse.json();
+          if (!lpResponse.ok || !lpData.transaction) {
+            throw new Error(
+              lpData.error ||
+                "Falha ao preparar a transação da Pool de Liquidez Raydium para o Jito Atomic Bundle."
+            );
           }
+
+          const lpTxBuf = Buffer.from(lpData.transaction, "base64");
+          const lpTx = VersionedTransaction.deserialize(new Uint8Array(lpTxBuf));
+          const lpIntegrity = verifyTransactionIntegrity(lpTx, publicKey.toBase58(), {
+            operation: "createLiquidityPool",
+            affiliateWallet: affiliateRef,
+            allowedTransferDestinations: [
+              lpData.quoteVaultAddress,
+              lpData.baseVaultAddress,
+            ].filter(Boolean),
+          });
+          if (!lpIntegrity.valid) {
+            throw new Error(
+              lpIntegrity.reason ||
+                "A transação de liquidez do Jito Bundle falhou na verificação de segurança."
+            );
+          }
+
+          unsignedTxs.push(lpTx);
+          poolVaultAddress = lpData.quoteVaultAddress;
+          ammConfigAddress = lpData.ammConfigAddress;
 
           const bundleResult = await buildAndSendAtomicLaunchBundle({
             connection,
@@ -251,6 +271,7 @@ export const useCreateToken = () => {
             jitoTipSol: tokenData.jitoBundle.jitoTipSol || 0.002,
             firstBuySol: tokenData.jitoBundle.firstBuySol || 0,
             poolVaultAddress,
+            ammConfigAddress,
             isMultiWalletBundle,
             multiWalletBuys: tokenData.jitoBundle.multiWalletBuys,
             onStatusUpdate: (msg, stepIdx) => {

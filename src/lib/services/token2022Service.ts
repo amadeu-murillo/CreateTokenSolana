@@ -69,6 +69,11 @@ const UPDATE_TOKEN_METADATA_FIELD_DISCRIMINATOR = Buffer.from([
   221, 233, 49, 45, 181, 202, 220, 200,
 ]);
 
+// sha256("spl_token_metadata_interface:updating_the_authority")[0..8]
+const UPDATE_TOKEN_METADATA_AUTHORITY_DISCRIMINATOR = Buffer.from([
+  150, 157, 54, 63, 66, 15, 205, 141,
+]);
+
 function serializeBorshString(value: string): Buffer {
   const strBuf = Buffer.from(value, "utf-8");
   const lenBuf = Buffer.alloc(4);
@@ -122,6 +127,30 @@ function createUpdateNativeMetadataFieldIx(params: {
     keys: [
       { pubkey: params.mint, isSigner: false, isWritable: true },
       { pubkey: params.updateAuthority, isSigner: true, isWritable: false },
+    ],
+    data,
+  });
+}
+
+function createUpdateNativeMetadataAuthorityIx(params: {
+  mint: PublicKey;
+  currentUpdateAuthority: PublicKey;
+  newUpdateAuthority: PublicKey | null;
+}): TransactionInstruction {
+  const newAuthBytes = params.newUpdateAuthority
+    ? params.newUpdateAuthority.toBuffer()
+    : Buffer.alloc(32); // OptionalNonZeroPubkey::None (all-zero pubkey revokes updateAuthority)
+
+  const data = Buffer.concat([
+    UPDATE_TOKEN_METADATA_AUTHORITY_DISCRIMINATOR,
+    newAuthBytes,
+  ]);
+
+  return new TransactionInstruction({
+    programId: TOKEN_2022_PROGRAM_ID,
+    keys: [
+      { pubkey: params.mint, isSigner: false, isWritable: true },
+      { pubkey: params.currentUpdateAuthority, isSigner: true, isWritable: false },
     ],
     data,
   });
@@ -336,6 +365,16 @@ export async function createToken2022Transaction(params: CreateToken2022Params) 
           })
         );
       }
+    }
+
+    if (!isMetadataMutable) {
+      coreInstructions.push(
+        createUpdateNativeMetadataAuthorityIx({
+          mint: mintPublicKey,
+          currentUpdateAuthority: userPublicKey,
+          newUpdateAuthority: null,
+        })
+      );
     }
   } else {
     coreInstructions.push(

@@ -7,13 +7,15 @@ import { uploadImageToArweave } from "@/lib/services/arweaveService";
 export const dynamic = "force-dynamic";
 
 
-// Configured with environment variables and working fallback credentials so Devnet & local testing work out-of-the-box
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "dgurmzcht",
-  api_key: process.env.CLOUDINARY_API_KEY || "376481879818689",
-  api_secret: process.env.CLOUDINARY_API_SECRET || "YfZk9mhp8eVA6xaZOZzHbF2H_qM",
-  secure: true,
-});
+function getCloudinaryConfig() {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+  const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
+  const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
+  if (!cloudName || !apiKey || !apiSecret) {
+    return null;
+  }
+  return { cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret, secure: true };
+}
 
 export async function POST(request: Request) {
   try {
@@ -66,7 +68,18 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Guaranteed HTTPS Image Hosting (Cloudinary) — works immediately on both Devnet & Mainnet without needing funded Irys ledger
+    // 2. HTTPS Image Hosting (Cloudinary) — requires server-side env vars
+    const cloudConfig = getCloudinaryConfig();
+    if (!cloudConfig) {
+      return NextResponse.json(
+        {
+          error:
+            "Image storage is not configured on the server (set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET or IRYS_UPLOADER_PRIVATE_KEY).",
+        },
+        { status: 500 }
+      );
+    }
+    cloudinary.config(cloudConfig);
     const result = await new Promise<UploadApiResponse>((resolve, reject) => {
       cloudinary.uploader
         .upload_stream(

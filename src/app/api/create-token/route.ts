@@ -13,12 +13,15 @@ import {
 
 export const dynamic = "force-dynamic";
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "dgurmzcht",
-  api_key: process.env.CLOUDINARY_API_KEY || "376481879818689",
-  api_secret: process.env.CLOUDINARY_API_SECRET || "YfZk9mhp8eVA6xaZOZzHbF2H_qM",
-  secure: true,
-});
+function getCloudinaryConfig() {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+  const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
+  const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
+  if (!cloudName || !apiKey || !apiSecret) {
+    return null;
+  }
+  return { cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret, secure: true };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -148,6 +151,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (!finalMetadataUri) {
+      const cloudConfig = getCloudinaryConfig();
+      if (!cloudConfig) {
+        return NextResponse.json(
+          {
+            error:
+              "Metadata storage is not configured on the server (set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET or IRYS_UPLOADER_PRIVATE_KEY).",
+          },
+          { status: 500 }
+        );
+      }
+      cloudinary.config(cloudConfig);
       const metadataBuffer = Buffer.from(JSON.stringify(metadataJson), "utf-8");
       const uploadResponse = await new Promise<UploadApiResponse>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(

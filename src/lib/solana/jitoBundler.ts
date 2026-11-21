@@ -113,6 +113,7 @@ export interface AtomicLaunchBundleParams {
   jitoTipSol?: number;
   firstBuySol?: number;
   poolVaultAddress?: string;
+  ammConfigAddress?: string;
   isMultiWalletBundle?: boolean;
   multiWalletBuys?: Array<{ secretKey: Uint8Array; buyAmountSol: number }>;
   onStatusUpdate?: (message: string, stepIndex: number) => void;
@@ -135,6 +136,7 @@ async function buildBuyerChunkSwapTransaction(params: {
   cluster: SolanaCluster;
   blockhash: string;
   buyers: Array<{ keypair: Keypair; buyAmountSol: number }>;
+  ammConfigAddress?: string;
   appendJitoTipSol?: number;
 }): Promise<{ tx: VersionedTransaction; extraSigners: Keypair[] }> {
   const {
@@ -144,10 +146,12 @@ async function buildBuyerChunkSwapTransaction(params: {
     cluster,
     blockhash,
     buyers,
+    ammConfigAddress,
     appendJitoTipSol = 0,
   } = params;
 
-  const pdas = deriveRaydiumCpmmPdas(baseMintPubkey, WSOL_MINT, cluster);
+  const ammConfigOverride = ammConfigAddress ? new PublicKey(ammConfigAddress) : undefined;
+  const pdas = deriveRaydiumCpmmPdas(baseMintPubkey, WSOL_MINT, cluster, ammConfigOverride);
   const inputVault = pdas.isBaseToken0 ? pdas.token1VaultPda : pdas.token0VaultPda;
   const outputVault = pdas.isBaseToken0 ? pdas.token0VaultPda : pdas.token1VaultPda;
 
@@ -279,6 +283,7 @@ export async function buildAndSendAtomicLaunchBundle(
     jitoTipSol = 0.002,
     firstBuySol = 0,
     poolVaultAddress,
+    ammConfigAddress,
     isMultiWalletBundle = false,
     multiWalletBuys,
     onStatusUpdate,
@@ -326,6 +331,7 @@ export async function buildAndSendAtomicLaunchBundle(
         cluster,
         blockhash,
         buyers: chunks[idx],
+        ammConfigAddress,
         appendJitoTipSol: isLastChunk ? jitoTipSol : 0,
       });
       txsToSign.push(tx);
@@ -353,6 +359,7 @@ export async function buildAndSendAtomicLaunchBundle(
           } as unknown as Keypair,
           buyAmountSol: item.buyAmountSol,
         })),
+        ammConfigAddress,
         appendJitoTipSol: jitoTipSol,
       });
       txsToSign.push(tx);

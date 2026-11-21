@@ -30,7 +30,11 @@ export async function GET() {
       },
       storage: {
         irysServerKeyConfigured: Boolean(process.env.IRYS_UPLOADER_PRIVATE_KEY),
-        cloudinaryFallbackReady: true,
+        cloudinaryFallbackReady: Boolean(
+          process.env.CLOUDINARY_CLOUD_NAME &&
+            process.env.CLOUDINARY_API_KEY &&
+            process.env.CLOUDINARY_API_SECRET
+        ),
       },
     });
   } catch (error: unknown) {
