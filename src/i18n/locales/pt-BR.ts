@@ -667,6 +667,6 @@ const dictionary: TranslationDictionary = {
   },
 };
 
-dictionary.costs = dictionary.costsPage;
+
 
 export default dictionary;

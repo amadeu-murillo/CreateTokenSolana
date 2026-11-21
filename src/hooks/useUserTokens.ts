@@ -523,15 +523,16 @@ export const useUserTokens = () => {
         }
 
         const cachedToken = metadataCache[mint];
-        if (isCacheItemValid(cachedToken) && cachedToken.data?.name) {
+        const cachedData = cachedToken?.data as { name?: string; symbol?: string; logoURI?: string } | undefined;
+        if (isCacheItemValid(cachedToken) && cachedData?.name) {
           return {
             mint,
             amount: uiAmountStr,
             rawAmount: rawAmountStr,
             decimals,
-            name: cachedToken.data.name,
-            symbol: cachedToken.data.symbol || mint.slice(0, 4).toUpperCase(),
-            logoURI: cachedToken.data.logoURI || "/sol.png",
+            name: cachedData.name,
+            symbol: cachedData.symbol || mint.slice(0, 4).toUpperCase(),
+            logoURI: cachedData.logoURI || "/sol.png",
             programId: accountInfo.programId,
             pairedLpMint: lpEntry?.lpMintAddress,
           };

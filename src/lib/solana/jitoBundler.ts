@@ -416,6 +416,10 @@ export async function buildAndSendAtomicLaunchBundle(
         `Devnet Sequencial (${i + 1}/${signedTransactions.length}): Confirmando transação...`,
         4
       );
+      if (i > 0) {
+        onStatusUpdate?.("Aguardando abertura do relógio on-chain da pool (2.5s)...", 4);
+        await new Promise((r) => setTimeout(r, 2500));
+      }
       const rawTx = signedTransactions[i].serialize();
       const sig = await connection.sendRawTransaction(rawTx, {
         skipPreflight: false,
@@ -479,7 +483,9 @@ export async function buildAndSendAtomicLaunchBundle(
 
   // Fallback to sequential Mainnet RPC broadcast if Jito Block Engine is unreachable from client region
   const fallbackSigs: string[] = [];
-  for (const signedTx of signedTransactions) {
+  for (let i = 0; i < signedTransactions.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 2500));
+    const signedTx = signedTransactions[i];
     const sig = await connection.sendRawTransaction(signedTx.serialize(), {
       skipPreflight: false,
       maxRetries: 3,

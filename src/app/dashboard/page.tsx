@@ -124,7 +124,7 @@ const TokenManagementCard = ({
         <div className={styles.tokenInfo}>
           <Image
             src={token.logoURI || "/favicon.ico"}
-            alt={token.name}
+            alt={token.name || "Token"}
             width={52}
             height={52}
             className={styles.tokenImage}

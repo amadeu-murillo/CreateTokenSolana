@@ -1126,7 +1126,7 @@ export async function createLiquidityPoolTransaction(
       builder.AllTxData?.signers
     );
 
-    const addressInfo = extInfo.address as Record<string, unknown>;
+    const addressInfo = extInfo.address as unknown as Record<string, unknown>;
     poolAddress = String(addressInfo.poolId ?? expectedPoolPda.toBase58());
     lpMintAddress = String(addressInfo.lpMint ?? "");
     const vaultAStr = String(addressInfo.vaultA ?? "");
@@ -1267,7 +1267,7 @@ async function resolveRaydiumCpmmPoolId(params: {
           const decoded = CpmmPoolInfoLayout.decode(acc.data);
           validPools.push({
             poolId: candidatePoolPubkeys[idx].toBase58(),
-            lpMint: decoded.lpMint.toBase58(),
+            lpMint: decoded.mintLp.toBase58(),
           });
         } catch {
           // Ignore decode failure
@@ -1697,7 +1697,7 @@ export async function discoverUserLiquidityPositions(
 
       try {
         const decoded = CpmmPoolInfoLayout.decode(acc.data);
-        const lpMintStr = decoded.lpMint.toBase58();
+        const lpMintStr = decoded.mintLp.toBase58();
         const lpBalance = userTokenBalances.get(lpMintStr);
         if (!lpBalance || BigInt(lpBalance.raw) <= BigInt(0)) return;
 

@@ -220,7 +220,7 @@ export interface ExtendedUiTranslations {
   };
 }
 
-export const EXTENDED_UI_TRANSLATIONS: Record<AppLocale, ExtendedUiTranslations> = {
+export const EXTENDED_UI_TRANSLATIONS: Record<string, ExtendedUiTranslations> = {
   pt: {
     selector: {
       loadingWallet: "Carregando tokens da sua carteira conectada...",

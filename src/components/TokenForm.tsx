@@ -1494,7 +1494,7 @@ export default function TokenForm() {
                       <div className={styles.field}>
                         <Label htmlFor="jitoTipSol">Gorjeta Validador Jito (0.001–0.01 SOL)</Label>
                         <Controller
-                          name="jitoTipSol"
+                          name="jitoBundle.jitoTipSol"
                           control={control}
                           render={() => (
                             <Controller
