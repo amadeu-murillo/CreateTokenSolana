@@ -167,7 +167,7 @@ export async function optimizeTokenLogo(
 }
 
 /**
- * Alias for optimizeTokenLogo returning OptimizedImageResult (used by AI Branding Studio & Arweave uploader).
+ * Alias for optimizeTokenLogo returning OptimizedImageResult (used by Token Form & Arweave uploader).
  */
 export const optimizeTokenImageFile = optimizeTokenLogo;
 

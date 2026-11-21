@@ -6,6 +6,7 @@ import Link from "next/link";
 import Feedback from "@/components/Feedback";
 import Notification from "@/components/ui/Notification";
 import { useLanguage } from "@/context/LanguageContext";
+import { trackEvent } from "@/lib/analytics";
 import styles from "./Confirmation.module.css";
 
 function ConfirmationContent() {
@@ -21,15 +22,47 @@ function ConfirmationContent() {
 
   const encodedMint = tokenAddress ? encodeURIComponent(tokenAddress) : "";
   const publicTokenPath = tokenAddress ? `/token/${encodedMint}` : "/";
+  const tokenPublicUrl = tokenAddress
+    ? `https://www.createtokensol.store/token/${tokenAddress}`
+    : "https://www.createtokensol.store";
+
+  const localizedShareCopy = (() => {
+    switch (locale) {
+      case "pt":
+      case "pt-BR":
+        return {
+          x: `🚀 Acabei de lançar meu token na Solana com blindagem RugCheck 100/100!\n\n🪙 Mint: ${tokenAddress}\n🔗 Página oficial: ${tokenPublicUrl}\nVia @CreateTokenSols`,
+          tg: "🚀 Confira nosso novo token verificado na Solana!",
+        };
+      case "es":
+        return {
+          x: `🚀 ¡Acabo de lanzar mi token en Solana con protección RugCheck 100/100!\n\n🪙 Mint: ${tokenAddress}\n🔗 Página oficial: ${tokenPublicUrl}\nVía @CreateTokenSols`,
+          tg: "🚀 ¡Mira nuestro nuevo token verificado en Solana!",
+        };
+      case "ru":
+        return {
+          x: `🚀 Я только что запустил свой токен в Solana с защитой RugCheck 100/100!\n\n🪙 Mint: ${tokenAddress}\n🔗 Официальная страница: ${tokenPublicUrl}\nЧерез @CreateTokenSols`,
+          tg: "🚀 Посмотрите наш новый верифицированный токен в Solana!",
+        };
+      case "zh":
+        return {
+          x: `🚀 我刚刚在 Solana 上发布了带有 RugCheck 100/100 安全认证的代币！\n\n🪙 Mint: ${tokenAddress}\n🔗 官方页面: ${tokenPublicUrl}\nVia @CreateTokenSols`,
+          tg: "🚀 查看我们在 Solana 上新发布的链上认证代币！",
+        };
+      case "en":
+      default:
+        return {
+          x: `🚀 Just launched my Solana token with 100/100 RugCheck security!\n\n🪙 Mint: ${tokenAddress}\n🔗 Official page: ${tokenPublicUrl}\nVia @CreateTokenSols`,
+          tg: "🚀 Check out our newly verified token on Solana!",
+        };
+    }
+  })();
+
   const shareUrlX = tokenAddress
-    ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-        `🚀 Acabei de lançar meu token na Solana com blindagem RugCheck 100/100!\n\n🪙 Mint: ${tokenAddress}\n🔗 Confira a página oficial: https://www.createtokensol.store/token/${tokenAddress}`
-      )}`
-    : "https://twitter.com";
+    ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(localizedShareCopy.x)}`
+    : "https://x.com/CreateTokenSols";
   const shareUrlTelegram = tokenAddress
-    ? `https://t.me/share/url?url=${encodeURIComponent(
-        `https://www.createtokensol.store/token/${tokenAddress}`
-      )}&text=${encodeURIComponent("🚀 Confira nosso novo token verificado na Solana!")}`
+    ? `https://t.me/share/url?url=${encodeURIComponent(tokenPublicUrl)}&text=${encodeURIComponent(localizedShareCopy.tg)}`
     : "https://t.me";
 
   return (
@@ -90,6 +123,7 @@ function ConfirmationContent() {
                 href={shareUrlX}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackEvent("share_clicked", { channel: "x", page: "confirmation", locale })}
                 style={{
                   padding: "0.5rem 0.85rem",
                   borderRadius: "0.6rem",
@@ -104,6 +138,7 @@ function ConfirmationContent() {
                 href={shareUrlTelegram}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackEvent("share_clicked", { channel: "telegram", page: "confirmation", locale })}
                 style={{
                   padding: "0.5rem 0.85rem",
                   borderRadius: "0.6rem",

@@ -1,5 +1,5 @@
 import { MetadataRoute } from "next";
-import { SITE_URL } from "@/lib/seo";
+import { SITE_URL, getLanguageAlternates } from "@/lib/seo";
 
 const BASE_URL = SITE_URL || "https://www.createtokensol.store";
 const LAST_MODIFIED = new Date("2026-11-21T00:00:00.000Z");
@@ -11,13 +11,13 @@ interface CanonicalRouteEntry {
 }
 
 /**
- * Only 200 OK canonical indexable routes are included here (no /create, /affiliates, /docs
- * redirects and no ?lang= query-string alternates that conflict with self-referencing canonicals).
+ * Only 200 OK canonical indexable routes are included here, each annotated with
+ * clean path-based hreflang alternates (/pt-br, /es, /ru, /zh).
  */
 const CANONICAL_ROUTES: ReadonlyArray<CanonicalRouteEntry> = [
   { path: "/", changeFrequency: "daily", priority: 1.0 },
   { path: "/reclaim", changeFrequency: "weekly", priority: 0.90 },
-  { path: "/volume-bot", changeFrequency: "weekly", priority: 0.90 },
+  { path: "/volume-bot", changeFrequency: "weekly", priority: 0.80 },
   { path: "/vesting", changeFrequency: "weekly", priority: 0.90 },
   { path: "/add-liquidity", changeFrequency: "weekly", priority: 0.95 },
   { path: "/burn", changeFrequency: "weekly", priority: 0.90 },
@@ -37,6 +37,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: LAST_MODIFIED,
       changeFrequency: route.changeFrequency,
       priority: route.priority,
+      alternates: {
+        languages: getLanguageAlternates(route.path),
+      },
     };
   });
 }

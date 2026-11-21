@@ -10,6 +10,21 @@ export const SITE_URL =
 
 export const SITE_NAME = "CreateTokenSolana";
 
+export const OG_IMAGE_URL = `${SITE_URL}/og-image.png`;
+export const ICON_IMAGE_URL = `${SITE_URL}/sol.png`;
+
+export const OFFICIAL_LINKS = {
+  supportEmail:
+    process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim() || "support@createtokensol.store",
+  xUrl:
+    process.env.NEXT_PUBLIC_SOCIAL_X_URL?.trim() || "https://x.com/CreateTokenSols",
+} as const;
+
+export const OFFICIAL_SAME_AS: string[] = [
+  SITE_URL,
+  OFFICIAL_LINKS.xUrl,
+];
+
 export type SeoLocale = "en" | "es" | "ru" | "zh" | "pt-BR";
 
 export interface LocalizedSeoEntry {
@@ -40,7 +55,7 @@ export const MULTILINGUAL_ROUTE_SEO: Record<
       title:
         "Solana Token Creator — Create SPL Token & Launch Solana Memecoin | No Code Token Builder",
       description:
-        "The #1 No Code Token Builder on Solana. Create SPL or Token-2022 tokens in under 60 seconds from 0.10 SOL with 100/100 RugCheck security, Vanity Mint Address, Jito Multi-Wallet Anti-Bubblemaps Bundler, Raydium CPMM Liquidity Pools, Volume Bot, and Token Vesting.",
+        "No-code Solana SPL & Token-2022 Token Builder. Launch tokens in under 60 seconds from 0.10 SOL with 100/100 RugCheck security, Vanity Mint Address, Raydium CPMM & Meteora Liquidity Pools, Verified Token Vesting, Solana Blinks, and 30% On-Chain Affiliates.",
       keywords: [
         "Solana Token Creator",
         "Create SPL Token",
@@ -58,7 +73,7 @@ export const MULTILINGUAL_ROUTE_SEO: Record<
       title:
         "Creador de Tokens Solana — Crear Token SPL y Lanzar Memecoin en Solana Sin Código",
       description:
-        "Crea tokens SPL y Token-2022 en Solana sin programar en menos de 60 segundos desde 0.10 SOL. seguridad RugCheck 100/100, Jito Multi-Wallet Anti-Bubblemaps, pools en Raydium CPMM, Volume Bot y Vesting.",
+        "Crea tokens SPL y Token-2022 en Solana sin programar en menos de 60 segundos desde 0.10 SOL. Seguridad RugCheck 100/100, Vanity Mint, pools en Raydium CPMM y Meteora, Vesting verificable, Solana Blinks y 30% de afiliados on-chain.",
       keywords: [
         "Creador de Tokens Solana",
         "Crear Token SPL",
@@ -72,7 +87,7 @@ export const MULTILINGUAL_ROUTE_SEO: Record<
       title:
         "Создать Токен Solana — Генератор SPL и Token-2022 и Запуск Мемкоинов Без Кода",
       description:
-        "Создавайте токены SPL и Token-2022 в сети Solana без программирования за 60 секунд от 0.10 SOL. Защита RugCheck 100/100, ИИ-генератор бренда, пулы ликвидности Raydium CPMM, Volume Bot и блокировка токенов.",
+        "Создавайте токены SPL и Token-2022 в сети Solana без программирования за 60 секунд от 0.10 SOL. Защита RugCheck 100/100, Vanity Mint, пулы ликвидности Raydium CPMM, блокировка токенов Vesting, Solana Blinks и 30% партнерская программа.",
       keywords: [
         "Создать токен Solana",
         "Генератор SPL токенов",
@@ -85,7 +100,7 @@ export const MULTILINGUAL_ROUTE_SEO: Record<
       title:
         "Solana 代币生成器 — 无代码创建 SPL 与 Token-2022 代币及发射 Memecoin",
       description:
-        "排名第一的 Solana 无代码发币平台。仅需 0.10 SOL 起，60 秒内创建 SPL 或 Token-2022 代币，支持 AI 品牌生成、RugCheck 100/100 安全评分、Jito 多钱包防气泡图捆绑交易、Raydium CPMM 流动性池与市值交易量机器人。",
+        "Solana 无代码发币平台。仅需 0.10 SOL 起，60 秒内创建 SPL 或 Token-2022 代币，支持 RugCheck 100/100 安全评分、Vanity Mint 靓号地址、Raydium CPMM 流动性池、链上锁仓 Vesting、Solana Blinks 与 30% 链上返佣。",
       keywords: [
         "Solana 一键发币",
         "Solana 代币生成器",
@@ -99,7 +114,7 @@ export const MULTILINGUAL_ROUTE_SEO: Record<
       title:
         "Criador de Token Solana — Criar Token SPL, Token-2022 e Lançar Memecoin Sem Código",
       description:
-        "A plataforma nº 1 para criar Token SPL e Token-2022 na Solana sem programar em menos de 60 segundos a partir de 0.10 SOL. nota 100/100 no RugCheck, Vanity Mint, Jito Bundle Multi-Carteira, Pool Raydium CPMM, Volume Bot e Vesting.",
+        "Crie Token SPL e Token-2022 na Solana sem programar em menos de 60 segundos a partir de 0.10 SOL. Blindagem 100/100 no RugCheck, Vanity Mint, Pool Raydium CPMM e Meteora, Cofre de Vesting verificável, Solana Blinks e 30% de afiliados on-chain.",
       keywords: [
         "Criador de Token Solana",
         "Criar Token SPL Solana",
@@ -567,7 +582,7 @@ export const MULTILINGUAL_ROUTE_SEO: Record<
     ru: {
       title: "Прозрачная Таблица Комиссий Solana — Создание Токенов от 0.10 SOL",
       description:
-        "Полный расчет стоимости операций в CreateTokenSolana: базовый минт 0.10 SOL, ИИ-студия, мультивалютный Jito бандл, бот объема, вестинг, пулы ликвидности (0.07 SOL) и 30% реферальных.",
+        "Полный расчет стоимости операций в CreateTokenSolana: базовый минт 0.10 SOL, ревокация прав, вестинг (0.10 SOL), пулы ликвидности Raydium CPMM (0.07 SOL), возврат аренды SOL (8%) и 30% реферальных ончейн.",
       keywords: [
         "сколько стоит создать токен solana",
         "стоимость пула ликвидности raydium",
@@ -577,7 +592,7 @@ export const MULTILINGUAL_ROUTE_SEO: Record<
     zh: {
       title: "Solana 透明费用明细表 — 模块化发币低至 0.10 SOL",
       description:
-        "查看 CreateTokenSolana 完整链上费用表：基础发币 0.10 SOL、AI 品牌设计、Jito 多钱包防气泡图发射、市值机器人、代币锁仓、流动性池（0.07 SOL）以及 30%/70% 推广自动分账明细。",
+        "查看 CreateTokenSolana 完整链上费用表：基础发币 0.10 SOL、权限撤销、代币锁仓 Vesting（0.10 SOL）、Raydium CPMM 流动性池（0.07 SOL）、SOL 租金回收（8%）以及 30%/70% 推广自动分账明细。",
       keywords: [
         "Solana 发币成本",
         "创建 Solana 代币多少钱",
@@ -587,7 +602,7 @@ export const MULTILINGUAL_ROUTE_SEO: Record<
     "pt-BR": {
       title: "Tabela Transparente de Custos e Taxas na Solana — Criação Modular a Partir de 0.10 SOL",
       description:
-        "Confira a tabela completa de custos on-chain do CreateTokenSolana: Mint Base 0.10 SOL, AI Studio (+0.05 SOL), Jito Multi-Carteira (0.30 SOL), Volume Bot, Vesting Lock, Reclaim (8%) e split de 30% para afiliados.",
+        "Confira a tabela completa de custos on-chain do CreateTokenSolana: Mint Base 0.10 SOL, Revogação de Autoridades, Pool Raydium CPMM (0.07 SOL), Vesting Lock (0.10 SOL), Reclaim SOL (8%) e split atômico de 30% para afiliados.",
       keywords: [
         "quanto custa criar um token na solana",
         "custo pool de liquidez raydium",
@@ -659,14 +674,20 @@ export interface RouteSeoConfig {
   canonicalOverride?: string;
 }
 
-export function getLanguageAlternates(canonicalUrl: string): Record<string, string> {
+export function getLanguageAlternates(routePath: string): Record<string, string> {
+  const cleanPath = routePath.startsWith("http")
+    ? routePath.replace(SITE_URL, "")
+    : routePath;
+  const suffix = !cleanPath || cleanPath === "/" ? "" : cleanPath.startsWith("/") ? cleanPath : `/${cleanPath}`;
+  const enUrl = `${SITE_URL}${suffix}`;
+
   return {
-    en: `${canonicalUrl}?lang=en`,
-    es: `${canonicalUrl}?lang=es`,
-    ru: `${canonicalUrl}?lang=ru`,
-    zh: `${canonicalUrl}?lang=zh`,
-    "pt-BR": `${canonicalUrl}?lang=pt-BR`,
-    "x-default": canonicalUrl,
+    en: enUrl,
+    "pt-BR": `${SITE_URL}/pt-br${suffix}`,
+    es: `${SITE_URL}/es${suffix}`,
+    ru: `${SITE_URL}/ru${suffix}`,
+    zh: `${SITE_URL}/zh${suffix}`,
+    "x-default": enUrl,
   };
 }
 
@@ -706,6 +727,7 @@ export function buildRouteMetadata(config: RouteSeoConfig): Metadata {
       ? {
           alternates: {
             canonical: canonicalUrl,
+            languages: getLanguageAlternates(routeKey),
           },
         }
       : {}),
@@ -719,8 +741,8 @@ export function buildRouteMetadata(config: RouteSeoConfig): Metadata {
       type: "website",
       images: [
         {
-          url: `${SITE_URL}/sol.png`,
-          secureUrl: `${SITE_URL}/sol.png`,
+          url: OG_IMAGE_URL,
+          secureUrl: OG_IMAGE_URL,
           width: 1200,
           height: 630,
           alt: `${SITE_NAME} — Solana Token & Liquidity Pool Launchpad`,
@@ -730,9 +752,11 @@ export function buildRouteMetadata(config: RouteSeoConfig): Metadata {
     },
     twitter: {
       card: "summary_large_image",
+      site: "@CreateTokenSols",
+      creator: "@CreateTokenSols",
       title: localizedPack?.en.title || config.title,
       description: localizedPack?.en.description || config.description,
-      images: [`${SITE_URL}/sol.png`],
+      images: [OG_IMAGE_URL],
     },
     robots: {
       index: shouldIndex,
@@ -764,7 +788,7 @@ export const JSON_LD_STRUCTURED_DATA = {
         "Solana 代币生成器",
       ],
       url: SITE_URL,
-      sameAs: ["https://www.createtokensol.store"],
+      sameAs: OFFICIAL_SAME_AS,
       applicationCategory: "FinanceApplication",
       applicationSubCategory: "Web3 Token Creator & DeFi Launchpad",
       operatingSystem: "Web, Solana Blockchain (Mainnet-Beta & Devnet)",
@@ -775,35 +799,36 @@ export const JSON_LD_STRUCTURED_DATA = {
         lowPrice: "0.005",
         highPrice: "0.75",
         priceCurrency: "SOL",
-        offerCount: 25,
+        offerCount: 24,
         description:
-          "Modular on-chain token creation starting at 0.10 SOL base mint fee, Jito Multi-Wallet Bundler, Raydium CPMM Liquidity Pools, Volume Bot, Token Vesting, and 30% instant on-chain affiliate split.",
+          "Modular on-chain token creation starting at 0.10 SOL base mint fee, Raydium CPMM & Meteora Liquidity Pools, Verified Token Vesting, SOL Rent Recovery, Solana Blinks, and 30% instant on-chain affiliate split.",
       },
       featureList: [
         "No-code Solana SPL & Token-2022 Token Creator (Transfer Fee, Soulbound, Permanent Delegate)",
-        "AI Agent Token Branding Studio (+0.05 SOL via Gemini API with <95 KiB WebP Logo)",
-        "Jito Multi-Wallet Anti-Bubblemaps Launch Bundler (4–8 Wallets in Block Zero)",
-        "Official Raydium CPMM CPI Liquidity Pool Builder",
-        "Solana Actions & Blinks for In-Feed X/Twitter Trading & Rent Recovery",
-        "Non-Custodial Volume & Maker Booster Bot (100, 300, 750 Makers)",
-        "Verified On-Chain Token Vesting & LP Lock Vault with Memo Certificate",
+        "100/100 RugCheck Authority Management (Revoke Mint, Revoke Freeze, Immutable Metadata)",
+        "Client-Side Vanity Mint Address Generator (Web Worker — Private Key Never Leaves Browser)",
+        "Official Raydium CPMM CPI & Meteora Dynamic AMM Liquidity Pool Builder",
+        "Solana Actions & Blinks for In-Feed X/Twitter Swaps & Rent Recovery",
+        "Verified On-Chain Token Vesting & LP Lock Vault with Exportable PNG Certificate",
         "SOL Rent Recovery Tool (Keep 92% Net / 8% Platform Fee)",
+        "Mass Airdrop Multisender with On-Chain Holder Snapshot",
         "30% Atomic On-Chain SOL Affiliate Program",
       ],
-      screenshot: `${SITE_URL}/sol.png`,
+      screenshot: OG_IMAGE_URL,
     },
     {
       "@type": "Organization",
       "@id": `${SITE_URL}/#organization`,
       name: SITE_NAME,
       url: SITE_URL,
+      sameAs: OFFICIAL_SAME_AS,
       logo: {
         "@type": "ImageObject",
-        url: `${SITE_URL}/sol.png`,
+        url: ICON_IMAGE_URL,
       },
       contactPoint: {
         "@type": "ContactPoint",
-        email: "createtokensol@gmail.com",
+        email: OFFICIAL_LINKS.supportEmail,
         contactType: "customer support",
         availableLanguage: ["English", "Spanish", "Russian", "Chinese", "Portuguese"],
       },

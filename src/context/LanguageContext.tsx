@@ -59,8 +59,29 @@ export function normalizeLocale(raw?: string | null): SupportedLocale | null {
   return null;
 }
 
+export function detectLocaleFromPathname(pathname?: string | null): SupportedLocale | null {
+  if (!pathname) return null;
+  const firstSegment = pathname.split("/").filter(Boolean)[0]?.toLowerCase();
+  if (!firstSegment) return null;
+  if (firstSegment === "pt-br" || firstSegment === "pt") return "pt-BR";
+  if (firstSegment === "es") return "es";
+  if (firstSegment === "ru") return "ru";
+  if (firstSegment === "zh") return "zh";
+  return null;
+}
+
 export function detectBrowserLocale(): SupportedLocale {
   if (typeof window === "undefined") return "en";
+
+  try {
+    const fromPath = detectLocaleFromPathname(window.location.pathname);
+    if (fromPath) {
+      localStorage.setItem(STORAGE_KEY, fromPath);
+      return fromPath;
+    }
+  } catch {
+    // Ignore pathname or storage errors
+  }
 
   try {
     const params = new URLSearchParams(window.location.search);

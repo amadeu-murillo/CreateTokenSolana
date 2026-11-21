@@ -149,7 +149,9 @@ function PublicTokenPageInner() {
 
   const shareBlinkOnXUrl = tokenInfo
     ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-        `🚀 Trade $${tokenInfo.symbol} (${tokenInfo.name}) directly in your X feed via Solana Blink!\n\n🛡️ RugCheck Security Score: ${tokenInfo.rugCheckScore}/100\n🪙 Mint: ${tokenInfo.mint}\n\n⚡ Instant Swap & On-Chain Audit:\n${blinkActionUrl}`
+        isPt
+          ? `🚀 Negocie $${tokenInfo.symbol} (${tokenInfo.name}) direto no feed do X via Solana Blink!\n\n🛡️ Nota RugCheck: ${tokenInfo.rugCheckScore}/100\n🪙 Mint: ${tokenInfo.mint}\n\n⚡ Swap Instantâneo & Auditoria On-Chain:\n${blinkActionUrl}\nVia @CreateTokenSols`
+          : `🚀 Trade $${tokenInfo.symbol} (${tokenInfo.name}) directly in your X feed via Solana Blink!\n\n🛡️ RugCheck Security Score: ${tokenInfo.rugCheckScore}/100\n🪙 Mint: ${tokenInfo.mint}\n\n⚡ Instant Swap & On-Chain Audit:\n${blinkActionUrl}\nVia @CreateTokenSols`
       )}`
     : "#";
 
@@ -695,7 +697,7 @@ function PublicTokenPageInner() {
                   : "🚀 Launch your own 100/100 RugCheck token in seconds on CreateTokenSolana"}
               </strong>
               <span style={{ fontSize: "0.8rem", color: "hsl(var(--muted-foreground))" }}>
-                SPL & Token-2022 · AI Studio · Jito Multi-Wallet · Volume Bot · 30% Affiliate Split
+                SPL & Token-2022 · 100/100 RugCheck · Raydium CPMM · Verified Vesting · 30% On-Chain Affiliates
               </span>
             </div>
             <Link

@@ -6,11 +6,18 @@ import AppShell from "@/components/AppShell";
 import {
   SITE_NAME,
   SITE_URL,
+  OG_IMAGE_URL,
   MULTILINGUAL_ROUTE_SEO,
   JSON_LD_STRUCTURED_DATA,
+  getLanguageAlternates,
 } from "@/lib/seo";
 
 const PRIMARY_DOMAIN = SITE_URL;
+const GA4_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID?.trim() || "";
+// Note: Google Ads strictly restricts ads promoting ICOs, DeFi protocols, and liquidity pools.
+// Keep NEXT_PUBLIC_GOOGLE_ADS_ID unset unless running policy-compliant educational campaigns.
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim() || "";
+const PRIMARY_GTAG_ID = GA4_MEASUREMENT_ID || GOOGLE_ADS_ID;
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -47,6 +54,7 @@ export const metadata: Metadata = {
   publisher: SITE_NAME,
   alternates: {
     canonical: PRIMARY_DOMAIN,
+    languages: getLanguageAlternates("/"),
   },
   verification: {
     google: [
@@ -64,8 +72,8 @@ export const metadata: Metadata = {
     description: homeSeo.en.description,
     images: [
       {
-        url: `${PRIMARY_DOMAIN}/sol.png`,
-        secureUrl: `${PRIMARY_DOMAIN}/sol.png`,
+        url: OG_IMAGE_URL,
+        secureUrl: OG_IMAGE_URL,
         width: 1200,
         height: 630,
         alt: "CreateTokenSolana — Solana Token Creator & No Code SPL Token Builder",
@@ -75,11 +83,13 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    site: "@CreateTokenSols",
+    creator: "@CreateTokenSols",
     title: homeSeo.en.title,
     description: homeSeo.en.description,
     images: [
       {
-        url: `${PRIMARY_DOMAIN}/sol.png`,
+        url: OG_IMAGE_URL,
         alt: "CreateTokenSolana — No Code Solana Token Creator",
       },
     ],
@@ -111,19 +121,24 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_STRUCTURED_DATA) }}
         />
-        <Script
-          async
-          src="https://www.googletagmanager.com/gtag/js?id=AW-17652797085"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'AW-17652797085');
-          `}
-        </Script>
+        {PRIMARY_GTAG_ID && (
+          <>
+            <Script
+              async
+              src={`https://www.googletagmanager.com/gtag/js?id=${PRIMARY_GTAG_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                ${GA4_MEASUREMENT_ID ? `gtag('config', '${GA4_MEASUREMENT_ID}', { anonymize_ip: true });` : ""}
+                ${GOOGLE_ADS_ID ? `gtag('config', '${GOOGLE_ADS_ID}');` : ""}
+              `}
+            </Script>
+          </>
+        )}
       </head>
       <body className="dark">
         <AppShell>{children}</AppShell>

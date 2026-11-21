@@ -14,6 +14,8 @@ import { useEffect, Suspense, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { isValidPublicKey } from "@/lib/security";
 import { DEV_WALLET_ADDRESS, STANDARD_SERVICE_FEE_SOL } from "@/lib/constants";
+import { OFFICIAL_LINKS } from "@/lib/seo";
+import { trackEvent } from "@/lib/analytics";
 
 const devWalletBase58 = DEV_WALLET_ADDRESS.toBase58();
 
@@ -72,6 +74,7 @@ function AffiliateTracker({ onRefChange }: { onRefChange?: (ref: string | null) 
       } catch {
         // Ignore storage errors
       }
+      trackEvent("affiliate_ref_captured", { has_ref: true });
       onRefChange?.(cleaned);
     } else {
       try {
@@ -499,6 +502,20 @@ function TrustFooter({ affiliateRef }: { affiliateRef?: string | null }) {
               {t.nav.affiliates} (30% Split)
             </Link>
             <a
+              href={OFFICIAL_LINKS.xUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.footerLink}
+            >
+              𝕏 Official (@CreateTokenSols) ↗
+            </a>
+            <a
+              href={`mailto:${OFFICIAL_LINKS.supportEmail}`}
+              className={styles.footerLink}
+            >
+              {OFFICIAL_LINKS.supportEmail}
+            </a>
+            <a
               href={`https://solscan.io/account/${devWalletBase58}${clusterSuffix}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -562,6 +579,22 @@ function TrustFooter({ affiliateRef }: { affiliateRef?: string | null }) {
       </div>
     </footer>
   );
+}
+
+function WalletAnalyticsTracker() {
+  const { connected, wallet } = useWallet();
+  const { cluster } = useCluster();
+
+  useEffect(() => {
+    if (connected) {
+      trackEvent("wallet_connected", {
+        wallet_name: wallet?.adapter?.name || "unknown",
+        cluster,
+      });
+    }
+  }, [connected, wallet, cluster]);
+
+  return null;
 }
 
 function InnerAppShell({
@@ -646,6 +679,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <Suspense fallback={null}>
           <AffiliateTracker onRefChange={setAffiliateRef} />
         </Suspense>
+        <WalletAnalyticsTracker />
         <InnerAppShell affiliateRef={affiliateRef}>{children}</InnerAppShell>
       </WalletProvider>
     </LanguageProvider>

@@ -96,7 +96,7 @@ function BurnCertificateCanvas({
   receipt: LastBurnReceipt;
   explorerUrl: string;
 }) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -213,17 +213,41 @@ function BurnCertificateCanvas({
     link.click();
   };
 
+  const burnActionLabel = (() => {
+    const isLock = receipt.mode === "burn-and-earn";
+    switch (locale) {
+      case "pt":
+      case "pt-BR":
+        return isLock
+          ? "Acabei de trancar permanentemente (Burn & Earn)"
+          : "Acabei de queimar permanentemente";
+      case "es":
+        return isLock
+          ? "Acabo de bloquear permanentemente (Burn & Earn)"
+          : "Acabo de quemar permanentemente";
+      case "ru":
+        return isLock
+          ? "Только что навсегда заблокировал (Burn & Earn)"
+          : "Только что навсегда сжег";
+      case "zh":
+        return isLock
+          ? "刚刚在链上永久锁定 (Burn & Earn)"
+          : "刚刚在链上永久销毁";
+      case "en":
+      default:
+        return isLock
+          ? "Just permanently locked (Burn & Earn)"
+          : "Just permanently burned";
+    }
+  })();
+
   const shareText = encodeURIComponent(
-    `🔥 ${
-      receipt.mode === "burn-and-earn"
-        ? "Acabei de trancar permanentemente (Burn & Earn)"
-        : "Acabei de queimar permanentemente"
-    } ${receipt.burnedAmount.toLocaleString(
+    `🔥 ${burnActionLabel} ${receipt.burnedAmount.toLocaleString(
       "en-US"
-    )} $${receipt.symbol} on-chain na Solana!\n\n✅ 100% VERIFIED ON-CHAIN\n🪙 Mint: ${receipt.mint.slice(
+    )} $${receipt.symbol} on Solana!\n\n✅ 100% VERIFIED ON-CHAIN\n🪙 Mint: ${receipt.mint.slice(
       0,
       8
-    )}...${receipt.mint.slice(-6)}\n🔗 Solscan: ${explorerUrl}\n🚀 Via @CreateTokenSol https://www.createtokensol.store`
+    )}...${receipt.mint.slice(-6)}\n🔗 Solscan: ${explorerUrl}\n🚀 Via @CreateTokenSols https://www.createtokensol.store`
   );
   const shareUrl = `https://twitter.com/intent/tweet?text=${shareText}`;
 

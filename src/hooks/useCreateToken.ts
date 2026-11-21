@@ -4,6 +4,7 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { useRouter } from "next/navigation";
 import { useCluster } from "@/context/WalletContext";
+import { trackEvent } from "@/lib/analytics";
 import {
   AFFILIATE_COMMISSION_RATE,
   ModularPricingOptions,
@@ -392,6 +393,10 @@ export const useCreateToken = () => {
           );
         }
 
+        trackEvent("token_creation_confirmed", {
+          cluster,
+          has_jito_bundle: Boolean(isJitoEnabled),
+        });
         router.push(
           `/confirmation?status=success&tokenAddress=${result.mintAddress}&txId=${signature}&network=${cluster}`
         );

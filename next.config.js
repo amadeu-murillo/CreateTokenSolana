@@ -29,6 +29,21 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    // Clean path-based localized URLs for multilingual SEO (/pt-br, /es, /ru, /zh)
+    // while keeping a single App Router codebase and preserving the localized URL in the browser.
+    const localePrefixes = ["pt-br", "pt", "es", "ru", "zh"];
+    return localePrefixes.flatMap((prefix) => [
+      {
+        source: `/${prefix}`,
+        destination: "/",
+      },
+      {
+        source: `/${prefix}/:path*`,
+        destination: "/:path*",
+      },
+    ]);
+  },
   async redirects() {
     return [
       {
