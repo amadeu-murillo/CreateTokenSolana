@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useBurnToken } from "../../hooks/useBurnToken";
 import { useUserTokens } from "../../hooks/useUserTokens";
@@ -803,9 +803,5 @@ function BurnPageContent() {
 }
 
 export default function BurnPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
-      <BurnPageContent />
-    </Suspense>
-  );
+  return <BurnPageContent />;
 }

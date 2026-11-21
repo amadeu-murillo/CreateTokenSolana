@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -765,9 +765,5 @@ function DashboardPageInner() {
 }
 
 export default function DashboardPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
-      <DashboardPageInner />
-    </Suspense>
-  );
+  return <DashboardPageInner />;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useAirdrop } from "@/hooks/useAirdrop";
@@ -625,9 +625,5 @@ function AirdropPageInner() {
 }
 
 export default function AirdropPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
-      <AirdropPageInner />
-    </Suspense>
-  );
+  return <AirdropPageInner />;
 }

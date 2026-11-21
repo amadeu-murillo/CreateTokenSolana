@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -320,9 +320,5 @@ function AffiliatesContent() {
 }
 
 export default function AfiliatesPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
-      <AffiliatesContent />
-    </Suspense>
-  );
+  return <AffiliatesContent />;
 }

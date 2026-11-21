@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -1399,9 +1399,5 @@ function AddLiquidityPageInner() {
 }
 
 export default function AddLiquidityPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
-      <AddLiquidityPageInner />
-    </Suspense>
-  );
+  return <AddLiquidityPageInner />;
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
@@ -45,7 +44,6 @@ interface MakerLogEntry {
 }
 
 function VolumeBotPageInner() {
-  const searchParams = useSearchParams();
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
   const { cluster, setCluster, getExplorerUrl } = useCluster();
@@ -81,22 +79,23 @@ function VolumeBotPageInner() {
   const stopLoopRef = useRef<boolean>(false);
   const fileRestoreRef = useRef<HTMLInputElement | null>(null);
 
-  // Capture ?ref=
+  // Capture ?ref= and ?mint= (SSR-safe without Suspense bailout)
   useEffect(() => {
-    const ref = searchParams.get("ref");
-    if (ref && isValidPublicKey(ref)) {
-      try {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+      if (ref && isValidPublicKey(ref)) {
         localStorage.setItem("affiliateRef", ref.trim());
-      } catch {
-        // Ignore
       }
+      const mintParam = params.get("mint");
+      if (mintParam && isValidPublicKey(mintParam)) {
+        setSelectedMint(mintParam.trim());
+        setCustomMintInput(mintParam.trim());
+      }
+    } catch {
+      // Ignore
     }
-    const mintParam = searchParams.get("mint");
-    if (mintParam && isValidPublicKey(mintParam)) {
-      setSelectedMint(mintParam.trim());
-      setCustomMintInput(mintParam.trim());
-    }
-  }, [searchParams]);
+  }, []);
 
   const activePackage = VOLUME_BOT_PACKAGES[tierId];
   const activeMint = (customMintInput.trim() || selectedMint).trim();
@@ -1036,9 +1035,5 @@ function VolumeBotPageInner() {
 }
 
 export default function VolumeBotPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
-      <VolumeBotPageInner />
-    </Suspense>
-  );
+  return <VolumeBotPageInner />;
 }

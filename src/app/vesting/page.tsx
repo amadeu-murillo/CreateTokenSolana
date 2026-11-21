@@ -1,8 +1,7 @@
 "use client";
 
-import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import { useCluster } from "@/context/WalletContext";
@@ -202,7 +201,6 @@ function VestingCertificateCanvas({
 }
 
 function VestingPageInner() {
-  const searchParams = useSearchParams();
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
   const { cluster, setCluster, getExplorerUrl } = useCluster();
@@ -236,22 +234,23 @@ function VestingPageInner() {
   const [verifiedLocks, setVerifiedLocks] = useState<StoredVestingLock[]>([]);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
-  // Capture ?ref= and ?mint=
+  // Capture ?ref= and ?mint= (SSR-safe without Suspense bailout)
   useEffect(() => {
-    const ref = searchParams.get("ref");
-    if (ref && isValidPublicKey(ref)) {
-      try {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+      if (ref && isValidPublicKey(ref)) {
         localStorage.setItem("affiliateRef", ref.trim());
-      } catch {
-        // Ignore
       }
+      const mintFromQuery = params.get("mint");
+      if (mintFromQuery && isValidPublicKey(mintFromQuery)) {
+        setSelectedMint(mintFromQuery.trim());
+        setVerifyMintInput(mintFromQuery.trim());
+      }
+    } catch {
+      // Ignore
     }
-    const mintFromQuery = searchParams.get("mint");
-    if (mintFromQuery && isValidPublicKey(mintFromQuery)) {
-      setSelectedMint(mintFromQuery.trim());
-      setVerifyMintInput(mintFromQuery.trim());
-    }
-  }, [searchParams]);
+  }, []);
 
   // Load saved locks from localStorage
   useEffect(() => {
@@ -1068,9 +1067,5 @@ function VestingPageInner() {
 }
 
 export default function VestingPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
-      <VestingPageInner />
-    </Suspense>
-  );
+  return <VestingPageInner />;
 }

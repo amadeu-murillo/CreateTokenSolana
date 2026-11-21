@@ -1,8 +1,7 @@
 "use client";
 
-import React, { Suspense, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useCluster } from "@/context/WalletContext";
@@ -31,7 +30,8 @@ import { isValidPublicKey } from "@/lib/security";
 import { SITE_URL } from "@/lib/seo";
 
 function ReclaimPageInner() {
-  const searchParams = useSearchParams();
+  const [queryRef, setQueryRef] = useState<string | null>(null);
+  const [storedRef, setStoredRef] = useState<string | null>(null);
   const { publicKey, connected } = useWallet();
   const { setVisible: setWalletModalVisible } = useWalletModal();
   const { cluster, setCluster, getExplorerUrl } = useCluster();
@@ -63,17 +63,24 @@ function ReclaimPageInner() {
   } | null>(null);
   const [blinkCopied, setBlinkCopied] = useState(false);
 
-  // Capture ?ref= from query string and persist in localStorage
+  // Capture ?ref= from query string and persist in localStorage (SSR-safe without Suspense bailout)
   useEffect(() => {
-    const ref = searchParams.get("ref");
-    if (ref && isValidPublicKey(ref)) {
-      try {
-        localStorage.setItem("affiliateRef", ref.trim());
-      } catch {
-        // Ignore storage errors
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+      if (ref && isValidPublicKey(ref)) {
+        const cleaned = ref.trim();
+        setQueryRef(cleaned);
+        localStorage.setItem("affiliateRef", cleaned);
       }
+      const saved = localStorage.getItem("affiliateRef");
+      if (saved && isValidPublicKey(saved)) {
+        setStoredRef(saved);
+      }
+    } catch {
+      // Ignore URL parsing or storage errors
     }
-  }, [searchParams]);
+  }, []);
 
   // Auto-select all empty accounts when detected
   useEffect(() => {
@@ -145,9 +152,9 @@ function ReclaimPageInner() {
   };
 
   const activeReferral =
-    searchParams.get("ref") ||
+    queryRef ||
     (publicKey ? publicKey.toBase58() : null) ||
-    (typeof window !== "undefined" ? localStorage.getItem("affiliateRef") : null);
+    storedRef;
   const referralQuery = activeReferral ? `?ref=${activeReferral}` : "";
   const reclaimBlinkUrl = `${SITE_URL}/reclaim${referralQuery}`;
 
@@ -788,9 +795,5 @@ function ReclaimPageInner() {
 }
 
 export default function ReclaimPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Loading...</div>}>
-      <ReclaimPageInner />
-    </Suspense>
-  );
+  return <ReclaimPageInner />;
 }

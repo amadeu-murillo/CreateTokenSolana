@@ -3,6 +3,7 @@ const path = require("path");
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  trailingSlash: false,
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -28,15 +29,55 @@ const nextConfig = {
       },
     ],
   },
-  async rewrites() {
+  async redirects() {
     return [
+      {
+        source: "/:path*",
+        has: [
+          {
+            type: "host",
+            value: "createtokensol.store",
+          },
+        ],
+        destination: "https://www.createtokensol.store/:path*",
+        permanent: true,
+      },
       {
         source: "/affiliates",
         destination: "/afiliates",
+        permanent: true,
       },
       {
         source: "/docs",
         destination: "/documentacao",
+        permanent: true,
+      },
+      {
+        source: "/create",
+        destination: "/",
+        permanent: true,
+      },
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow",
+          },
+        ],
+      },
+      {
+        source: "/confirmation",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, follow",
+          },
+        ],
       },
     ];
   },

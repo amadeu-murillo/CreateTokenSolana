@@ -692,7 +692,6 @@ export function buildRouteMetadata(config: RouteSeoConfig): Metadata {
           ]
         : []),
       "www.createtokensol.store",
-      "createtokensol.store",
       "CreateTokenSolana",
     ])
   );
@@ -703,10 +702,13 @@ export function buildRouteMetadata(config: RouteSeoConfig): Metadata {
     title: localizedPack?.en.title || config.title,
     description: localizedPack?.en.description || config.description,
     keywords: mergedKeywords,
-    alternates: {
-      canonical: canonicalUrl,
-      languages: getLanguageAlternates(canonicalUrl),
-    },
+    ...(shouldIndex
+      ? {
+          alternates: {
+            canonical: canonicalUrl,
+          },
+        }
+      : {}),
     openGraph: {
       title: localizedPack?.en.title || config.title,
       description: localizedPack?.en.description || config.description,
@@ -762,12 +764,7 @@ export const JSON_LD_STRUCTURED_DATA = {
         "Solana 代币生成器",
       ],
       url: SITE_URL,
-      sameAs: [
-        "https://www.createtokensol.store",
-        "https://createtokensol.store",
-        "https://www.createtoken.sbs",
-        "https://createtokensol.vercel.app",
-      ],
+      sameAs: ["https://www.createtokensol.store"],
       applicationCategory: "FinanceApplication",
       applicationSubCategory: "Web3 Token Creator & DeFi Launchpad",
       operatingSystem: "Web, Solana Blockchain (Mainnet-Beta & Devnet)",

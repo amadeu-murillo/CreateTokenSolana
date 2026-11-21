@@ -7,7 +7,6 @@ import {
   SITE_NAME,
   SITE_URL,
   MULTILINGUAL_ROUTE_SEO,
-  getLanguageAlternates,
   JSON_LD_STRUCTURED_DATA,
 } from "@/lib/seo";
 
@@ -29,9 +28,7 @@ const allHomeKeywords = Array.from(
     ...homeSeo.zh.keywords,
     ...homeSeo["pt-BR"].keywords,
     "www.createtokensol.store",
-    "createtokensol.store",
-    "createtoken.sbs",
-    "createtokensol.vercel.app",
+    "CreateTokenSolana",
   ])
 );
 
@@ -50,7 +47,6 @@ export const metadata: Metadata = {
   publisher: SITE_NAME,
   alternates: {
     canonical: PRIMARY_DOMAIN,
-    languages: getLanguageAlternates(PRIMARY_DOMAIN),
   },
   verification: {
     google: [

@@ -7,7 +7,6 @@ export const metadata = buildRouteMetadata({
   title: "Transaction Confirmation — CreateTokenSolana",
   description: seo.description,
   path: "/confirmation",
-  canonicalOverride: "/",
   noIndex: true,
   keywords: seo.keywords,
 });
