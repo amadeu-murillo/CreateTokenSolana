@@ -28,3 +28,20 @@ Full-stack **Next.js 14 (App Router) + TypeScript + Solana Web3.js / SPL Token /
    npm install
    npm run dev
    ```
+## Affiliate Earnings — Firestore Composite Indexes & Reconciliation
+
+The `/api/affiliate-earnings` endpoint uses Firestore server-side aggregations (`getAggregateFromServer` with `sum` and `count`), period filtering (`range=7d|30d|90d|all`), cursor pagination (`orderBy("createdAt", "desc")`), and top-commission lookup. Create the following composite indexes on the `affiliate_commissions` collection:
+
+1. **Paginated history & period filter**
+   - Collection: `affiliate_commissions`
+   - Fields: `affiliateWallet` (Ascending), `createdAt` (Descending)
+2. **Highest commission KPI (all-time)**
+   - Collection: `affiliate_commissions`
+   - Fields: `affiliateWallet` (Ascending), `commissionAmountSOL` (Descending)
+3. **Highest commission KPI (with period filter)**
+   - Collection: `affiliate_commissions`
+   - Fields: `affiliateWallet` (Ascending), `createdAt` (Ascending), `commissionAmountSOL` (Descending)
+
+### Missing Commission Retry & Optional On-Chain Reconciliation
+- Client transactions post to `/api/record-commission` via `recordCommissionWithRetry` (3 attempts with exponential backoff). If transient failures persist, the payload is stored in `localStorage` (`pendingAffiliateCommissions`) and flushed automatically on the next visit by `AffiliateTracker`.
+- For full server-side reconciliation (e.g., if a user closes the browser before the POST fires), schedule a periodic job or protected admin endpoint that calls `connection.getSignaturesForAddress(affiliateWallet)` for recent confirmed signatures, filters transactions that also include `DEV_WALLET_ADDRESS_STRING`, and replays them into the existing `/api/record-commission` on-chain split verifier (idempotent via `409` deduplication).

@@ -1,4 +1,5 @@
 "use client";
+import { getStoredAffiliateRef } from "@/lib/affiliateAttribution";
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -402,7 +403,7 @@ function DashboardPageInner() {
 
       let affiliateRef: string | null = null;
       try {
-        affiliateRef = localStorage.getItem("affiliateRef");
+        affiliateRef = getStoredAffiliateRef();
       } catch {
         affiliateRef = null;
       }

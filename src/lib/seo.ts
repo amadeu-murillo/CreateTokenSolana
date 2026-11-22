@@ -42,7 +42,7 @@ export type RoutePath =
   | "/burn"
   | "/airdrop"
   | "/dashboard"
-  | "/afiliates"
+  | "/affiliates"
   | "/costs"
   | "/documentacao";
 
@@ -504,7 +504,7 @@ export const MULTILINGUAL_ROUTE_SEO: Record<
       ],
     },
   },
-  "/afiliates": {
+  "/affiliates": {
     en: {
       title: "Solana Web3 Affiliate Program — Earn 30% Instant On-Chain SOL Commissions",
       description:

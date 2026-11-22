@@ -1,3 +1,4 @@
+import { getStoredAffiliateRef, recordCommissionWithRetry } from "@/lib/affiliateAttribution";
 import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
@@ -88,7 +89,7 @@ export const useCreateToken = () => {
       try {
         let affiliateRef: string | null = null;
         try {
-          affiliateRef = localStorage.getItem("affiliateRef");
+          affiliateRef = getStoredAffiliateRef();
         } catch {
           affiliateRef = null;
         }
@@ -377,17 +378,13 @@ export const useCreateToken = () => {
         }
 
         if (affiliateRef && affiliateRef.trim() !== publicKey.toBase58()) {
-          fetch("/api/record-commission", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              affiliateWallet: affiliateRef.trim(),
-              commissionAmountSOL: Number((effectiveFeeSol * AFFILIATE_COMMISSION_RATE).toFixed(4)),
-              transactionSignature: signature,
-              tokenCreatorWallet: publicKey.toBase58(),
-              mintAddress: result.mintAddress,
-              network: cluster,
-            }),
+          recordCommissionWithRetry({
+            affiliateWallet: affiliateRef.trim(),
+            commissionAmountSOL: Number((effectiveFeeSol * AFFILIATE_COMMISSION_RATE).toFixed(4)),
+            transactionSignature: signature,
+            tokenCreatorWallet: publicKey.toBase58(),
+            mintAddress: result.mintAddress,
+            network: cluster,
           }).catch((firebaseErr) =>
             console.warn("Warning recording affiliate commission:", firebaseErr)
           );

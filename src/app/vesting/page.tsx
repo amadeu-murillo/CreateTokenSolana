@@ -1,4 +1,5 @@
 "use client";
+import { captureAffiliateRef, getStoredAffiliateRef } from "@/lib/affiliateAttribution";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -240,7 +241,7 @@ function VestingPageInner() {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get("ref");
       if (ref && isValidPublicKey(ref)) {
-        localStorage.setItem("affiliateRef", ref.trim());
+        captureAffiliateRef(ref.trim());
       }
       const mintFromQuery = params.get("mint");
       if (mintFromQuery && isValidPublicKey(mintFromQuery)) {
@@ -304,7 +305,7 @@ function VestingPageInner() {
 
     try {
       const affiliateRef =
-        typeof window !== "undefined" ? localStorage.getItem("affiliateRef") : null;
+        typeof window !== "undefined" ? getStoredAffiliateRef() : null;
 
       const res = await fetch("/api/vesting", {
         method: "POST",

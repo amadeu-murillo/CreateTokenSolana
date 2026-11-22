@@ -1,4 +1,5 @@
 "use client";
+import { captureAffiliateRef, getStoredAffiliateRef } from "@/lib/affiliateAttribution";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -85,7 +86,7 @@ function VolumeBotPageInner() {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get("ref");
       if (ref && isValidPublicKey(ref)) {
-        localStorage.setItem("affiliateRef", ref.trim());
+        captureAffiliateRef(ref.trim());
       }
       const mintParam = params.get("mint");
       if (mintParam && isValidPublicKey(mintParam)) {
@@ -232,7 +233,7 @@ function VolumeBotPageInner() {
 
     try {
       const affiliateRef =
-        typeof window !== "undefined" ? localStorage.getItem("affiliateRef") : null;
+        typeof window !== "undefined" ? getStoredAffiliateRef() : null;
 
       const res = await fetch("/api/volume-boost", {
         method: "POST",

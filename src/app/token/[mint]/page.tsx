@@ -1,4 +1,5 @@
 "use client";
+import { getStoredAffiliateRef } from "@/lib/affiliateAttribution";
 
 import React, { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
@@ -46,7 +47,7 @@ function PublicTokenPageInner() {
   const activeRef =
     queryRef ||
     (publicKey ? publicKey.toBase58() : null) ||
-    (typeof window !== "undefined" ? localStorage.getItem("affiliateRef") : null);
+    (typeof window !== "undefined" ? getStoredAffiliateRef() : null);
 
   useEffect(() => {
     let active = true;

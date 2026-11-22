@@ -23,7 +23,7 @@ const CANONICAL_ROUTES: ReadonlyArray<CanonicalRouteEntry> = [
   { path: "/burn", changeFrequency: "weekly", priority: 0.90 },
   { path: "/airdrop", changeFrequency: "weekly", priority: 0.90 },
   { path: "/dashboard", changeFrequency: "weekly", priority: 0.85 },
-  { path: "/afiliates", changeFrequency: "monthly", priority: 0.85 },
+  { path: "/affiliates", changeFrequency: "monthly", priority: 0.85 },
   { path: "/costs", changeFrequency: "monthly", priority: 0.85 },
   { path: "/documentacao", changeFrequency: "monthly", priority: 0.80 },
 ];

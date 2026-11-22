@@ -58,9 +58,24 @@ const nextConfig = {
         permanent: true,
       },
       {
-        source: "/affiliates",
-        destination: "/afiliates",
-        permanent: true,
+        source: "/afiliates",
+        destination: "/affiliates",
+        statusCode: 301,
+      },
+      {
+        source: "/afiliados",
+        destination: "/affiliates",
+        statusCode: 301,
+      },
+      {
+        source: "/:locale(pt-br|pt|es|ru|zh)/afiliates",
+        destination: "/:locale/affiliates",
+        statusCode: 301,
+      },
+      {
+        source: "/:locale(pt-br|pt|es|ru|zh)/afiliados",
+        destination: "/:locale/affiliates",
+        statusCode: 301,
       },
       {
         source: "/docs",

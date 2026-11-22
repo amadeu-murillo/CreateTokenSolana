@@ -12,7 +12,7 @@ import styles from "../app/Layout.module.css";
 import ThemeSwitcher from "./ThemeSwitcher";
 import { useEffect, Suspense, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { isValidPublicKey } from "@/lib/security";
+import { captureAffiliateRef, flushPendingCommissions } from "@/lib/affiliateAttribution";
 import { DEV_WALLET_ADDRESS, STANDARD_SERVICE_FEE_SOL } from "@/lib/constants";
 import { OFFICIAL_LINKS } from "@/lib/seo";
 import { trackEvent } from "@/lib/analytics";
@@ -66,27 +66,18 @@ function AffiliateTracker({ onRefChange }: { onRefChange?: (ref: string | null) 
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const ref = searchParams.get("ref");
-    if (ref && isValidPublicKey(ref)) {
-      const cleaned = ref.trim();
-      try {
-        localStorage.setItem("affiliateRef", cleaned);
-      } catch {
-        // Ignore storage errors
-      }
+    const { activeRef, capturedNew } = captureAffiliateRef(searchParams.get("ref"));
+    if (capturedNew) {
       trackEvent("affiliate_ref_captured", { has_ref: true });
-      onRefChange?.(cleaned);
-    } else {
-      try {
-        const stored = localStorage.getItem("affiliateRef");
-        if (stored && isValidPublicKey(stored)) {
-          onRefChange?.(stored);
-        }
-      } catch {
-        // Ignore
-      }
     }
+    onRefChange?.(activeRef);
   }, [searchParams, onRefChange]);
+
+  useEffect(() => {
+    flushPendingCommissions().catch(() => {
+      // Non-blocking background retry flush
+    });
+  }, []);
 
   return null;
 }
@@ -311,7 +302,7 @@ function NavLinks({
     { href: "/add-liquidity", icon: <IconLayers className={styles.navIcon} />, label: t.nav.liquidityPool },
     { href: "/volume-bot", icon: <IconTrendingUp className={styles.navIcon} />, label: "Volume Bot" },
     { href: "/burn", icon: <IconFlame className={styles.navIcon} />, label: t.nav.burn },
-    { href: "/afiliates", icon: <IconDollarSign className={styles.navIcon} />, label: t.nav.affiliates },
+    { href: "/affiliates", icon: <IconDollarSign className={styles.navIcon} />, label: t.nav.affiliates },
   ];
 
   const secondaryMobileLinks = [
@@ -498,7 +489,7 @@ function TrustFooter({ affiliateRef }: { affiliateRef?: string | null }) {
             <Link href={withRef("/costs")} className={styles.footerLink}>
               {t.costsPage?.pageTitle || "Transparent Costs & Fees Table"}
             </Link>
-            <Link href={withRef("/afiliates")} className={styles.footerLink}>
+            <Link href={withRef("/affiliates")} className={styles.footerLink}>
               {t.nav.affiliates} (30% Split)
             </Link>
             <a

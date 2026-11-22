@@ -1,3 +1,4 @@
+import { getStoredAffiliateRef } from "@/lib/affiliateAttribution";
 import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
@@ -53,7 +54,7 @@ export const useAirdrop = () => {
         }
 
         const affiliateRef =
-          typeof window !== "undefined" ? localStorage.getItem("affiliateRef") : null;
+          typeof window !== "undefined" ? getStoredAffiliateRef() : null;
         const transactions: VersionedTransaction[] = [];
 
         for (let i = 0; i < recipientChunks.length; i++) {

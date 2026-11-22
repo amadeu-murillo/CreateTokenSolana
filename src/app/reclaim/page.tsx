@@ -1,4 +1,5 @@
 "use client";
+import { captureAffiliateRef, getStoredAffiliateRef } from "@/lib/affiliateAttribution";
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -71,9 +72,9 @@ function ReclaimPageInner() {
       if (ref && isValidPublicKey(ref)) {
         const cleaned = ref.trim();
         setQueryRef(cleaned);
-        localStorage.setItem("affiliateRef", cleaned);
+        captureAffiliateRef(cleaned);
       }
-      const saved = localStorage.getItem("affiliateRef");
+      const saved = getStoredAffiliateRef();
       if (saved && isValidPublicKey(saved)) {
         setStoredRef(saved);
       }

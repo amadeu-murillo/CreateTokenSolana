@@ -44,7 +44,7 @@ export default function Home() {
       icon: <DollarSign size={24} />,
       title: t.nav.affiliates,
       description: t.home.ecosystemDesc.affiliates,
-      href: "/afiliates",
+      href: "/affiliates",
     },
     {
       icon: <ShieldCheck size={24} />,

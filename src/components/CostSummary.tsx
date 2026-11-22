@@ -1,4 +1,5 @@
 "use client";
+import { getStoredAffiliateRef } from "@/lib/affiliateAttribution";
 
 import { useState, useEffect } from "react";
 import styles from "./CostSummary.module.css";
@@ -68,7 +69,7 @@ export default function CostSummary({
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const fromQuery = urlParams.get("ref");
-        const stored = localStorage.getItem("affiliateRef");
+        const stored = getStoredAffiliateRef();
         const candidate = (fromQuery || stored || "").trim();
         setHasActiveAffiliate(
           Boolean(

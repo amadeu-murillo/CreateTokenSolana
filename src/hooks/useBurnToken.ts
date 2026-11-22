@@ -1,3 +1,4 @@
+import { getStoredAffiliateRef } from "@/lib/affiliateAttribution";
 import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
@@ -56,7 +57,7 @@ export const useBurnToken = () => {
       try {
         let affiliateRef: string | null = null;
         try {
-          affiliateRef = localStorage.getItem("affiliateRef");
+          affiliateRef = getStoredAffiliateRef();
         } catch {
           affiliateRef = null;
         }
@@ -199,7 +200,7 @@ export const useBurnToken = () => {
       try {
         let affiliateRef: string | null = null;
         try {
-          affiliateRef = localStorage.getItem("affiliateRef");
+          affiliateRef = getStoredAffiliateRef();
         } catch {
           affiliateRef = null;
         }

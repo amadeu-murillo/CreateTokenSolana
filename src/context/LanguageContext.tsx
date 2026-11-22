@@ -187,8 +187,8 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         const rawPath = window.location.pathname || "/";
         const normalizedPath = (
-          rawPath === "/affiliates"
-            ? "/afiliates"
+          rawPath === "/afiliates" || rawPath === "/afiliados"
+            ? "/affiliates"
             : rawPath === "/docs"
             ? "/documentacao"
             : rawPath === "/create"
