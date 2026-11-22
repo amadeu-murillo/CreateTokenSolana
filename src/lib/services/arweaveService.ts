@@ -8,7 +8,7 @@ import {
 import { bundlrUploader } from "@metaplex-foundation/umi-uploader-bundlr";
 import { SolanaCluster, getRpcEndpoint } from "@/lib/constants";
 
-export const IRYS_NODE_MAINNET = "https://node1.irys.xyz";
+export const IRYS_NODE_MAINNET = "https://uploader.irys.xyz";
 export const IRYS_NODE_DEVNET = "https://devnet.irys.xyz";
 
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";

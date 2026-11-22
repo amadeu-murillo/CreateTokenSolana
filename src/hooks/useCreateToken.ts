@@ -15,6 +15,7 @@ import { getMetadataCache, setMetadataCache } from "@/lib/cache";
 import { verifyTransactionIntegrity } from "@/lib/security";
 import { buildAndSendAtomicLaunchBundle } from "@/lib/solana/jitoBundler";
 import { parseSolanaError } from "./useErrorHandler";
+import { uploadMetadataJsonWithUserWallet } from "@/lib/solana/clientIrysUploader";
 
 export interface TokenData {
   name: string;
@@ -59,7 +60,8 @@ export interface TokenData {
 
 export const useCreateToken = () => {
   const router = useRouter();
-  const { publicKey, sendTransaction, signAllTransactions } = useWallet();
+  const wallet = useWallet();
+  const { publicKey, sendTransaction, signAllTransactions } = wallet;
   const { connection } = useConnection();
   const { cluster } = useCluster();
   const [isLoading, setIsLoading] = useState(false);
@@ -132,7 +134,53 @@ export const useCreateToken = () => {
           calculateModularTokenCreationFee(modularOptions);
 
         setProgressStep(2);
-        setStatusStep("2. Upload de Metadados — Publicando JSON Metaplex e montando transação...");
+        setStatusStep("2. Upload de Metadados — Publicando JSON Metaplex no Irys pela sua carteira...");
+
+        // Upload Metaplex JSON metadata directly to Irys using the user's connected wallet
+        // (no server-side IRYS_UPLOADER_PRIVATE_KEY required)
+        let preUploadedMetadataUri: string | undefined;
+        if (tokenData.storageProvider !== "cloudinary" && wallet.connected) {
+          try {
+            const attributes: Array<{ trait_type: string; value: string }> = [];
+            const safeWebsite = tokenData.website?.trim();
+            if (safeWebsite) attributes.push({ trait_type: "Website", value: safeWebsite });
+            if (tokenData.twitter?.trim()) {
+              const handle = tokenData.twitter.trim().replace(/^@/, "");
+              const twUrl = handle.startsWith("http") ? handle : `https://x.com/${handle}`;
+              attributes.push({ trait_type: "Twitter", value: twUrl });
+            }
+            if (tokenData.instagram?.trim()) {
+              const handle = tokenData.instagram.trim().replace(/^@/, "");
+              const igUrl = handle.startsWith("http") ? handle : `https://instagram.com/${handle}`;
+              attributes.push({ trait_type: "Instagram", value: igUrl });
+            }
+            const isCustomCreator = Boolean(tokenData.customCreator?.enabled);
+            const metadataJson: Record<string, unknown> = {
+              name: tokenData.name,
+              symbol: tokenData.symbol,
+              description: tokenData.description || `${tokenData.name} (${tokenData.symbol}) token on Solana.`,
+              image: tokenData.imageUrl,
+              ...(attributes.length > 0 ? { attributes } : {}),
+              creator: {
+                name: isCustomCreator ? tokenData.customCreator?.name || tokenData.name : "CreateTokenSolana",
+                site: isCustomCreator ? tokenData.customCreator?.website || "https://www.createtokensol.store" : "https://www.createtokensol.store",
+              },
+              properties: {
+                files: [{ uri: tokenData.imageUrl, type: "image/png" }],
+                category: "image",
+              },
+              ...(safeWebsite ? { external_url: safeWebsite } : {}),
+            };
+            const uploadedMeta = await uploadMetadataJsonWithUserWallet({
+              metadata: metadataJson,
+              wallet,
+              cluster,
+            });
+            preUploadedMetadataUri = uploadedMeta.metadataUri;
+          } catch (userMetaErr) {
+            console.warn("User-wallet Irys metadata upload failed, falling back to server storage:", userMetaErr);
+          }
+        }
 
         // Strip secret keys (both buyer sub-wallets and vanitySecretKey) from server payload
         const sanitizedJitoBundle = tokenData.jitoBundle
@@ -151,6 +199,7 @@ export const useCreateToken = () => {
 
         const apiPayload = {
           ...safeTokenData,
+          ...(preUploadedMetadataUri ? { metadataUri: preUploadedMetadataUri } : {}),
           vanityPublicKey,
           jitoBundle: sanitizedJitoBundle,
           wallet: publicKey.toBase58(),
@@ -408,7 +457,7 @@ export const useCreateToken = () => {
         setProgressStep(0);
       }
     },
-    [publicKey, sendTransaction, signAllTransactions, connection, cluster, router]
+    [wallet, publicKey, sendTransaction, signAllTransactions, connection, cluster, router]
   );
 
   const clearError = useCallback(() => setError(null), []);
